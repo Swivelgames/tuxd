@@ -24,6 +24,8 @@ impl Session {
 				"Run this application in an interactive terminal",
 			));
 		}
+		// Colors are document content in this editor, even when NO_COLOR is set.
+		crossterm::style::force_color_output(true);
 		let previous = std::panic::take_hook();
 		std::panic::set_hook(Box::new(move |info| {
 			restore();

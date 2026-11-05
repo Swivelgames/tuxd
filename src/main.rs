@@ -1,6 +1,9 @@
 mod app;
+mod clipboard;
 mod document;
 mod editor;
+mod layout;
+mod styling;
 mod terminal;
 mod ui;
 
@@ -15,7 +18,7 @@ fn main() -> io::Result<()> {
 		Some("--diagnostic-panic") => Some(true),
 		Some("--help" | "-h") => {
 			println!(
-				"Terminal UX Designer\n\nRun without arguments to edit.\nCtrl+Q quit · F1 help\n\nSlice 1: text is session-local; saving is not available yet."
+				"Terminal UX Designer\n\nRun without arguments to edit.\nCtrl+Q quit · F1 help\n\nText is session-local; saving is not available yet."
 			);
 			return Ok(());
 		}
@@ -26,6 +29,7 @@ fn main() -> io::Result<()> {
 		ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(io::stdout()))?;
 	let mut app = app::App::default();
 	loop {
+		app.poll_clipboard();
 		terminal.draw(|frame| ui::draw(frame, &mut app))?;
 		if let Some(panic) = diagnostic {
 			if panic {
@@ -33,8 +37,16 @@ fn main() -> io::Result<()> {
 			}
 			return Err(io::Error::other("Intentional terminal cleanup diagnostic"));
 		}
-		if app.handle(event::read()?) {
-			return Ok(());
+		loop {
+			if event::poll(std::time::Duration::from_millis(100))? {
+				if app.handle(event::read()?) {
+					return Ok(());
+				}
+				break;
+			}
+			if app.poll_clipboard() {
+				break;
+			}
 		}
 	}
 }

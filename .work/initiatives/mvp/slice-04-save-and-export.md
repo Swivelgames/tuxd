@@ -19,7 +19,7 @@ Create a styled document, save it, reopen it without losing formatting, and reus
 - Safe writes using a temporary file and atomic replacement where supported, plus deliberate handling of overwrites and write failures.
 - ANSI file export containing actual escape bytes and preserved newlines, with a terminal style reset at completion.
 - Escaped-text export and copying the displayed escaped ANSI representation; label these distinctly from raw ANSI export.
-- A clipboard strategy for the primary environment, explicit success/failure feedback, and file export as an available fallback when clipboard access is unsupported.
+- Build on Slice 2’s escaped-ANSI clipboard support and success/failure feedback; add file export as a fallback when clipboard access is unsupported.
 - Focus navigation, help, and shortcuts for these new workflows, integrated with the existing editor and tools.
 
 ## Stability and verification

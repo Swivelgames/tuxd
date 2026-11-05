@@ -51,13 +51,13 @@ This depicts the intended direction; controls appear as their slices become func
 - Changing one attribute preserves all unrelated attributes.
 - Character insertion replaces the selection or inserts at the saved cursor position.
 - Undo/redo includes text and formatting changes.
-- Explicit newlines and horizontal scrolling come first. Soft wrapping is deferred so terminal layouts retain their shape.
+- Editor and code panes each provide toggleable soft wrapping and always-on logical line-number gutters. Wrapped continuation rows leave the gutter blank. Wrapping never changes stored text or generated output.
 
 ## Tools and output
 
 The tools panel offers bold, italic, underline, strike-through, dim, and clear formatting; foreground/background selection; ANSI 8/16, indexed 256, and 24-bit RGB colors; and box, block, and Nerd glyph categories. RGB starts with hex and numeric component entry.
 
-The initial code drawer displays escaped ANSI as read-only text. ANSI file export writes actual escape bytes, while code copying copies the visible escaped representation. Later work adds ANSI token highlighting, sequence explanations, and language-specific string generation, starting with Rust.
+The initial code drawer displays escaped ANSI as read-only text. Each document newline is shown as a visible `\n` followed by a real display line break; tabs are shown as `\t`. ANSI file export will write actual escape bytes. Ctrl+C in the code pane copies escaped ANSI without presentation-only newlines or gutters. Later work adds ANSI token highlighting, sequence explanations, and language-specific string generation, starting with Rust.
 
 Project files preserve editable text and styles. Generated ANSI is an output, not the editable source of truth. Importing arbitrary terminal output or editing generated code bidirectionally is outside the MVP.
 
@@ -91,6 +91,10 @@ Every slice is a usable, stable increment. Each ends with a runnable application
 - Maximize the editor initially; introduce the right tools panel when it becomes functional.
 - Include mouse click-to-position and wheel scrolling in Slice 1; selection follows in Slice 2.
 - Normalize pasted CRLF/CR to newlines, preserve tabs, and display other control characters as escaped text.
+
+## Future work: customizable themes
+
+Add user-selectable and customizable UI themes in a later slice. Theme colors should cover gutters, active-line indicators, pane borders, selection overlays, controls, and status feedback. Keep application UI colors independent of document foreground/background formatting so switching themes never changes generated ANSI or saved content. Decide configuration, persistence, and built-in theme presets when that work is scoped. The current navy/slate gutter palette is the initial appearance, not a permanent customization constraint.
 
 ## Future work: proper Vim mode
 

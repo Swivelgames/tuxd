@@ -3,7 +3,7 @@ use unicode_width::UnicodeWidthStr;
 
 pub const TAB_STOP: usize = 4;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Position {
 	pub row: usize,
 	pub byte: usize,
@@ -12,22 +12,87 @@ pub struct Position {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Document {
 	pub lines: Vec<String>,
+	pub styles: crate::styling::Styles,
 }
 
 impl Default for Document {
 	fn default() -> Self {
 		Self {
 			lines: vec![String::new()],
+			styles: Default::default(),
 		}
 	}
 }
 
 impl Document {
+	pub fn word_target(&self, position: Position, backwards: bool) -> Position {
+		let text = self.lines.join("\n");
+		let offset = self.offset(position);
+		// Unicode word-boundary segments; skip whitespace, treating punctuation as
+		// separate tokens. Apostrophes within words follow Unicode segmentation.
+		let segments: Vec<_> = text.split_word_bound_indices().collect();
+		let target = if backwards {
+			segments
+				.iter()
+				.rev()
+				.find(|(start, part)| *start < offset && !part.chars().all(char::is_whitespace))
+				.map_or(0, |(start, _)| *start)
+		} else {
+			segments
+				.iter()
+				.find(|(start, part)| {
+					start + part.len() > offset && !part.chars().all(char::is_whitespace)
+				})
+				.map_or(text.len(), |(start, part)| start + part.len())
+		};
+		let mut remaining = target;
+		for (row, line) in self.lines.iter().enumerate() {
+			if remaining <= line.len() {
+				return Position {
+					row,
+					byte: if backwards {
+						boundary_before(line, remaining)
+					} else {
+						boundary_after(line, remaining)
+					},
+				};
+			}
+			remaining -= line.len() + 1;
+		}
+		position
+	}
+
+	pub fn offset(&self, position: Position) -> usize {
+		self.lines[..position.row]
+			.iter()
+			.map(|line| line.len() + 1)
+			.sum::<usize>()
+			+ position.byte
+	}
+
+	pub fn style_at(&self, position: Position) -> crate::styling::TextStyle {
+		self.styles.at(self.offset(position))
+	}
+
+	pub fn normalize_styles(&mut self) {
+		let text = self.lines.join("\n");
+		let mut normalized = crate::styling::Styles::default();
+		for (byte, grapheme) in text.grapheme_indices(true) {
+			normalized.push(byte, byte + grapheme.len(), self.styles.at(byte));
+		}
+		self.styles = normalized;
+	}
+
 	pub fn is_empty(&self) -> bool {
 		self.lines.len() == 1 && self.lines[0].is_empty()
 	}
 
 	pub fn insert(&mut self, position: Position, text: &str) -> Position {
+		self.styles.insert(
+			self.offset(position),
+			text.len(),
+			crate::styling::TextStyle::default(),
+		);
 		let tail = self.lines[position.row].split_off(position.byte);
 		let parts: Vec<_> = text.split('\n').collect();
 		self.lines[position.row].push_str(parts[0]);
@@ -52,6 +117,7 @@ impl Document {
 	}
 
 	pub fn remove(&mut self, start: Position, end: Position) -> Position {
+		self.styles.remove(self.offset(start), self.offset(end));
 		if start.row == end.row {
 			self.lines[start.row].replace_range(start.byte..end.byte, "");
 		} else {
@@ -60,6 +126,7 @@ impl Document {
 			self.lines[start.row].push_str(&tail);
 			self.lines.drain(start.row + 1..=end.row);
 		}
+		self.normalize_styles();
 		Position {
 			row: start.row,
 			byte: boundary_before(&self.lines[start.row], start.byte),
@@ -178,6 +245,30 @@ pub fn sanitize(text: &str) -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn word_boundaries_skip_whitespace_cross_lines_and_keep_graphemes() {
+		let mut doc = Document::default();
+		doc.insert(Position::default(), "one  café!\n e\u{301}");
+		let after_one = doc.word_target(Position::default(), false);
+		assert_eq!(after_one, Position { row: 0, byte: 3 });
+		let after_cafe = doc.word_target(after_one, false);
+		assert_eq!(after_cafe, Position { row: 0, byte: 10 });
+		let punctuation = doc.word_target(after_cafe, false);
+		assert_eq!(punctuation, Position { row: 0, byte: 11 });
+		assert_eq!(
+			doc.word_target(punctuation, false),
+			Position { row: 1, byte: 4 }
+		);
+		assert_eq!(
+			doc.word_target(Position { row: 1, byte: 1 }, true),
+			after_cafe
+		);
+		assert_eq!(
+			doc.word_target(Position { row: 1, byte: 4 }, true),
+			Position { row: 1, byte: 1 }
+		);
+	}
 
 	#[test]
 	fn multiline_insert_remove_and_trailing_newline() {

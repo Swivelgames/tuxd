@@ -17,6 +17,8 @@ import struct
 import subprocess
 import termios
 import time
+import tempfile
+import shlex
 
 import pyte
 
@@ -25,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Session:
-	def __init__(self, binary, *args):
+	def __init__(self, binary, *args, env=None):
 		self.master, self.slave = pty.openpty()
 		self.original = termios.tcgetattr(self.slave)
 		self.screen = pyte.Screen(80, 24)
@@ -40,7 +42,7 @@ class Session:
 
 		self.process = subprocess.Popen(
 			[binary, *args], stdin=self.slave, stdout=self.slave, stderr=self.slave,
-			env={**os.environ, "TERM": "xterm-256color"}, preexec_fn=controlling_terminal,
+			env={key: value for key, value in {**os.environ, "TERM": "xterm-256color", **(env or {})}.items() if value is not None}, preexec_fn=controlling_terminal,
 		)
 		self.drain()
 
@@ -111,33 +113,33 @@ def main():
 	try:
 		assert "Editor" in session.row(1)
 		session.send("abc")
-		assert session.row(2)[1:4] == "abc"
+		assert session.row(2)[7:10] == "abc"
 		session.send("\x1a")
-		assert session.row(2)[1:4] == "   "
+		assert session.row(2)[7:10] == "   "
 		session.send("\x19")
-		assert session.row(2)[1:4] == "abc"
+		assert session.row(2)[7:10] == "abc"
 		session.send("\x1b[H" + "X" + "\x1b[F" + "\x7f")
-		assert session.row(2)[1:4] == "Xab"
+		assert session.row(2)[7:10] == "Xab"
 		# Enhanced keyboard protocol distinguishes Ctrl+Shift+Z from Ctrl+Z.
 		session.send("\x1a")
-		assert session.row(2)[1:5] == "Xabc"
+		assert session.row(2)[7:11] == "Xabc"
 		session.send("\x1b[122;6u")
-		assert session.row(2)[1:4] == "Xab"
+		assert session.row(2)[7:10] == "Xab"
 		# SGR mouse click at the first editable cell, then insert.
-		session.send("\x1b[<0;2;3M!\x1b[<0;2;3m")
-		assert session.row(2)[1:5] == "!Xab"
+		session.send("\x1b[<0;8;3M!\x1b[<0;8;3m")
+		assert session.row(2)[7:11] == "!Xab"
 		# Undo all edits back to an empty document, then test an atomic paste.
 		session.send("\x1a" * 8)
 		session.paste("e\u0301\t界👩‍💻\r\nsecond\rthird\x1b[31m")
-		assert session.row(3)[1:7] == "second"
+		assert session.row(3)[7:13] == "second"
 		assert "third\\u{1b}[31m" in session.row(4)
 		session.send("\x1a")
-		assert session.row(2)[1:8] == "       "
+		assert session.row(2)[7:14] == "       "
 		session.send("\x19")
 		assert "second" in session.row(3)
 		session.send("\x1b[1;5H")
 		session.send("\x1b[3~")  # Delete the entire combining grapheme.
-		assert session.screen.cursor.x == 1
+		assert session.screen.cursor.x == 7
 		# Help blocks edits and is dismissible.
 		session.send("\x1bOP")
 		assert "No saving yet" in "\n".join(session.rows())
@@ -164,6 +166,93 @@ def main():
 	finally:
 		session.close()
 	print("PASS: typing, navigation, mouse, Unicode, atomic paste, undo/redo, help, scrolling, resize, quit")
+	session = Session(binary)
+	try:
+		session.paste("Hello\nworld")
+		session.send("\x1b[1;5H" + "\x1b[1;2C" * 5)
+		session.send("\x02\x1b[105;5u\x15")
+		cell = session.screen.buffer[2][7]
+		assert cell.bold and cell.italics and cell.underscore, (cell, session.output[-2500:])
+		# Cyan is the eleventh tool, at row 13 in an 80-column window.
+		session.send("\x1b[<0;60;13M\x1b[<0;60;13m")
+		assert session.screen.buffer[2][7].fg in ("cyan", "00cdcd"), session.screen.buffer[2][7]
+		session.send("\x1b")
+		assert session.screen.buffer[2][7].bold
+		session.send("\x1b[12~")
+		rows = session.rows()
+		first = next(i for i, row in enumerate(rows) if "Hello" in row and "\\n" in row)
+		assert "world" in rows[first + 1], rows
+		# Reversed mouse drag selects the complete second line; toggling preserves it.
+		session.send("\x1b[<0;13;4M\x1b[<32;8;4M\x1b[<0;8;4m")
+		session.send("\x02")
+		assert session.screen.buffer[3][7].bold
+		session.send("X")
+		assert session.row(3)[7:12] == "X    "
+		session.send("\x1a")
+		assert "world" in session.row(3)
+		assert session.screen.buffer[3][7].bold
+		session.send("\x1b")
+		# Focus tools, navigate to italic, and apply it without losing the insertion point.
+		session.send("\x1b[17~")
+		session.resize(40, 12)
+		assert "Tools" in "\n".join(session.rows())
+		session.send("\x1b")
+		session.resize(80, 24)
+		session.send("\x11y")
+		session.finish()
+	finally:
+		session.close()
+	print("PASS: selection, bold/italic/underline/cyan, multiline ANSI drawer, reverse drag, replacement undo, narrow tools")
+	# Use isolated clipboard helpers so acceptance checks never replace the user's clipboard.
+	with tempfile.TemporaryDirectory(prefix="terminal-ux-clipboard-") as directory:
+		folder = Path(directory)
+		copied = folder / "clipboard.txt"
+		helper = folder / "xclip"
+		helper.write_text("#!/bin/sh\n/bin/cat > " + shlex.quote(str(copied)) + "\n")
+		helper.chmod(0o700)
+		failure = folder / "xsel"
+		failure.write_text("#!/bin/sh\nexit 1\n")
+		failure.chmod(0o700)
+		env = {"PATH": directory, "DISPLAY": ":test", "WAYLAND_DISPLAY": None}
+		session = Session(binary, env=env)
+		try:
+			session.paste("alpha\nbeta\t\\n")
+			session.send("\x1b[12~\x1b[17~\x1b[17~")  # Open and focus code.
+			session.send("\x03")
+			assert copied.read_text() == r"\x1b[0malpha\nbeta\t\\n\x1b[0m"
+			assert "Copied escaped ANSI" in session.row(23)
+			# Wrap independently; copy still excludes all presentation line breaks/gutters.
+			session.send("\x1b[13~")
+			session.resize(30, 24)
+			session.send("\x03")
+			assert copied.read_text() == r"\x1b[0malpha\nbeta\t\\n\x1b[0m"
+			assert "Wrap: on" in "\n".join(session.rows())
+			session.send("\x1b")
+			session.send("\x1b[1;5F")
+			session.paste("\n" + "a" * 70)
+			session.send("\x1b[13~\x1b[H")  # Editor wrapping, then logical Home.
+			assert session.screen.cursor.x == 7
+			session.send("\x1b[B")  # Down moves within the wrapped logical line.
+			assert "Ln 3" in session.row(23)
+			session.send("\x1b[13~")
+			session.resize(80, 24)
+			session.send("\x1b[1;5F")
+			session.paste(" one two")
+			session.send("\x1b[1;5D")  # Ctrl+Left
+			session.send("\x1b[1;3C")  # Alt+Right
+			session.send("\x1b\x7f")  # Alt+Backspace
+			session.send("\x1b[1;5H")
+			# Failed helpers report failure and preserve the working document.
+			helper.write_text("#!/bin/sh\nexit 1\n")
+			session.send("\x1b[17~\x1b[17~\x03")
+			assert "Copy failed" in session.row(23)
+			session.send("\x1b")
+			assert "alpha" in session.row(2)
+			session.send("\x11y")
+			session.finish()
+		finally:
+			session.close()
+	print("PASS: per-pane wrap, gutters, wrapped navigation, word bindings, clipboard payload and failure feedback")
 	for argument, expected in [("--diagnostic-error", 1), ("--diagnostic-panic", 101)]:
 		session = Session(binary, argument)
 		session.finish(expected)

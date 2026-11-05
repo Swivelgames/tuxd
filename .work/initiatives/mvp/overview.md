@@ -1,6 +1,6 @@
 # MVP initiative
 
-Status: In progress — Slice 1 complete
+Status: In progress — Slices 1 and 2 complete
 
 ## Outcome
 
@@ -36,9 +36,9 @@ Repeat core selection and tool operations using keyboard navigation. Verify resi
 
 ## Scope boundaries
 
-Include one document, explicit newlines, horizontal/vertical scrolling, linear selection, Unicode-aware editing, and deterministic ANSI generation. Small documents are the performance target; large-file optimization is deferred.
+Include one document, explicit newlines, horizontal/vertical scrolling, linear selection, per-pane soft wrapping and logical line numbers, Unicode-aware word editing, code clipboard copy, and deterministic ANSI generation. Small documents are the performance target; large-file optimization is deferred.
 
-Defer soft wrapping, rectangular selections, multi-document tabs, arbitrary ANSI import, bidirectional code editing, and terminal cursor-control authoring. Language generation and syntax highlighting belong to slice 6.
+Defer rectangular selections, multi-document tabs, arbitrary ANSI import, bidirectional code editing, and terminal cursor-control authoring. Language generation and syntax highlighting belong to slice 6.
 
 ## Architecture decisions
 
