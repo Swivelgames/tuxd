@@ -1,6 +1,6 @@
 # MVP slice breakdown
 
-Status: In progress — Slices 1 and 2 complete
+Status: In progress — Slices 1–3 complete
 
 Each slice builds on the preceding checkpoint and includes its own stability work. Estimates are planning ranges for one developer and modest document sizes, not deadlines. Revise them after the editor and styling foundations are validated.
 
@@ -19,7 +19,7 @@ The first complete styling loop is approximately 5–8 developer days. The MVP i
 
 Start with its smallest end-to-end workflow, make that runnable, and then complete the scope and acceptance criteria. Keep the app usable during development. Do not merge a nominally complete slice whose central workflow is still stubbed or unstable.
 
-The slice specifications distinguish deliverables, stability requirements, hands-on checks, and deferred work. Checks are planned until implementation evidence is recorded in the corresponding slice. Slices 1 and 2 now record their implementations and passing verification; subsequent slices remain planned.
+The slice specifications distinguish deliverables, stability requirements, hands-on checks, and deferred work. Checks are planned until implementation evidence is recorded in the corresponding slice. Slices 1–3 now record their implementations and passing verification; subsequent slices remain planned.
 
 ## Sequence rationale
 

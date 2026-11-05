@@ -1,3 +1,4 @@
+use crate::scrollbar::{self, Bar, Target};
 use ratatui::{
 	Frame,
 	layout::Rect,
@@ -144,6 +145,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	let area = frame.area();
 	frame.render_widget(Clear, area);
 	app.tool_areas.clear();
+	app.scrollbars.clear();
+	app.panel.area = Rect::default();
+	app.panel.indexed_area = Rect::default();
+	app.panel.gauge_areas.clear();
 	app.code_area = Rect::default();
 	app.code_pane = Rect::default();
 	app.editor_pane = Rect::default();
@@ -177,7 +182,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		}),
 		app.code_toggle,
 	);
-	let tools_width = if area.width >= 65 { 22 } else { 0 };
+	let tools_width = if area.width >= 65 { 35 } else { 0 };
 	let code_height = if app.code_open && app.focus == 2 && area.height < 10 {
 		area.height - 2
 	} else if app.code_open && area.height >= 10 {
@@ -193,11 +198,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	);
 	if code_height > 0 {
 		let code_rect = Rect::new(body.x, body.bottom(), body.width, code_height);
-		let block = Block::bordered().title(if app.focus == 2 {
-			" Code * · Ctrl+C copy "
-		} else {
-			" Code · escaped ANSI "
-		});
+		let block = Block::bordered()
+			.border_type(ratatui::widgets::BorderType::Rounded)
+			.title(if app.focus == 2 {
+				" Code * · Ctrl+C copy "
+			} else {
+				" Code · escaped ANSI "
+			});
 		let inner = block.inner(code_rect);
 		app.code_pane = inner;
 		frame.render_widget(block, code_rect);
@@ -240,12 +247,48 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 			},
 			|_| Style::default(),
 		);
+		scrollbar::draw(
+			frame,
+			&mut app.scrollbars,
+			Bar {
+				target: Target::CodeVertical,
+				area: Rect::new(
+					code_rect.right().saturating_sub(1),
+					inner.y,
+					1,
+					inner.height,
+				),
+				content: layout.rows.len(),
+				viewport: app.code_area.height as usize,
+				offset: app.code_top,
+			},
+		);
+		if !app.code_wrap {
+			scrollbar::draw(
+				frame,
+				&mut app.scrollbars,
+				Bar {
+					target: Target::CodeHorizontal,
+					area: Rect::new(
+						app.code_area.x,
+						code_rect.bottom().saturating_sub(1),
+						app.code_area.width,
+						1,
+					),
+					content: layout.rows.iter().map(|row| row.width).max().unwrap_or(0),
+					viewport: app.code_area.width as usize,
+					offset: app.code_left,
+				},
+			);
+		}
 	}
-	let border = Block::bordered().title(if app.focus == 0 {
-		" Editor · untitled "
-	} else {
-		" Editor "
-	});
+	let border = Block::bordered()
+		.border_type(ratatui::widgets::BorderType::Rounded)
+		.title(if app.focus == 0 {
+			" Editor · untitled "
+		} else {
+			" Editor "
+		});
 	let inner = border.inner(body);
 	frame.render_widget(border, body);
 	app.editor_wrap_toggle = wrap_button(frame, body, app.editor.wrap);
@@ -277,6 +320,36 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 			}
 		},
 	);
+	scrollbar::draw(
+		frame,
+		&mut app.scrollbars,
+		Bar {
+			target: Target::EditorVertical,
+			area: Rect::new(body.right().saturating_sub(1), inner.y, 1, inner.height),
+			content: layout.rows.len(),
+			viewport: app.editor_area.height as usize,
+			offset: editor.top,
+		},
+	);
+	if !editor.wrap {
+		scrollbar::draw(
+			frame,
+			&mut app.scrollbars,
+			Bar {
+				target: Target::EditorHorizontal,
+				area: Rect::new(
+					app.editor_area.x,
+					body.bottom().saturating_sub(1),
+					app.editor_area.width,
+					1,
+				),
+				content: layout.rows.iter().map(|row| row.width).max().unwrap_or(0) + 1,
+				viewport: app.editor_area.width as usize,
+				offset: editor.left,
+			},
+		);
+	}
+
 	let (cursor_row, cursor_x) = layout.location(editor.cursor);
 	if app.overlay == Overlay::None
 		&& app.focus == 0
@@ -309,45 +382,20 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		let tool_rect = if tools_width > 0 {
 			Rect::new(body.right(), body.y, tools_width, area.height - 2)
 		} else {
-			body
+			Rect::new(body.x, body.y, body.width, area.height - 2)
 		};
 		frame.render_widget(Clear, tool_rect);
-		let block = Block::bordered().title(if app.focus == 1 {
-			" Tools * · Esc back "
-		} else {
-			" Tools · F6 "
-		});
-		let inside = block.inner(tool_rect);
-		frame.render_widget(block, tool_rect);
-		let top = if app.focus == 1 {
-			app.tool_index
-				.saturating_sub(inside.height.saturating_sub(1) as usize)
-		} else {
-			0
-		};
-		for (row, index) in (top..12).take(inside.height as usize).enumerate() {
-			let state = match app.editor.tool_state(index) {
-				Some(true) => "x",
-				Some(false) => " ",
-				None => "-",
-			};
-			let text = format!(
-				"{} [{}] {}",
-				if app.focus == 1 && app.tool_index == index {
-					">"
-				} else {
-					" "
-				},
-				state,
-				crate::styling::LABELS[index]
-			);
-			let rect = Rect::new(inside.x, inside.y + row as u16, inside.width, 1);
-			frame.render_widget(Paragraph::new(text), rect);
-			app.tool_areas.push((rect, index));
+		if tools_width == 0 {
+			app.scrollbars.clear();
 		}
+		crate::panel_ui::draw(frame, app, tool_rect);
+
 		if tools_width == 0 {
 			app.editor_pane = Rect::default();
 			app.editor_area = Rect::default();
+			app.code_pane = Rect::default();
+			app.editor_wrap_toggle = Rect::default();
+			app.code_wrap_toggle = Rect::default();
 		}
 	}
 	if app.overlay != Overlay::None {
@@ -378,8 +426,8 @@ No saving yet."
 		let (title, text, height) = match app.overlay {
 			Overlay::Help => (
 				" Help · F1 / Esc close ",
-				"Arrows · Home/End · Page Up/Down\nCtrl+Home/End: document start/end\nCtrl+Z: undo · Ctrl+Y: redo\nTab: literal tab (4-column stops)\nClick: cursor · Wheel: scroll\nCtrl+Q: quit (Y/N if text exists)\n\nText is session-local. No saving yet.\nShift+arrows / drag: select · Esc: clear\nCtrl+B/I/U: styles · F6: focus · F2: code\nF3: wrap focused pane · Ctrl+C: copy code\nCtrl/Alt+arrows: words · +Backspace: delete",
-				17,
+				"Arrows · Home/End · Page Up/Down\nCtrl+Home/End: document start/end\nCtrl+Z: undo · Ctrl+Y: redo\nTab: literal tab (4-column stops)\nClick: cursor · Wheel: scroll\nCtrl+Q: quit (Y/N if text exists)\n\nText is session-local. No saving yet.\nShift+arrows / drag: select · Esc: clear\nCtrl+B/I/U: styles · F6: focus · F2: code\nF3: wrap focused pane · Ctrl+C: copy code\nCtrl/Alt+arrows: words · +Backspace: delete\nTools: Tab / arrows / PgUp/Dn · Enter applies\nRGB: type replaces field · Ctrl+A replaces\nANSI colors / dim / italic depend on terminal\nRGB needs true color · Nerd needs Nerd Font",
+				21,
 			),
 			Overlay::Quit => (
 				" Discard session? ",
@@ -400,7 +448,11 @@ No saving yet."
 		frame.render_widget(
 			Paragraph::new(text)
 				.wrap(ratatui::widgets::Wrap { trim: false })
-				.block(Block::bordered().title(title)),
+				.block(
+					Block::bordered()
+						.border_type(ratatui::widgets::BorderType::Rounded)
+						.title(title),
+				),
 			popup,
 		);
 	}
@@ -410,8 +462,252 @@ No saving yet."
 mod tests {
 	use super::*;
 	use crate::editor::EditKind;
+	use crate::panel::Control;
+	use crate::styling::Action;
 	use ratatui::{Terminal, backend::TestBackend};
 	use std::time::Instant;
+
+	#[test]
+	fn rgb_gauges_stage_drag_and_keyboard_changes_until_apply() {
+		use crate::styling::Ink;
+		use crossterm::event::{
+			Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+		};
+		let mut app = App::default();
+		app.panel.palette = 2;
+		app.editor.insert("color", EditKind::Atomic, Instant::now());
+		app.editor.navigate(crate::editor::Movement::Home, true);
+		let original = app.editor.document.clone();
+		let selection = app.editor.selection();
+		let mut terminal = Terminal::new(TestBackend::new(100, 40)).unwrap();
+		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+		let (red, _) = app.panel.gauge_areas[0];
+		for (kind, x) in [
+			(MouseEventKind::Down(MouseButton::Left), red.x),
+			(MouseEventKind::Drag(MouseButton::Left), red.right() + 4),
+			(MouseEventKind::Up(MouseButton::Left), red.right() + 4),
+		] {
+			app.handle(Event::Mouse(MouseEvent {
+				kind,
+				column: x,
+				row: red.y,
+				modifiers: KeyModifiers::NONE,
+			}));
+		}
+		assert_eq!(app.panel.rgb(), Ok(Ink::Rgb(255, 192, 255)));
+		app.handle(Event::Key(KeyEvent::new(
+			KeyCode::Left,
+			KeyModifiers::SHIFT,
+		)));
+		assert_eq!(app.panel.fields[1], "245");
+		assert_eq!(app.panel.fields[0], "#f5c0ff");
+		assert_eq!(app.editor.document, original);
+		assert_eq!(app.editor.selection(), selection);
+		app.handle(Event::Key(KeyEvent::new(
+			KeyCode::Enter,
+			KeyModifiers::NONE,
+		)));
+		assert_eq!(
+			app.editor.document.styles.at(0).foreground,
+			Ink::Rgb(245, 192, 255)
+		);
+		app.editor.undo(false);
+		assert_eq!(app.editor.document, original);
+	}
+
+	#[test]
+	fn scrollbar_drag_reaches_all_viewport_ends_without_editing() {
+		use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+		for target in [
+			Target::EditorVertical,
+			Target::EditorHorizontal,
+			Target::CodeVertical,
+			Target::CodeHorizontal,
+			Target::Tools,
+			Target::Indexed,
+		] {
+			let mut app = App::default();
+			app.editor.wrap = false;
+			app.code_wrap = false;
+			app.panel.palette = 1;
+			app.editor.insert(
+				&vec!["x".repeat(160); 80].join("\n"),
+				EditKind::Atomic,
+				Instant::now(),
+			);
+			app.editor.navigate(crate::editor::Movement::Start, false);
+			app.editor.navigate(crate::editor::Movement::Right, true);
+			let original = app.editor.document.clone();
+			let selection = app.editor.selection();
+			let cursor = app.editor.cursor;
+			let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+			terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+			let bar = *app
+				.scrollbars
+				.iter()
+				.find(|bar| bar.target == target)
+				.unwrap();
+			for (kind, column, row) in [
+				(
+					MouseEventKind::Down(MouseButton::Left),
+					bar.area.x,
+					bar.area.y,
+				),
+				(
+					MouseEventKind::Drag(MouseButton::Left),
+					bar.area.right() - 1,
+					bar.area.bottom() - 1,
+				),
+				(
+					MouseEventKind::Up(MouseButton::Left),
+					bar.area.right() - 1,
+					bar.area.bottom() - 1,
+				),
+			] {
+				app.handle(Event::Mouse(MouseEvent {
+					kind,
+					column,
+					row,
+					modifiers: KeyModifiers::NONE,
+				}));
+				terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+			}
+			let bar = app
+				.scrollbars
+				.iter()
+				.find(|bar| bar.target == target)
+				.unwrap();
+			assert_eq!(bar.offset, bar.content - bar.viewport, "{target:?}");
+			assert_eq!(app.editor.document, original);
+			assert_eq!(app.editor.selection(), selection);
+			assert_eq!(app.editor.cursor, cursor);
+			app.editor.undo(false);
+			assert!(app.editor.document.is_empty());
+		}
+	}
+
+	#[test]
+	fn indexed_palette_scrolls_independently_and_reaches_last_partial_row() {
+		use crate::styling::{Action, Ink};
+		use crossterm::event::{Event, KeyModifiers, MouseEvent, MouseEventKind};
+		let mut app = App::default();
+		app.panel.palette = 1;
+		let mut terminal = Terminal::new(TestBackend::new(100, 45)).unwrap();
+		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+		let sections = app.panel.layout().1;
+		let grid = app.panel.indexed_area;
+		let original = app.editor.document.clone();
+		for _ in 0..40 {
+			app.handle(Event::Mouse(MouseEvent {
+				kind: MouseEventKind::ScrollDown,
+				column: grid.x,
+				row: grid.y,
+				modifiers: KeyModifiers::NONE,
+			}));
+			terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+		}
+		assert_eq!(app.panel.indexed_top, 32);
+		assert_eq!(app.panel.top, 0);
+		assert_eq!(app.panel.layout().1, sections);
+		let items = app.panel.items();
+		let last = items
+			.iter()
+			.position(|item| item.control == Control::Style(Action::Foreground(Ink::Indexed(255))))
+			.unwrap();
+		assert!(app.tool_areas.iter().any(|(_, index)| *index == last));
+		assert_eq!(
+			app.tool_areas
+				.iter()
+				.filter(|(_, index)| matches!(items[*index].ink, Some(Ink::Indexed(_))))
+				.count(),
+			32
+		);
+		app.tool_index = items
+			.iter()
+			.position(|item| item.ink == Some(Ink::Indexed(0)))
+			.unwrap();
+		app.reveal_tool();
+		assert_eq!(app.panel.indexed_top, 0);
+		assert_eq!(app.editor.document, original);
+	}
+
+	#[test]
+	fn keyboard_reaches_every_palette_control_in_wide_and_narrow_layouts() {
+		use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+		for (width, height) in [(80, 24), (40, 12), (20, 5)] {
+			for palette in 0..3 {
+				let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+				let mut app = App::default();
+				app.focus = 1;
+				app.panel.palette = palette;
+				let original = app.editor.document.clone();
+				for index in 0..app.panel.items().len() {
+					terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+					assert_eq!(app.tool_index, index);
+					assert!(
+						app.tool_areas
+							.iter()
+							.any(|(rect, tool)| *tool == index && rect.width > 0 && rect.height > 0),
+						"unreachable {index} palette {palette} at {width}x{height}"
+					);
+					app.handle(Event::Key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)));
+				}
+				assert_eq!(app.editor.document, original);
+				if width < 65 {
+					assert_eq!(app.code_pane, Rect::default());
+				}
+			}
+		}
+	}
+
+	#[test]
+	fn mouse_swatch_hit_areas_apply_both_channels_and_clear_is_undoable() {
+		use crate::styling::Ink;
+		use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+		let mut app = App::default();
+		let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+		app.editor.insert("ab", EditKind::Atomic, Instant::now());
+		app.editor.navigate(crate::editor::Movement::Home, true);
+		for control in [
+			Control::Style(Action::Foreground(Ink::Ansi(15))),
+			Control::Target(true),
+			Control::Style(Action::Background(Ink::Ansi(1))),
+			Control::Style(Action::Dim),
+			Control::Style(Action::Strike),
+		] {
+			terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+			let index = app
+				.panel
+				.items()
+				.iter()
+				.position(|item| item.control == control)
+				.unwrap();
+			app.tool_index = index;
+			app.reveal_tool();
+			terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+			let (rect, _) = app
+				.tool_areas
+				.iter()
+				.find(|(_, tool)| *tool == index)
+				.unwrap();
+			app.handle(Event::Mouse(MouseEvent {
+				kind: MouseEventKind::Down(MouseButton::Left),
+				column: rect.x,
+				row: rect.y,
+				modifiers: KeyModifiers::NONE,
+			}));
+			assert!(app.editor.selection().is_some());
+		}
+		let style = app.editor.document.styles.at(0);
+		assert_eq!(style.foreground, Ink::Ansi(15));
+		assert_eq!(style.background, Ink::Ansi(1));
+		assert!(style.dim && style.strike);
+		let original = app.editor.document.clone();
+		app.editor.apply_tool(Action::Clear);
+		assert_eq!(app.editor.document.styles.at(0), Default::default());
+		app.editor.undo(false);
+		assert_eq!(app.editor.document, original);
+	}
 
 	#[test]
 	fn active_gutters_follow_the_editor_cursor_in_both_panes() {
@@ -465,7 +761,7 @@ mod tests {
 			Instant::now(),
 		);
 		app.editor.navigate(crate::editor::Movement::Start, false);
-		app.editor.toggle_wrap();
+		app.editor.wrap = true;
 		app.code_open = true;
 		app.code_wrap = true;
 		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
@@ -493,7 +789,7 @@ mod tests {
 			Instant::now(),
 		);
 		app.editor.navigate(crate::editor::Movement::Start, false);
-		app.editor.toggle_wrap();
+		app.editor.wrap = true;
 		app.code_open = true;
 		app.code_wrap = true;
 		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
@@ -541,7 +837,7 @@ mod tests {
 		for _ in 0..5 {
 			app.editor.navigate(crate::editor::Movement::Right, true);
 		}
-		app.editor.apply_tool(0);
+		app.editor.apply_tool(Action::Bold);
 		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
 		assert!(
 			terminal.backend().buffer()[(7, 2)]
@@ -562,7 +858,7 @@ mod tests {
 		assert_eq!(buffer[(7, 2)].symbol(), "a");
 		assert_eq!(buffer[(11, 2)].symbol(), "界");
 		assert_eq!(buffer[(13, 2)].symbol(), "e\u{301}");
-		assert_eq!(app.editor_area, Rect::new(7, 2, 32, 6));
+		assert_eq!(app.editor_area, Rect::new(7, 2, 32, 2));
 	}
 
 	#[test]

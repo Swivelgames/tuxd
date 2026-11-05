@@ -84,6 +84,21 @@ class Session:
 	def rows(self):
 		return [self.row(number) for number in range(self.screen.lines)]
 
+	def click_tool(self, label):
+		# Locate a control in the scrollable sidebar, independent of panel spacing.
+		for direction in [64, 65]:
+			for _ in range(100):
+				for row, text in enumerate(self.rows()):
+					column = text.find(label, 45)
+					if column >= 0:
+						self.send(f"\x1b[<0;{column + 1};{row + 1}M\x1b[<0;{column + 1};{row + 1}m")
+						return
+				before = self.rows()
+				self.send(f"\x1b[<{direction};70;15M")
+				if before == self.rows():
+					break
+		raise AssertionError(f"Tool {label!r} not visible: {self.rows()}")
+
 	def finish(self, expected=0):
 		try:
 			assert self.process.wait(timeout=5) == expected
@@ -173,12 +188,11 @@ def main():
 		session.send("\x02\x1b[105;5u\x15")
 		cell = session.screen.buffer[2][7]
 		assert cell.bold and cell.italics and cell.underscore, (cell, session.output[-2500:])
-		# Cyan is the eleventh tool, at row 13 in an 80-column window.
-		session.send("\x1b[<0;60;13M\x1b[<0;60;13m")
+		# Cyan (ANSI 6) is the third cell of the second swatch row.
+		session.click_tool("06")
 		assert session.screen.buffer[2][7].fg in ("cyan", "00cdcd"), session.screen.buffer[2][7]
 		session.send("\x1b")
 		assert session.screen.buffer[2][7].bold
-		session.send("\x1b[12~")
 		rows = session.rows()
 		first = next(i for i, row in enumerate(rows) if "Hello" in row and "\\n" in row)
 		assert "world" in rows[first + 1], rows
@@ -195,7 +209,7 @@ def main():
 		# Focus tools, navigate to italic, and apply it without losing the insertion point.
 		session.send("\x1b[17~")
 		session.resize(40, 12)
-		assert "Tools" in "\n".join(session.rows())
+		assert "Editor" not in "\n".join(session.rows())
 		session.send("\x1b")
 		session.resize(80, 24)
 		session.send("\x11y")
@@ -203,6 +217,55 @@ def main():
 	finally:
 		session.close()
 	print("PASS: selection, bold/italic/underline/cyan, multiline ANSI drawer, reverse drag, replacement undo, narrow tools")
+	session = Session(binary)
+	try:
+		assert "Code: on" in session.row(0)
+		assert sum("Wrap: on" in row for row in session.rows()) == 2
+		session.paste("sample")
+		session.send("\x1b[H" + "\x1b[1;2C" * 6)
+		session.send("\x1b[<0;63;3M\x1b[<0;63;3m")
+		session.send("\x1b[<0;68;3M\x1b[<0;68;3m")
+		session.click_tool("Background")
+		session.click_tool("256")
+		# Scroll the sidebar to an indexed swatch without disturbing the selection.
+		for _ in range(3):
+			session.send("\x1b[<65;70;15M")
+		session.click_tool("42")
+		session.send("\x1b")
+		assert session.screen.buffer[2][7].bg == "00d787", session.screen.buffer[2][7]
+		# Return to the top by keyboard, then stage and apply RGB.
+		session.send("\x1b[17~\x1b[H")
+		session.click_tool("RGB")
+		session.click_tool("Hex:")
+		session.paste("#0080ff")
+		assert session.screen.buffer[2][7].bg == "00d787"
+		session.send("\r")
+		# No selection now: RGB is the pending insertion style.
+		session.send("\x1b")
+		session.send("Z")
+		assert session.screen.buffer[2][13].bg == "0080ff"
+		session.click_tool("Hex:")
+		session.paste("#oops")
+		session.send("\r")
+		assert "6 hex digits" in "\n".join(session.rows())
+		session.click_tool("Clear")
+		session.send("\x1b")
+		# Keyboard-only character navigation works in the narrow overlay.
+		session.send("\x1b[17~")
+		session.resize(40, 12)
+		session.send("\x1b[F\r\r")
+		assert "Editor" not in "\n".join(session.rows())
+		session.send("\x1b")
+		session.resize(80, 24)
+		assert "sampleZ╬╬" in session.row(2), session.rows()
+		session.send("\x1a")
+		assert "sampleZ╬" in session.row(2)
+		session.send("\x11y")
+		session.finish()
+	finally:
+		session.close()
+	print("PASS: default panes, extended styles, indexed background, staged/invalid RGB, narrow glyph insertion and undo")
+
 	# Use isolated clipboard helpers so acceptance checks never replace the user's clipboard.
 	with tempfile.TemporaryDirectory(prefix="terminal-ux-clipboard-") as directory:
 		folder = Path(directory)
@@ -217,7 +280,7 @@ def main():
 		session = Session(binary, env=env)
 		try:
 			session.paste("alpha\nbeta\t\\n")
-			session.send("\x1b[12~\x1b[17~\x1b[17~")  # Open and focus code.
+			session.send("\x1b[17~\x1b[17~")  # Focus the initially visible code pane.
 			session.send("\x03")
 			assert copied.read_text() == r"\x1b[0malpha\nbeta\t\\n\x1b[0m"
 			assert "Copied escaped ANSI" in session.row(23)
@@ -230,7 +293,7 @@ def main():
 			session.send("\x1b")
 			session.send("\x1b[1;5F")
 			session.paste("\n" + "a" * 70)
-			session.send("\x1b[13~\x1b[H")  # Editor wrapping, then logical Home.
+			session.send("\x1b[H")  # Editor starts wrapped; logical Home.
 			assert session.screen.cursor.x == 7
 			session.send("\x1b[B")  # Down moves within the wrapped logical line.
 			assert "Ln 3" in session.row(23)

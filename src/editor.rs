@@ -1,3 +1,4 @@
+use crate::styling::Action;
 use std::time::{Duration, Instant};
 
 use crate::document::{Document, Position, byte_at_column, column_at};
@@ -103,7 +104,7 @@ impl Editor {
 			.is_some_and(|(start, end)| start <= position && position < end)
 	}
 
-	pub fn tool_state(&self, tool: usize) -> Option<bool> {
+	pub fn tool_state(&self, tool: Action) -> Option<bool> {
 		let matches = |style: crate::styling::TextStyle| style.matches(tool);
 		if let Some((start, end)) = self.selection() {
 			let a = self.document.offset(start);
@@ -120,7 +121,7 @@ impl Editor {
 		}
 	}
 
-	pub fn apply_tool(&mut self, tool: usize) {
+	pub fn apply_tool(&mut self, tool: Action) {
 		let enabled = self.tool_state(tool) != Some(true);
 		self.begin_edit(EditKind::Atomic, Instant::now());
 		if let Some((start, end)) = self.selection() {
@@ -455,6 +456,7 @@ impl Editor {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::styling::Ink;
 	use unicode_segmentation::UnicodeSegmentation;
 
 	#[test]
@@ -488,9 +490,9 @@ mod tests {
 	#[test]
 	fn word_deletion_preserves_styles_and_is_one_undo_transaction() {
 		let mut editor = Editor::default();
-		editor.apply_tool(0);
+		editor.apply_tool(Action::Bold);
 		editor.insert("one ", EditKind::Atomic, Instant::now());
-		editor.apply_tool(1);
+		editor.apply_tool(Action::Italic);
 		editor.insert("café", EditKind::Atomic, Instant::now());
 		let before = editor.document.clone();
 		editor.delete_word(Instant::now());
@@ -514,19 +516,19 @@ mod tests {
 		editor.navigate(Movement::Start, false);
 		editor.navigate(Movement::Right, true);
 		editor.navigate(Movement::Right, true);
-		editor.apply_tool(0);
-		editor.apply_tool(1);
-		editor.apply_tool(10);
-		assert_eq!(editor.tool_state(0), Some(true));
+		editor.apply_tool(Action::Bold);
+		editor.apply_tool(Action::Italic);
+		editor.apply_tool(Action::Foreground(Ink::Ansi(6)));
+		assert_eq!(editor.tool_state(Action::Bold), Some(true));
 		editor.navigate(Movement::Right, true);
-		assert_eq!(editor.tool_state(0), None);
-		editor.apply_tool(0);
-		assert_eq!(editor.tool_state(0), Some(true));
+		assert_eq!(editor.tool_state(Action::Bold), None);
+		editor.apply_tool(Action::Bold);
+		assert_eq!(editor.tool_state(Action::Bold), Some(true));
 		editor.insert("界\nX", EditKind::Typing, Instant::now());
 		assert_eq!(editor.document.lines, ["界", "X", "def"]);
 		assert!(editor.document.styles.at(0).bold);
 		assert!(editor.document.styles.at(0).italic);
-		assert_eq!(editor.document.styles.at(0).foreground, Some(6));
+		assert_eq!(editor.document.styles.at(0).foreground, Ink::Ansi(6));
 		editor.undo(false);
 		assert_eq!(editor.document.lines, ["abc", "def"]);
 		assert_eq!(
@@ -543,7 +545,7 @@ mod tests {
 		editor.insert("ab", EditKind::Atomic, Instant::now());
 		editor.navigate(Movement::Home, false);
 		editor.navigate(Movement::Right, true);
-		editor.apply_tool(0);
+		editor.apply_tool(Action::Bold);
 		editor.navigate(Movement::Right, false);
 		assert_eq!(editor.cursor.byte, 1);
 		assert!(editor.typing_style().bold);
@@ -552,7 +554,7 @@ mod tests {
 		assert!(!editor.document.styles.at(2).bold);
 		editor.navigate(Movement::Home, false);
 		assert!(!editor.typing_style().bold);
-		editor.apply_tool(1);
+		editor.apply_tool(Action::Italic);
 		editor.insert("Y", EditKind::Typing, Instant::now());
 		assert!(editor.document.styles.at(0).italic);
 		editor.navigate(Movement::End, false);
@@ -567,7 +569,7 @@ mod tests {
 	fn combining_edits_do_not_split_style_boundaries() {
 		let mut editor = Editor::default();
 		editor.insert("e", EditKind::Atomic, Instant::now());
-		editor.apply_tool(0);
+		editor.apply_tool(Action::Bold);
 		editor.insert("\u{301}", EditKind::Typing, Instant::now());
 		assert_eq!(editor.document.styles.runs.len(), 1);
 		assert_eq!(editor.document.styles.runs[0].end, "e\u{301}".len());

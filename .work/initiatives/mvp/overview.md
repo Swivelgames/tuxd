@@ -1,6 +1,6 @@
 # MVP initiative
 
-Status: In progress — Slices 1 and 2 complete
+Status: In progress — Slices 1–3 complete
 
 ## Outcome
 

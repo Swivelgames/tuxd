@@ -1,3 +1,5 @@
+use crate::panel::{Control, Panel};
+use crate::styling::Action;
 use std::time::Instant;
 
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
@@ -16,8 +18,10 @@ pub enum Overlay {
 	Quit,
 }
 
-#[derive(Default)]
 pub struct App {
+	pub scrollbars: Vec<crate::scrollbar::Bar>,
+	pub scrollbar_drag: Option<(crate::scrollbar::Target, usize)>,
+	pub panel: Panel,
 	pub code_wrap: bool,
 	pub editor_wrap_toggle: Rect,
 	pub code_wrap_toggle: Rect,
@@ -38,6 +42,37 @@ pub struct App {
 	pub editor: Editor,
 	pub overlay: Overlay,
 	pub editor_area: Rect,
+}
+
+impl Default for App {
+	fn default() -> Self {
+		let mut editor = Editor::default();
+		editor.wrap = true;
+		Self {
+			scrollbars: Vec::new(),
+			scrollbar_drag: None,
+			panel: Default::default(),
+			code_wrap: true,
+			editor_wrap_toggle: Default::default(),
+			code_wrap_toggle: Default::default(),
+			notice: Default::default(),
+			clipboard_result: Default::default(),
+			focus: Default::default(),
+			code_open: true,
+			code_top: Default::default(),
+			code_left: Default::default(),
+			code_area: Default::default(),
+			code_pane: Default::default(),
+			editor_pane: Default::default(),
+			code_toggle: Default::default(),
+			tool_areas: Default::default(),
+			tool_index: Default::default(),
+			dragging: Default::default(),
+			editor,
+			overlay: Default::default(),
+			editor_area: Default::default(),
+		}
+	}
 }
 
 impl App {
@@ -109,6 +144,9 @@ impl App {
 			KeyCode::F(6) => {
 				self.focus = (self.focus + 1) % if self.code_open { 3 } else { 2 };
 				self.editor.break_group();
+				if self.focus == 1 {
+					self.reveal_tool();
+				}
 				return true;
 			}
 			KeyCode::Esc => {
@@ -120,9 +158,9 @@ impl App {
 			}
 			KeyCode::Char(ch) if ctrl && "bBiIuU".contains(ch) => {
 				self.editor.apply_tool(match ch.to_ascii_lowercase() {
-					'b' => 0,
-					'i' => 1,
-					_ => 2,
+					'b' => Action::Bold,
+					'i' => Action::Italic,
+					_ => Action::Underline,
 				});
 				return true;
 			}
@@ -130,12 +168,7 @@ impl App {
 			_ => (),
 		}
 		if self.focus == 1 {
-			match key.code {
-				KeyCode::Up | KeyCode::BackTab => self.tool_index = (self.tool_index + 11) % 12,
-				KeyCode::Down | KeyCode::Tab => self.tool_index = (self.tool_index + 1) % 12,
-				KeyCode::Enter | KeyCode::Char(' ') => self.editor.apply_tool(self.tool_index),
-				_ => (),
-			}
+			self.panel_key(key);
 			return true;
 		}
 		if self.focus == 2 {
@@ -169,12 +202,326 @@ impl App {
 		false
 	}
 
+	pub fn reveal_tool(&mut self) {
+		if let Some(item) = self.panel.items().get(self.tool_index) {
+			if let Some(crate::styling::Ink::Indexed(n)) = item.ink {
+				let row = n as usize / 7;
+				if row < self.panel.indexed_top {
+					self.panel.indexed_top = row;
+				}
+				if row >= self.panel.indexed_top + 5 {
+					self.panel.indexed_top = row - 4;
+				}
+			}
+			if let Some(row) = self.panel.display_row(item) {
+				if row < self.panel.top {
+					self.panel.top = row;
+				}
+				if row >= self.panel.top + self.panel.height.max(1) {
+					self.panel.top = row + 1 - self.panel.height.max(1);
+				}
+			}
+		}
+	}
+
+	fn activate_tool(&mut self) {
+		let items = self.panel.items();
+		let Some(item) = items.get(self.tool_index) else {
+			return;
+		};
+		match item.control {
+			Control::Section(section) => {
+				self.panel.collapsed[section] = !self.panel.collapsed[section]
+			}
+			Control::Style(action) => self.editor.apply_tool(action),
+			Control::Target(background) => self.panel.background = background,
+			Control::Palette(tab) => self.panel.palette = tab,
+			Control::GlyphTab(tab) => self.panel.glyph_tab = tab,
+			Control::Glyph(ch) => {
+				self.focus = 1;
+				self.editor
+					.insert(&ch.to_string(), EditKind::Atomic, Instant::now());
+			}
+			Control::Field(_) => {
+				self.focus = 1;
+				self.panel.replace_field = true;
+			}
+			Control::Apply => self.apply_rgb(),
+		}
+		self.reveal_tool();
+	}
+
+	fn apply_rgb(&mut self) {
+		match self.panel.rgb() {
+			Ok(ink) => {
+				self.editor.apply_tool(self.panel.color_action(ink));
+				self.panel.error = None;
+			}
+			Err(error) => {
+				self.notice = Some(error.clone());
+				self.panel.error = Some(error);
+			}
+		}
+	}
+
+	fn panel_key(&mut self, key: crossterm::event::KeyEvent) {
+		let mut items = self.panel.items();
+		for item in &mut items {
+			item.row = self.panel.display_row(item).unwrap_or(usize::MAX);
+		}
+		self.tool_index = self.tool_index.min(items.len() - 1);
+		let current = &items[self.tool_index];
+		if let Some(crate::styling::Ink::Indexed(n)) = current.ink
+			&& matches!(
+				key.code,
+				KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown
+			) {
+			let down = matches!(key.code, KeyCode::Down | KeyCode::PageDown);
+			let distance = if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
+				35
+			} else {
+				7
+			};
+			let next = if down {
+				n as i32 + distance
+			} else {
+				n as i32 - distance
+			};
+			let control = if next < 0 {
+				Control::Palette(1)
+			} else if next > 255 {
+				Control::Style(self.panel.color_action(crate::styling::Ink::Default))
+			} else {
+				Control::Style(
+					self.panel
+						.color_action(crate::styling::Ink::Indexed(next as u8)),
+				)
+			};
+			if let Some(index) = items.iter().position(|item| item.control == control) {
+				self.tool_index = index;
+			}
+			self.reveal_tool();
+			return;
+		}
+
+		if let Control::Field(field) = current.control {
+			if field > 0
+				&& matches!(
+					key.code,
+					KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End
+				) {
+				let current = self.panel.fields[field].parse::<u8>().unwrap_or(0);
+				let step = if key.modifiers.contains(KeyModifiers::SHIFT) {
+					10
+				} else {
+					1
+				};
+				let value = match key.code {
+					KeyCode::Left => current.saturating_sub(step),
+					KeyCode::Right => current.saturating_add(step),
+					KeyCode::Home => 0,
+					_ => 255,
+				};
+				self.panel.set_component(field, value);
+				return;
+			}
+
+			match key.code {
+				KeyCode::Enter => {
+					self.apply_rgb();
+					return;
+				}
+				KeyCode::Backspace => {
+					self.panel.edit(field, "", true);
+					return;
+				}
+				KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+					self.panel.replace_field = true;
+					return;
+				}
+				KeyCode::Char(ch)
+					if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT =>
+				{
+					self.panel.edit(field, &ch.to_string(), false);
+					return;
+				}
+				_ => (),
+			}
+		}
+		match key.code {
+			KeyCode::BackTab | KeyCode::Left => {
+				self.tool_index = self.tool_index.checked_sub(1).unwrap_or(items.len() - 1)
+			}
+			KeyCode::Tab | KeyCode::Right => self.tool_index = (self.tool_index + 1) % items.len(),
+			KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
+				let down = matches!(key.code, KeyCode::Down | KeyCode::PageDown);
+				let distance = if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
+					self.panel.height.max(1)
+				} else {
+					1
+				};
+				let row = if down {
+					current.row.saturating_add(distance)
+				} else {
+					current.row.saturating_sub(distance)
+				};
+				if let Some((index, _)) = items
+					.iter()
+					.enumerate()
+					.filter(|(_, item)| item.row != usize::MAX)
+					.filter(|(_, item)| {
+						if down {
+							item.row > current.row
+						} else {
+							item.row < current.row
+						}
+					})
+					.min_by_key(|(_, item)| {
+						(item.row.abs_diff(row), item.column.abs_diff(current.column))
+					}) {
+					self.tool_index = index;
+				}
+			}
+			KeyCode::Home => self.tool_index = 0,
+			KeyCode::End => self.tool_index = items.len() - 1,
+			KeyCode::Enter | KeyCode::Char(' ') => self.activate_tool(),
+			_ => (),
+		}
+		self.panel.replace_field = true;
+		self.reveal_tool();
+	}
+
+	fn set_scroll(&mut self, target: crate::scrollbar::Target, offset: usize) {
+		use crate::scrollbar::Target;
+		match target {
+			Target::EditorVertical => self.editor.top = offset,
+			Target::EditorHorizontal => self.editor.left = offset,
+			Target::CodeVertical => self.code_top = offset,
+			Target::CodeHorizontal => self.code_left = offset,
+			Target::Tools => self.panel.top = offset,
+			Target::Indexed => self.panel.indexed_top = offset,
+		}
+	}
+
 	fn mouse(&mut self, mouse: crossterm::event::MouseEvent) {
 		let point = (mouse.column, mouse.row).into();
 		if mouse.kind == MouseEventKind::Up(MouseButton::Left) {
 			self.dragging = false;
+			self.scrollbar_drag = None;
+			self.panel.gauge_drag = None;
 			return;
 		}
+		let gauge = if mouse.kind == MouseEventKind::Drag(MouseButton::Left) {
+			self.panel.gauge_drag.and_then(|field| {
+				self.panel
+					.gauge_areas
+					.iter()
+					.find(|(_, f)| *f == field)
+					.copied()
+			})
+		} else {
+			self.panel
+				.gauge_areas
+				.iter()
+				.find(|(area, _)| area.contains(point))
+				.copied()
+		};
+		if let Some((area, field)) = gauge {
+			let value = match mouse.kind {
+				MouseEventKind::Down(MouseButton::Left)
+				| MouseEventKind::Drag(MouseButton::Left) => {
+					self.dragging = false;
+					self.panel.gauge_drag = Some(field);
+					Some(
+						(mouse
+							.column
+							.saturating_sub(area.x)
+							.min(area.width.saturating_sub(1)) as usize
+							* 255 / area.width.saturating_sub(1).max(1) as usize) as u8,
+					)
+				}
+				MouseEventKind::ScrollUp => Some(
+					self.panel.fields[field]
+						.parse::<u8>()
+						.unwrap_or(0)
+						.saturating_add(1),
+				),
+				MouseEventKind::ScrollDown => Some(
+					self.panel.fields[field]
+						.parse::<u8>()
+						.unwrap_or(0)
+						.saturating_sub(1),
+				),
+				_ => None,
+			};
+			if let Some(value) = value {
+				self.focus = 1;
+				if let Some(index) = self
+					.panel
+					.items()
+					.iter()
+					.position(|item| item.control == Control::Field(field))
+				{
+					self.tool_index = index;
+				}
+				self.panel.set_component(field, value);
+				return;
+			}
+		}
+
+		if mouse.kind == MouseEventKind::Drag(MouseButton::Left)
+			&& let Some((target, grab)) = self.scrollbar_drag
+		{
+			if let Some(bar) = self
+				.scrollbars
+				.iter()
+				.find(|bar| bar.target == target)
+				.copied()
+			{
+				self.set_scroll(
+					target,
+					bar.offset_at(bar.coordinate(mouse.column, mouse.row), grab),
+				);
+			}
+			return;
+		}
+		if let Some(bar) = self
+			.scrollbars
+			.iter()
+			.find(|bar| bar.area.contains(point))
+			.copied()
+		{
+			match mouse.kind {
+				MouseEventKind::Down(MouseButton::Left) => {
+					self.dragging = false;
+					let at = bar.coordinate(mouse.column, mouse.row);
+					let (start, size) = bar.thumb();
+					let grab = if (start..start + size).contains(&at) {
+						at - start
+					} else {
+						size / 2
+					};
+					self.scrollbar_drag = Some((bar.target, grab));
+					if !(start..start + size).contains(&at) {
+						self.set_scroll(bar.target, bar.offset_at(at, grab));
+					}
+					return;
+				}
+				MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
+					let offset = if mouse.kind == MouseEventKind::ScrollDown {
+						bar.offset
+							.saturating_add(3)
+							.min(bar.content.saturating_sub(bar.viewport))
+					} else {
+						bar.offset.saturating_sub(3)
+					};
+					self.set_scroll(bar.target, offset);
+					return;
+				}
+				_ => (),
+			}
+		}
+
 		if self.dragging
 			&& mouse.kind == MouseEventKind::Drag(MouseButton::Left)
 			&& self.editor_area.width > 0
@@ -216,7 +563,7 @@ impl App {
 				.find(|(area, _)| area.contains(point))
 			{
 				self.tool_index = *tool;
-				self.editor.apply_tool(*tool);
+				self.activate_tool();
 				return;
 			}
 			if self.code_pane.contains(point) {
@@ -239,7 +586,19 @@ impl App {
 			MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
 		) {
 			let down = mouse.kind == MouseEventKind::ScrollDown;
-			if self.editor_pane.contains(point) {
+			if self.panel.indexed_area.contains(point) {
+				self.panel.indexed_top = if down {
+					(self.panel.indexed_top + 1).min(32)
+				} else {
+					self.panel.indexed_top.saturating_sub(1)
+				};
+			} else if self.panel.area.contains(point) {
+				self.panel.top = if down {
+					self.panel.top.saturating_add(3)
+				} else {
+					self.panel.top.saturating_sub(3)
+				};
+			} else if self.editor_pane.contains(point) {
 				self.editor.scroll(down);
 			} else if self.code_pane.contains(point) {
 				self.code_top = if down {
@@ -340,6 +699,13 @@ impl App {
 					_ => self.editor.break_group(),
 				}
 			}
+			Event::Paste(text) if self.overlay == Overlay::None && self.focus == 1 => {
+				if let Some(item) = self.panel.items().get(self.tool_index)
+					&& let Control::Field(field) = item.control
+				{
+					self.panel.edit(field, text.trim(), false);
+				}
+			}
 			Event::Paste(text) if self.overlay == Overlay::None && self.focus == 0 => self
 				.editor
 				.insert(&sanitize(&text), EditKind::Atomic, Instant::now()),
@@ -360,6 +726,106 @@ mod tests {
 		Event::Key(KeyEvent::new(code, modifiers))
 	}
 
+	fn choose(app: &mut App, control: Control) {
+		app.tool_index = app
+			.panel
+			.items()
+			.iter()
+			.position(|item| item.control == control)
+			.unwrap();
+		app.activate_tool();
+	}
+
+	#[test]
+	fn collapsing_sections_preserves_selection_and_document_history() {
+		let mut app = App::default();
+		app.handle(Event::Paste("selected".into()));
+		app.editor.navigate(Movement::Home, true);
+		let selection = app.editor.selection();
+		let original = app.editor.document.clone();
+		for section in 0..3 {
+			choose(&mut app, Control::Section(section));
+			assert!(app.panel.collapsed[section]);
+		}
+		assert_eq!(app.panel.items().len(), 3);
+		assert_eq!(app.editor.selection(), selection);
+		assert_eq!(app.editor.document, original);
+		for section in 0..3 {
+			choose(&mut app, Control::Section(section));
+		}
+		assert!(
+			app.panel
+				.items()
+				.iter()
+				.any(|item| item.control == Control::Glyph('┌'))
+		);
+		app.editor.undo(false);
+		assert!(app.editor.document.is_empty());
+	}
+
+	#[test]
+	fn palettes_preserve_selection_and_rgb_is_staged_until_valid_apply() {
+		use crate::styling::Ink;
+		let mut app = App::default();
+		assert!(app.code_open && app.code_wrap && app.editor.wrap);
+		app.handle(Event::Paste("hello".into()));
+		app.handle(key(KeyCode::Home, KeyModifiers::SHIFT));
+		let selection = app.editor.selection();
+		let original = app.editor.document.clone();
+		choose(&mut app, Control::Target(true));
+		choose(&mut app, Control::Palette(2));
+		choose(&mut app, Control::Field(0));
+		app.handle(Event::Paste("#00ff80".into()));
+		assert_eq!(app.editor.document, original);
+		app.handle(key(KeyCode::Enter, KeyModifiers::NONE));
+		assert_eq!(
+			app.editor.document.styles.at(0).background,
+			Ink::Rgb(0, 255, 128)
+		);
+		assert_eq!(app.editor.selection(), selection);
+		let colored = app.editor.document.clone();
+		choose(&mut app, Control::Field(2));
+		app.handle(Event::Paste("256".into()));
+		app.handle(key(KeyCode::Enter, KeyModifiers::NONE));
+		assert!(app.panel.error.is_some());
+		assert_eq!(app.editor.document, colored);
+		// Invalid apply did not add an undo transaction.
+		app.handle(key(KeyCode::Char('z'), KeyModifiers::CONTROL));
+		assert_eq!(app.editor.document, original);
+		app.handle(key(KeyCode::Char('y'), KeyModifiers::CONTROL));
+		assert_eq!(app.editor.document, colored);
+		choose(&mut app, Control::Style(Action::Clear));
+		assert_eq!(app.editor.document, original);
+		app.editor.undo(false);
+		assert_eq!(app.editor.document, colored);
+	}
+
+	#[test]
+	fn glyph_replacement_and_repeated_insertion_are_independent_undo_steps() {
+		let mut app = App::default();
+		app.handle(Event::Paste("界x".into()));
+		app.editor.navigate(Movement::Start, false);
+		app.editor.navigate(Movement::Right, true);
+		app.editor.apply_tool(Action::Dim);
+		let before = app.editor.document.clone();
+		choose(&mut app, Control::Glyph('┌'));
+		assert_eq!(app.focus, 1);
+		assert_eq!(app.editor.document.lines, ["┌x"]);
+		assert!(app.editor.document.styles.at(0).dim);
+		choose(&mut app, Control::Glyph('─'));
+		assert_eq!(app.editor.document.lines, ["┌─x"]);
+		app.editor.undo(false);
+		assert_eq!(app.editor.document.lines, ["┌x"]);
+		app.editor.undo(false);
+		assert_eq!(app.editor.document, before);
+		app.editor.undo(true);
+		choose(&mut app, Control::GlyphTab(2));
+		choose(&mut app, Control::Glyph('\u{f015}'));
+		assert_eq!(app.editor.document.lines, ["┌\u{f015}x"]);
+		app.handle(key(KeyCode::Esc, KeyModifiers::NONE));
+		assert_eq!(app.focus, 0);
+	}
+
 	#[test]
 	fn control_and_alt_word_bindings_and_focus_specific_wrap() {
 		for modifier in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
@@ -372,12 +838,12 @@ mod tests {
 			app.handle(key(KeyCode::Backspace, modifier));
 			assert_eq!(app.editor.document.lines, ["one "]);
 			app.handle(key(KeyCode::F(3), KeyModifiers::NONE));
-			assert!(app.editor.wrap);
-			assert!(!app.code_wrap);
+			assert!(!app.editor.wrap);
+			assert!(app.code_wrap);
 			app.code_open = true;
 			app.focus = 2;
 			app.handle(key(KeyCode::F(3), KeyModifiers::NONE));
-			assert!(app.editor.wrap && app.code_wrap);
+			assert!(!app.editor.wrap && !app.code_wrap);
 		}
 	}
 

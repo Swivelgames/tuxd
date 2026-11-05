@@ -108,3 +108,12 @@ See the [MVP initiative](initiatives/mvp/overview.md) and [slice breakdown](init
 - [Ratatui colors](https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html)
 - [tui-textarea](https://docs.rs/tui-textarea/latest/tui_textarea/index.html)
 - [XTerm control sequences](https://invisible-island.net/xterm/ctlseqs/)
+
+## Future work: clipboard editing and character discovery
+
+- Copy/cut the editor selection as escaped ANSI, preserving the selected text's formatting. Cut must remove text only after successful clipboard transfer and be one undoable edit.
+- Paste escaped ANSI from any clipboard source into styled editor content. Define a supported text-style sequence grammar and literal-escape rules; never execute clipboard content as terminal commands. Keep malformed or unsupported input handling explicit and preserve Unicode boundaries.
+- Expand the curated character catalogs and add character search by glyph, name, and code point.
+- Copy/paste styles independently of text, applying them to a selection or the pending typing style with normal undo behavior.
+
+These are follow-up enhancements. Slice 4 remains focused on persistence and export; existing whole-Code clipboard copying remains available.
