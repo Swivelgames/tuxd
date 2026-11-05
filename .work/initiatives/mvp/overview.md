@@ -1,6 +1,6 @@
 # MVP initiative
 
-Status: Planned
+Status: In progress — Slice 1 complete
 
 ## Outcome
 
@@ -55,3 +55,5 @@ Defer soft wrapping, rectangular selections, multi-document tabs, arbitrary ANSI
 Unicode mapping begins in slice 1 and receives mouse coverage in slice 2. Style boundaries and ANSI transitions are validated in slice 2. Terminal attribute/font limitations are surfaced in slice 3. Clipboard availability and safe persistence are addressed in slice 4. Slice 5 expands the environment and interaction matrix; it is not the first correctness pass.
 
 Choose and record the primary development terminal/platform in slice 1, then define a small compatibility matrix before slice 5. Do not promise universal terminal rendering parity.
+
+Current compatibility target: modern Linux terminals. Slice 1 is validated under Linux PTYs and tmux. Conventional editing is the initial input mode; a proper Vim mode is deferred to a separately scoped later slice.

@@ -81,6 +81,21 @@ Never execute pasted escape sequences as terminal commands. Treat pasted control
 
 Every slice is a usable, stable increment. Each ends with a runnable application, a hands-on acceptance walkthrough, relevant automated checks, and regression verification of earlier behavior. Later hardening does not excuse broken fundamentals in earlier slices.
 
+## Agreed initial decisions
+
+- Conventional, nonmodal editing initially; modern Linux terminals are the current compatibility target.
+- Literal tabs with four-column display stops and no automatic indentation initially.
+- Ctrl+Z undo, Ctrl+Y redo, Ctrl+Q quit, and F1 help.
+- Group typing/deletion until navigation, another operation, or a 750 ms pause; each paste is one transaction.
+- Confirm discarding a nonempty document while saving is unavailable.
+- Maximize the editor initially; introduce the right tools panel when it becomes functional.
+- Include mouse click-to-position and wheel scrolling in Slice 1; selection follows in Slice 2.
+- Normalize pasted CRLF/CR to newlines, preserve tabs, and display other control characters as escaped text.
+
+## Future work: proper Vim mode
+
+Add a separately scoped later slice for a coherent Vim editing mode, including modal state, composable motions/operators, counts, and deliberate undo behavior. Decide the full compatibility contract, registers, visual selection, repeat behavior, and search in that slice. Keep document/editing commands independent of input bindings so modal and conventional editing can share the same document operations. A few Vim-like key aliases would not meet this goal.
+
 See the [MVP initiative](initiatives/mvp/overview.md) and [slice breakdown](initiatives/mvp/breakdown.md).
 
 ## Technical references

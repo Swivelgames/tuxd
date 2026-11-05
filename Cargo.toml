@@ -1,0 +1,12 @@
+[package]
+name = "terminal-ux-designer"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "A small terminal editor for designing styled text"
+
+[dependencies]
+crossterm = "0.29"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+unicode-segmentation = "1.13"
+unicode-width = "0.2"
