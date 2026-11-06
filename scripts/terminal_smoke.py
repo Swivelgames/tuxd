@@ -43,7 +43,7 @@ class Session:
 
 		self.process = subprocess.Popen(
 			[binary, *args], stdin=self.slave, stdout=self.slave, stderr=self.slave,
-			env={key: value for key, value in {**os.environ, "TERM": "xterm-256color", "XDG_CONFIG_HOME": self.config_directory.name, **(env or {})}.items() if value is not None}, preexec_fn=controlling_terminal,
+			env={key: value for key, value in {**os.environ, "TERM": "xterm-256color", "XDG_CONFIG_HOME": self.config_directory.name, "TMUX": None, "TMUX_PANE": None, "SSH_CONNECTION": None, "SSH_TTY": None, **(env or {})}.items() if value is not None}, preexec_fn=controlling_terminal,
 		)
 		self.drain()
 
@@ -256,6 +256,28 @@ def shared_clipboard_checks(binary):
 		finally:
 			session.close()
 	print("PASS: shared Copy/Paste/Select all in Hex, RGB ranges and path fields; RGB remains staged")
+
+
+def hardening_cli_checks(binary):
+	with tempfile.TemporaryDirectory(prefix="tuxd-path-checks-") as directory:
+		path = os.fsencode(directory) + b"/document-\xff.tuxd.json"
+		with open(path, "wb") as file:
+			file.write((ROOT / "examples/welcome.tuxd.json").read_bytes())
+		session = Session(binary, path)
+		try:
+			assert "Terminal UX Designer" in session.row(2)
+			session.send("\x11")
+			session.finish()
+		finally:
+			session.close()
+		fifo = Path(directory) / "input.fifo"
+		os.mkfifo(fifo)
+		for source in [fifo, Path(directory), Path(directory) / "missing"]:
+			result = subprocess.run([binary, str(source)], capture_output=True, timeout=3)
+			assert result.returncode != 0
+			assert b"panicked" not in result.stderr
+			assert b"\x1b[?1049h" not in result.stdout
+	print("PASS: non-UTF-8 document path; FIFO, directory and missing-file startup failures")
 
 
 def main():
@@ -578,6 +600,7 @@ def main():
 			session.close()
 	print("PASS: file browsing, Vim navigation, hidden alias, shortcut settings, format radios, import offer, Ctrl+V, Save As and overwrite guard")
 
+	hardening_cli_checks(binary)
 	shared_clipboard_checks(binary)
 	shortcut_settings_checks(binary)
 

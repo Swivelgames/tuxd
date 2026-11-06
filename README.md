@@ -96,7 +96,7 @@ The Code pane starts open and shows read-only ANSI for the whole document; F2 co
 
 The interactive preview enables color output even when `NO_COLOR` is set, because colors and attributes are document content. Attribute appearance still depends on your terminal/font. Syntax highlighting, drag autoscroll, and customizable application themes arrive later.
 
-Ctrl+C while Code is focused copies the full escaped output, regardless of scrolling or wrapping. The clipboard contains literal `\x1b`, `\n`, and `\t`; it contains no extra physical newlines, gutters, or wrap markers. Copy uses `wl-copy` on Wayland or `xclip`/`xsel` on X11. Install the appropriate helper for your desktop. A status message reports success or failure, and the editor remains responsive during the operation. The terminal smoke suite uses isolated helpers and never changes your actual desktop clipboard.
+Ctrl+C while Code is focused copies the full escaped output, regardless of scrolling or wrapping. The clipboard contains literal `\x1b`, `\n`, and `\t`; it contains no extra physical newlines, gutters, or wrap markers. Copy chooses tmux forwarding when running inside tmux, OSC 52 in direct SSH sessions, or `wl-copy`/`xclip`/`xsel` on a local desktop. The tmux path uses `load-buffer -w` with stdin, including with `set-clipboard external`; tmux selects the target client. Direct OSC 52 is emitted between rendered frames. Forwarded copies report delivery as unconfirmed because terminal clipboard acceptance cannot be acknowledged. Terminal settings and payload limits can still prevent delivery. Direct OSC 52 rejects payloads above 100 KiB rather than truncating them; export larger output. Linux virtual console and dumb terminals report an unsupported clipboard transport. Copy remains asynchronous while helpers run. Tests use isolated PTYs, clipboard helpers, and tmux servers.
 
 Word movement uses Unicode word-boundary segments, skips intervening whitespace (including newlines), and treats punctuation as separate tokens. Left moves to the previous token's start; Right moves to the next token's end. Ctrl/Alt+Backspace uses the same backward boundary. Ctrl+Backspace requires a terminal that reports the modifier distinctly; Alt+Backspace is also supported.
 
@@ -169,3 +169,15 @@ Automatic styled clipboard paste, stdin import, workspaces/multiple open files, 
 The compact unsaved-changes prompt defaults to **Cancel**. Use Tab/Shift+Tab or arrows to select Save, Discard, or Cancel, then Enter; mouse clicks and the existing S/D/C shortcuts also work.
 
 Editor and Code have clickable collapse indicators in their titles. F5 toggles Editor; F2 toggles Code (including the shared lower pane in slim mode). Collapsing one leaves its title bar visible and gives the remaining vertical space to the other. At least one pane stays expanded. These are session layout preferences and do not change document contents.
+
+## Compatibility and performance verification
+
+The supported target is modern Linux terminals. The [Slice 5 validation record](.work/initiatives/mvp/slice-05-validation.md) distinguishes automated protocol/rendering checks from desktop-terminal visual acceptance and records measured performance and known limitations.
+
+Run the optional release-mode measurement with `cargo test --release modest_document_performance -- --ignored --nocapture`. Set `TUXD_PERF_FIXTURE=/tmp/tuxd-performance.tuxd.json` on that command to generate the representative 1,000-line styled Unicode document for interactive testing. Undo history retains up to 200 snapshots. Fonts and terminal implementations can differ in emoji and ambiguous-width rendering.
+
+Run `uv run scripts/clipboard_smoke.py` to verify direct SSH and tmux forwarding without changing your desktop clipboard. These copy transports do not add remote clipboard reading; terminal-side paste remains available.
+
+Run `python3 scripts/alacritty_smoke.py` for real Alacritty rendering/input checks on an isolated Xvfb display (requires Alacritty, Xvfb, xdotool and ImageMagick). It saves screenshots for inspection and leaves the desktop and clipboard untouched.
+
+Composed Unicode sequences with inconsistent terminal widths (including joined emoji and flags) currently use a display-only `\u{…}` fallback in Editor, Code, and import previews. Accents, CJK and ordinary single emoji continue to render normally. Editing still treats each original grapheme as one unit; save/export and Code copying preserve the original characters. A fallback too wide for a wrapped row is abbreviated with `…`. Component-emoji rendering is planned.

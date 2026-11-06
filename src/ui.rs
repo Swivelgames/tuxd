@@ -5,6 +5,7 @@ use ratatui::{
 	style::{Color, Modifier, Style},
 	widgets::{Block, Clear, Paragraph},
 };
+
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
@@ -106,14 +107,26 @@ fn draw_lines(frame: &mut Frame, view: View<'_>, style_at: impl Fn(Position) -> 
 				row: row.line,
 				byte: cell.byte,
 			});
-			let display = if source == "\t" || start != cell.x || end != cell.x + cell.width {
+			let rendered = crate::document::display_grapheme(source);
+			let display = if source == "\t" {
 				" ".repeat(end - start)
-			} else if source.width() > cell.width {
+			} else if rendered.is_ascii() {
+				let mut visible = rendered[start - cell.x..]
+					.chars()
+					.take(end - start)
+					.collect::<String>();
+				// A fallback remains one editable grapheme even in a narrow wrapped row.
+				if cell.width < rendered.len() && !visible.is_empty() {
+					visible.pop();
+					visible.push('…');
+				}
+				visible
+			} else if start != cell.x || end != cell.x + cell.width {
+				" ".repeat(end - start)
+			} else if rendered.width() > cell.width {
 				"�".into()
-			} else if source.width() == 0 {
-				format!("◌{source}")
 			} else {
-				source.to_owned()
+				rendered.into_owned()
 			};
 			frame.buffer_mut().set_stringn(
 				text.x + (start - left) as u16,

@@ -157,3 +157,7 @@ Launch with `cargo run --locked`. Manual walkthrough:
 6. Resize across wide/slim layouts. Navigate categories, collapse subsections, scroll with the mouse/scrollbar, and confirm the footer stays accessible.
 
 Limits: physical keys sharing a terminal encoding cannot be distinguished. Capture is limited to nine decoded presses; timeout is bounded to 60 seconds. Proper Vim editing and broader terminal compatibility remain future work.
+
+## Follow-up: leader and General settings
+
+The [shortcut leader enhancement](../../initial-concept.md#future-work-shortcut-leader-and-general-settings) records the requested optional `<leader>` prefix and capture-count behavior. A future General category will contain Leader and Sequence Timeout. This follow-up does not reopen the completed slice or change the current shortcut defaults.

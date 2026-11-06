@@ -1,5 +1,5 @@
 use unicode_segmentation::UnicodeSegmentation;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub const TAB_STOP: usize = 4;
 
@@ -199,13 +199,41 @@ pub struct Glyph<'a> {
 	pub text: &'a str,
 }
 
+/// Conservative display for clusters whose width differs across terminal stacks.
+/// ZWJ/modifier/presentation sequences and regional indicators are escaped until
+/// component rendering can negotiate terminal widths. Never use this for export.
+/// Document bytes and extended-grapheme editing remain unchanged.
+pub fn display_grapheme(text: &str) -> std::borrow::Cow<'_, str> {
+	let scalar_width: usize = text.chars().map(|c| c.width().unwrap_or(0)).sum();
+	if scalar_width != text.width()
+		|| text.contains('\u{200d}')
+		|| text
+			.chars()
+			.any(|c| ('\u{1f1e6}'..='\u{1f1ff}').contains(&c))
+	{
+		std::borrow::Cow::Owned(
+			text.chars()
+				.map(|c| format!("\\u{{{:x}}}", c as u32))
+				.collect(),
+		)
+	} else if text.width() == 0 {
+		std::borrow::Cow::Owned(format!("◌{text}"))
+	} else {
+		std::borrow::Cow::Borrowed(text)
+	}
+}
+
+pub fn display_width(text: &str) -> usize {
+	display_grapheme(text).width().max(1)
+}
+
 pub fn glyphs(line: &str) -> impl Iterator<Item = Glyph<'_>> {
 	let mut column = 0;
 	line.grapheme_indices(true).map(move |(byte, text)| {
 		let width = if text == "\t" {
 			TAB_STOP - column % TAB_STOP
 		} else {
-			text.width().max(1)
+			display_width(text)
 		};
 		let glyph = Glyph {
 			byte,
@@ -254,6 +282,22 @@ pub fn sanitize(text: &str) -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn ambiguous_clusters_have_a_display_only_ascii_fallback() {
+		for text in ["👩🏽‍💻", "🇺🇳", "🏽", "❤️", "1️⃣", "\u{200d}"] {
+			let display = display_grapheme(text);
+			if text != "🏽" {
+				assert!(display.is_ascii(), "{text:?}: {display:?}");
+				assert!(display.starts_with("\\u{"));
+			}
+			assert_eq!(display_width(text), display.width().max(1));
+		}
+		for text in ["é", "e\u{301}", "界", "👩", "a"] {
+			assert_eq!(display_grapheme(text), text);
+		}
+		assert_eq!(display_grapheme("\u{301}"), "◌\u{301}");
+	}
 
 	#[test]
 	fn word_boundaries_skip_whitespace_cross_lines_and_keep_graphemes() {

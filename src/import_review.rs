@@ -14,6 +14,7 @@ use ratatui::{
 	widgets::{Block, BorderType, Clear, Paragraph, Row, Table},
 };
 use std::path::PathBuf;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Review {
 	path: PathBuf,
@@ -249,10 +250,10 @@ impl Review {
 				Rect::new(inside.x, y, gutter, 1),
 			);
 			let spans: Vec<_> = lines[row.line][row.start..row.end]
-				.char_indices()
+				.grapheme_indices(true)
 				.map(|(at, ch)| {
 					Span::styled(
-						ch.to_string(),
+						crate::document::display_grapheme(ch).into_owned(),
 						if marks[row.line][row.start + at] {
 							red
 						} else {

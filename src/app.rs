@@ -25,7 +25,7 @@ pub struct App {
 	pub editor_wrap_toggle: Rect,
 	pub code_wrap_toggle: Rect,
 	pub notice: Option<String>,
-	clipboard_result: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
+	clipboard_result: Option<std::sync::mpsc::Receiver<Result<crate::clipboard::Copied, String>>>,
 	copy_ansi: bool,
 	rgb_paste: Option<(usize, std::sync::mpsc::Receiver<Result<String, String>>)>,
 	pub focus: usize,
@@ -99,15 +99,11 @@ impl App {
 		if let Some(receiver) = &self.clipboard_result {
 			match receiver.try_recv() {
 				Ok(result) => {
-					self.notice = Some(match result {
-						Ok(()) => if self.copy_ansi {
-							"Copied escaped ANSI to clipboard"
-						} else {
-							"Copied selection to clipboard"
-						}
-						.into(),
-						Err(message) => message,
-					});
+					self.notice = Some(
+						result
+							.and_then(|copied| crate::clipboard::finish(copied, self.copy_ansi))
+							.unwrap_or_else(|error| error),
+					);
 					self.clipboard_result = None;
 				}
 				Err(std::sync::mpsc::TryRecvError::Disconnected) => {

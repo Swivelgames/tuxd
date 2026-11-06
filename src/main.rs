@@ -5,6 +5,8 @@ mod document;
 mod editor;
 mod file_picker;
 mod files;
+#[cfg(test)]
+mod hardening;
 mod import_review;
 mod layout;
 mod panel;
@@ -25,21 +27,27 @@ fn main() -> io::Result<()> {
 		return Err(io::Error::other("Expected at most one document path"));
 	}
 	let mut document_path = None;
-	let diagnostic = match std::env::args().nth(1).as_deref() {
+	let argument = std::env::args_os().nth(1);
+	let diagnostic = match argument.as_deref() {
 		None => None,
-		Some("--diagnostic-error") => Some(false),
-		Some("--diagnostic-panic") => Some(true),
-		Some("--help" | "-h") => {
+		Some(arg) if arg == "--diagnostic-error" => Some(false),
+		Some(arg) if arg == "--diagnostic-panic" => Some(true),
+		Some(arg) if arg == "--help" || arg == "-h" => {
 			println!(
 				"Terminal UX Designer\n\nUsage: terminal-ux-designer [document.tuxd.json]\nF4 files · Ctrl+S save · Ctrl+Q quit · F1 shortcuts"
 			);
 			return Ok(());
 		}
-		Some(arg) if !arg.starts_with('-') => {
+		Some(arg) if !arg.as_encoded_bytes().starts_with(b"-") => {
 			document_path = Some(std::path::PathBuf::from(arg));
 			None
 		}
-		Some(arg) => return Err(io::Error::other(format!("Unknown argument: {arg}"))),
+		Some(arg) => {
+			return Err(io::Error::other(format!(
+				"Unknown argument: {}",
+				arg.to_string_lossy()
+			)));
+		}
 	};
 	let loaded = document_path
 		.as_deref()

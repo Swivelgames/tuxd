@@ -1459,6 +1459,7 @@ dependencies = [
 name = "terminal-ux-designer"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "crossterm",
  "libc",
  "ratatui",

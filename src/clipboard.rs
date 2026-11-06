@@ -5,8 +5,62 @@ use std::{
 	time::{Duration, Instant},
 };
 
-/// The desktop helper retains clipboard ownership after the editor exits.
-pub fn copy(text: &str) -> Result<(), String> {
+/// Forwarded transports cannot acknowledge delivery to the client clipboard.
+pub enum Copied {
+	Desktop,
+	Tmux,
+	Terminal(Vec<u8>),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Transport {
+	Desktop,
+	Tmux,
+	Terminal,
+}
+fn transport(tmux: bool, ssh: bool, term: &str) -> Result<Transport, String> {
+	if term == "linux" || term == "dumb" {
+		return Err("Copy failed: this terminal has no supported clipboard transport; export the Code output instead".into());
+	}
+	Ok(if tmux {
+		Transport::Tmux
+	} else if ssh {
+		Transport::Terminal
+	} else {
+		Transport::Desktop
+	})
+}
+fn osc52(text: &str) -> Result<Vec<u8>, String> {
+	use base64::Engine;
+	// Never truncate or split: each OSC 52 write replaces the clipboard.
+	if text.len() > 100 * 1024 {
+		return Err(
+			"Copy failed: terminal clipboard payload exceeds 100 KiB; export instead".into(),
+		);
+	}
+	let encoded = base64::engine::general_purpose::STANDARD.encode(text.as_bytes());
+	Ok(format!("\x1b]52;c;{encoded}\x07").into_bytes())
+}
+
+pub fn copy(text: &str) -> Result<Copied, String> {
+	let selected = transport(
+		std::env::var_os("TMUX").is_some(),
+		std::env::var_os("SSH_CONNECTION").is_some() || std::env::var_os("SSH_TTY").is_some(),
+		&std::env::var("TERM").unwrap_or_default(),
+	)?;
+	match selected {
+		Transport::Tmux => {
+			// stdin avoids shell quoting and argument-size limits. A named buffer
+			// avoids replacing unrelated tmux history. -w requests client forwarding.
+			let name = format!("tuxd-{}", std::process::id());
+			copy_with("tmux", &["load-buffer", "-w", "-b", &name, "-"], text).map_err(|_| {
+				"Copy failed: tmux clipboard forwarding failed; export instead".to_owned()
+			})?;
+			return Ok(Copied::Tmux);
+		}
+		Transport::Terminal => return osc52(text).map(Copied::Terminal),
+		Transport::Desktop => (),
+	}
 	let mut helpers: Vec<(&str, &[&str])> = Vec::new();
 	if std::env::var_os("WAYLAND_DISPLAY").is_some() {
 		helpers.push(("wl-copy", &["--type", "text/plain;charset=utf-8"]));
@@ -17,13 +71,34 @@ pub fn copy(text: &str) -> Result<(), String> {
 	}
 	for (program, args) in helpers {
 		if copy_with(program, args, text).is_ok() {
-			return Ok(());
+			return Ok(Copied::Desktop);
 		}
 	}
 	Err(
 		"Copy failed: use wl-copy on Wayland or xclip/xsel on X11; check your display connection."
 			.into(),
 	)
+}
+
+/// Called by the UI thread so the OSC cannot interleave with a rendered frame.
+pub fn finish(result: Copied, ansi: bool) -> Result<String, String> {
+	let payload = if ansi { "escaped ANSI" } else { "selection" };
+	match result {
+		Copied::Desktop => Ok(format!("Copied {payload} to clipboard")),
+		Copied::Tmux => Ok(format!(
+			"Sent {payload} via tmux; clipboard delivery unconfirmed"
+		)),
+		Copied::Terminal(bytes) => {
+			let mut stdout = std::io::stdout().lock();
+			stdout
+				.write_all(&bytes)
+				.and_then(|_| stdout.flush())
+				.map_err(|e| format!("Copy failed: {e}"))?;
+			Ok(format!(
+				"Sent {payload} via OSC 52; clipboard delivery unconfirmed"
+			))
+		}
+	}
 }
 
 fn copy_with(program: &str, args: &[&str], text: &str) -> Result<(), ()> {
@@ -124,5 +199,47 @@ fn paste_with(program: &str, args: &[&str]) -> Result<String, ()> {
 				return Err(());
 			}
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	#[test]
+	fn routing_respects_remote_client_and_console_limitations() {
+		assert_eq!(
+			transport(true, true, "tmux-256color").unwrap(),
+			Transport::Tmux
+		);
+		assert_eq!(
+			transport(false, true, "xterm-256color").unwrap(),
+			Transport::Terminal
+		);
+		assert_eq!(
+			transport(false, false, "xterm-256color").unwrap(),
+			Transport::Desktop
+		);
+		assert!(transport(false, true, "linux").is_err());
+		assert!(transport(false, false, "dumb").is_err());
+	}
+	#[test]
+	fn osc_payload_roundtrips_without_truncation_or_control_injection() {
+		use base64::Engine;
+		for text in [
+			String::new(),
+			"界\\x1b[31m\n\x1b]52;c;evil\x07".into(),
+			"x".repeat(100 * 1024),
+		] {
+			let bytes = osc52(&text).unwrap();
+			assert_eq!(&bytes[..7], b"\x1b]52;c;");
+			assert_eq!(*bytes.last().unwrap(), 7);
+			assert_eq!(
+				base64::engine::general_purpose::STANDARD
+					.decode(&bytes[7..bytes.len() - 1])
+					.unwrap(),
+				text.as_bytes()
+			);
+		}
+		assert!(osc52(&"x".repeat(100 * 1024 + 1)).is_err());
 	}
 }
