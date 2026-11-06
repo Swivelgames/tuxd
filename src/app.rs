@@ -2,20 +2,13 @@ use crate::panel::{Control, Panel};
 use crate::styling::Action;
 use std::time::Instant;
 
-use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
+use crossterm::event::{Event, KeyEventKind, MouseButton, MouseEventKind};
 use ratatui::layout::Rect;
 
 use crate::{
 	document::sanitize,
 	editor::{EditKind, Editor, Movement},
 };
-
-#[derive(Default, PartialEq, Eq)]
-pub enum Overlay {
-	#[default]
-	None,
-	Help,
-}
 
 pub struct App {
 	pub editor_open: bool,
@@ -33,6 +26,8 @@ pub struct App {
 	pub code_wrap_toggle: Rect,
 	pub notice: Option<String>,
 	clipboard_result: Option<std::sync::mpsc::Receiver<Result<(), String>>>,
+	copy_ansi: bool,
+	rgb_paste: Option<(usize, std::sync::mpsc::Receiver<Result<String, String>>)>,
 	pub focus: usize,
 	pub code_open: bool,
 	pub code_top: usize,
@@ -46,7 +41,8 @@ pub struct App {
 	pub dragging: bool,
 
 	pub editor: Editor,
-	pub overlay: Overlay,
+	pub shortcuts: crate::shortcuts::Runtime,
+	pub settings: Option<crate::shortcuts::settings::Settings>,
 	pub editor_area: Rect,
 }
 
@@ -70,6 +66,8 @@ impl Default for App {
 			code_wrap_toggle: Default::default(),
 			notice: Default::default(),
 			clipboard_result: Default::default(),
+			copy_ansi: false,
+			rgb_paste: None,
 			focus: Default::default(),
 			code_open: true,
 			code_top: Default::default(),
@@ -82,7 +80,8 @@ impl Default for App {
 			tool_index: Default::default(),
 			dragging: Default::default(),
 			editor,
-			overlay: Default::default(),
+			shortcuts: Default::default(),
+			settings: None,
 			editor_area: Default::default(),
 		}
 	}
@@ -101,7 +100,12 @@ impl App {
 			match receiver.try_recv() {
 				Ok(result) => {
 					self.notice = Some(match result {
-						Ok(()) => "Copied escaped ANSI to clipboard".into(),
+						Ok(()) => if self.copy_ansi {
+							"Copied escaped ANSI to clipboard"
+						} else {
+							"Copied selection to clipboard"
+						}
+						.into(),
 						Err(message) => message,
 					});
 					self.clipboard_result = None;
@@ -113,19 +117,61 @@ impl App {
 				Err(std::sync::mpsc::TryRecvError::Empty) => (),
 			}
 		}
-		path_updated || (was_pending && self.clipboard_result.is_none())
+		let mut pasted = false;
+		if let Some((field, receiver)) = &self.rgb_paste {
+			let field = *field;
+			match receiver.try_recv() {
+				Ok(Ok(text)) => {
+					self.panel.edit(field, text.trim(), false);
+					pasted = true;
+				}
+				Ok(Err(error)) => {
+					self.notice = Some(error);
+					pasted = true;
+				}
+				Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+					self.notice = Some("Clipboard paste failed".into());
+					pasted = true;
+				}
+				Err(std::sync::mpsc::TryRecvError::Empty) => (),
+			}
+		}
+		if pasted {
+			self.rgb_paste = None;
+		}
+		pasted || path_updated || (was_pending && self.clipboard_result.is_none())
 	}
 
 	fn copy_code(&mut self) {
+		self.copy_text(crate::styling::clipboard_text(&self.editor.document), true);
+	}
+	fn copy_text(&mut self, text: String, ansi: bool) {
 		if self.clipboard_result.is_some() {
 			return;
 		}
-		let text = crate::styling::clipboard_text(&self.editor.document);
 		let (sender, receiver) = std::sync::mpsc::channel();
 		self.clipboard_result = Some(receiver);
-		self.notice = Some("Copying escaped ANSI…".into());
+		self.copy_ansi = ansi;
+		self.notice = Some(
+			if ansi {
+				"Copying escaped ANSI…"
+			} else {
+				"Copying selection…"
+			}
+			.into(),
+		);
 		std::thread::spawn(move || {
 			let _ = sender.send(crate::clipboard::copy(&text));
+		});
+	}
+	fn paste_rgb(&mut self, field: usize) {
+		if self.rgb_paste.is_some() {
+			return;
+		}
+		let (sender, receiver) = std::sync::mpsc::channel();
+		self.rgb_paste = Some((field, receiver));
+		std::thread::spawn(move || {
+			let _ = sender.send(crate::clipboard::paste());
 		});
 	}
 
@@ -172,42 +218,78 @@ impl App {
 		self.scrollbar_drag = None;
 		self.editor.break_group();
 	}
-	fn workspace_key(&mut self, key: crossterm::event::KeyEvent) -> bool {
-		let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-		match key.code {
-			KeyCode::F(3) => {
-				if self.focus != 1 {
-					self.toggle_wrap(self.focus == 2);
+	pub fn input_scope(&self) -> crate::shortcuts::InputScope {
+		use crate::{files::Dialog, shortcuts::InputScope as S};
+		match &self.files.dialog {
+			Some(Dialog::Path { picker, .. }) => picker.input_scope(),
+			Some(Dialog::Menu { .. }) => S::Menu,
+			Some(Dialog::Review(_)) => self.files.review.input_scope(),
+			Some(_) => S::Prompt,
+			None if self.focus == 0 => S::Editor,
+			None if self.focus == 2 => S::Code,
+			None => self
+				.panel
+				.items()
+				.get(self.tool_index)
+				.map_or(S::Tools, |item| match item.control {
+					Control::Field(0) => S::Hex,
+					Control::Field(_) => S::Channel,
+					Control::Target(_) => S::Radio,
+					Control::Palette(_) | Control::GlyphTab(_) => S::ToolTabs,
+					Control::Glyph(_) => S::Grid,
+					_ if item.ink.is_some() => S::Grid,
+					_ => S::Tools,
+				}),
+		}
+	}
+	fn execute_action(&mut self, action: crate::shortcuts::ActionId) {
+		use crate::files::Action as F;
+		use crate::shortcuts::ActionId as A;
+		let now = Instant::now();
+		match action {
+			A::New => self.file_action(F::New),
+			A::Open => self.file_action(F::Open),
+			A::Save => self.file_action(F::Save),
+			A::SaveAs => self.file_action(F::SaveAs),
+			A::Import => self.file_action(F::ImportEscaped),
+			A::Export => self.file_action(F::ExportEscaped),
+			A::Quit => self.file_action(F::Quit),
+			A::FileMenu => self.open_file_menu(),
+			A::ToggleCode => self.toggle_pane(true),
+			A::ToggleEditor => self.toggle_pane(false),
+			A::EditorWrap => self.toggle_wrap(false),
+			A::CodeWrap => self.toggle_wrap(true),
+			A::Bold => self.editor.apply_tool(Action::Bold),
+			A::Italic => self.editor.apply_tool(Action::Italic),
+			A::Underline => self.editor.apply_tool(Action::Underline),
+			A::Undo => self.editor.undo(false),
+			A::Redo => self.editor.undo(true),
+			A::DeleteBefore => self.editor.delete(true, now),
+			A::DeleteAfter => self.editor.delete(false, now),
+			A::DeleteWord => self.editor.delete_word(now),
+			A::InsertNewline => self.editor.insert("\n", EditKind::Atomic, now),
+			A::InsertTab => self.editor.insert("\t", EditKind::Atomic, now),
+			A::ClearSelection => {
+				self.editor.anchor = None;
+				self.focus = 0;
+				self.editor_open = true;
+				self.dragging = false;
+				self.editor.break_group();
+			}
+			A::NextTab | A::PreviousTab => {
+				if self.slim {
+					self.select_slim_tab(
+						(self.slim_tab + if action == A::PreviousTab { 3 } else { 1 }) % 4,
+					);
 				}
-				return true;
 			}
-			KeyCode::Char('c' | 'C') if ctrl && self.focus == 2 => {
-				self.copy_code();
-				return true;
-			}
-			KeyCode::F(2) => {
-				self.toggle_pane(true);
-				return true;
-			}
-			KeyCode::F(5) => {
-				self.toggle_pane(false);
-				return true;
-			}
-			KeyCode::Left | KeyCode::Right
-				if self.slim && self.focus != 0 && key.modifiers.contains(KeyModifiers::ALT) =>
-			{
-				self.select_slim_tab(
-					(self.slim_tab + if key.code == KeyCode::Left { 3 } else { 1 }) % 4,
-				);
-				return true;
-			}
-			KeyCode::F(6) => {
+			A::CyclePanes => {
 				if self.slim {
 					if self.focus == 0 {
 						self.select_slim_tab(self.slim_tab);
 					} else {
-						self.editor_open = true;
 						self.focus = 0;
+						self.editor_open = true;
 					}
 				} else {
 					self.focus = (self.focus + 1) % 3;
@@ -222,60 +304,91 @@ impl App {
 					}
 				}
 				self.editor.break_group();
-				return true;
 			}
-			KeyCode::Esc => {
-				self.editor.anchor = None;
+			A::FocusEditor => {
 				self.focus = 0;
 				self.editor_open = true;
-				self.dragging = false;
 				self.editor.break_group();
-				return true;
 			}
-			KeyCode::Char(ch) if ctrl && "bBiIuU".contains(ch) => {
-				self.editor.apply_tool(match ch.to_ascii_lowercase() {
-					'b' => Action::Bold,
-					'i' => Action::Italic,
-					_ => Action::Underline,
-				});
-				return true;
+			A::FocusCode => {
+				if self.slim {
+					self.select_slim_tab(0);
+				} else {
+					self.focus = 2;
+					self.code_open = true;
+				}
+				self.editor.break_group();
 			}
-			KeyCode::Char('z' | 'Z' | 'y' | 'Y') if ctrl => return false,
-			_ => (),
-		}
-		if self.focus == 1 {
-			self.panel_key(key);
-			return true;
-		}
-		if self.focus == 2 {
-			match key.code {
-				KeyCode::Up => self.code_top = self.code_top.saturating_sub(1),
-				KeyCode::Down => self.code_top = self.code_top.saturating_add(1),
-				KeyCode::Left => self.code_left = self.code_left.saturating_sub(4),
-				KeyCode::Right => self.code_left = self.code_left.saturating_add(4),
-				KeyCode::PageUp => {
-					self.code_top = self.code_top.saturating_sub(self.code_area.height as usize)
+			A::FocusTools => {
+				if self.slim {
+					self.select_slim_tab(self.slim_tab.max(1));
+				} else {
+					self.focus = 1;
+					self.reveal_tool();
 				}
-				KeyCode::PageDown => {
-					self.code_top = self.code_top.saturating_add(self.code_area.height as usize)
-				}
-				KeyCode::Home => {
-					self.code_left = 0;
-					if ctrl {
-						self.code_top = 0;
+				self.editor.break_group();
+			}
+			A::Copy => {
+				if self.focus == 2 && self.files.dialog.is_none() {
+					self.copy_code();
+				} else if let Some(crate::files::Dialog::Path { picker, .. }) = &self.files.dialog {
+					if let Some(text) = picker.selected_text() {
+						self.copy_text(text, false);
 					}
+				} else if let Some(item) = self.panel.items().get(self.tool_index)
+					&& let Control::Field(field) = item.control
+					&& self.panel.replace_field
+				{
+					self.copy_text(self.panel.fields[field].clone(), false);
 				}
-				KeyCode::End => {
-					self.code_left = usize::MAX;
-					if ctrl {
-						self.code_top = usize::MAX;
-					}
-				}
-				_ => (),
 			}
-			return true;
+			A::CodeUp => self.code_top = self.code_top.saturating_sub(1),
+			A::CodeDown => self.code_top = self.code_top.saturating_add(1),
+			A::CodeLeft => self.code_left = self.code_left.saturating_sub(4),
+			A::CodeRight => self.code_left = self.code_left.saturating_add(4),
+			A::CodePageUp => {
+				self.code_top = self.code_top.saturating_sub(self.code_area.height as usize)
+			}
+			A::CodePageDown => {
+				self.code_top = self.code_top.saturating_add(self.code_area.height as usize)
+			}
+			A::CodeHome => self.code_left = 0,
+			A::CodeEnd => self.code_left = usize::MAX,
+			A::CodeStart => {
+				self.code_top = 0;
+				self.code_left = 0;
+			}
+			A::CodeFinish => {
+				self.code_top = usize::MAX;
+				self.code_left = usize::MAX;
+			}
+			A::MoveLeft => self.editor.navigate(Movement::Left, false),
+			A::SelectLeft => self.editor.navigate(Movement::Left, true),
+			A::MoveRight => self.editor.navigate(Movement::Right, false),
+			A::SelectRight => self.editor.navigate(Movement::Right, true),
+			A::MoveUp => self.editor.navigate(Movement::Up, false),
+			A::SelectUp => self.editor.navigate(Movement::Up, true),
+			A::MoveDown => self.editor.navigate(Movement::Down, false),
+			A::SelectDown => self.editor.navigate(Movement::Down, true),
+			A::MoveHome => self.editor.navigate(Movement::Home, false),
+			A::SelectHome => self.editor.navigate(Movement::Home, true),
+			A::MoveEnd => self.editor.navigate(Movement::End, false),
+			A::SelectEnd => self.editor.navigate(Movement::End, true),
+			A::MovePageUp => self.editor.navigate(Movement::PageUp, false),
+			A::SelectPageUp => self.editor.navigate(Movement::PageUp, true),
+			A::MovePageDown => self.editor.navigate(Movement::PageDown, false),
+			A::SelectPageDown => self.editor.navigate(Movement::PageDown, true),
+			A::MoveStart => self.editor.navigate(Movement::Start, false),
+			A::SelectStart => self.editor.navigate(Movement::Start, true),
+			A::MoveFinish => self.editor.navigate(Movement::Finish, false),
+			A::SelectFinish => self.editor.navigate(Movement::Finish, true),
+			A::MoveWordLeft => self.editor.navigate(Movement::WordLeft, false),
+			A::SelectWordLeft => self.editor.navigate(Movement::WordLeft, true),
+			A::MoveWordRight => self.editor.navigate(Movement::WordRight, false),
+			A::SelectWordRight => self.editor.navigate(Movement::WordRight, true),
+			_ if self.files.dialog.is_some() => self.file_shortcut(action),
+			_ => self.panel_action(action),
 		}
-		false
 	}
 
 	pub fn reveal_tool(&mut self) {
@@ -340,128 +453,111 @@ impl App {
 		}
 	}
 
-	fn panel_key(&mut self, key: crossterm::event::KeyEvent) {
-		let mut items = self.panel.items();
-		for item in &mut items {
-			item.row = self.panel.display_row(item).unwrap_or(usize::MAX);
+	fn panel_action(&mut self, action: crate::shortcuts::ActionId) {
+		use crate::shortcuts::ActionId as A;
+		let items = self.panel.items();
+		if items.is_empty() {
+			return;
 		}
 		self.tool_index = self.tool_index.min(items.len() - 1);
 		let current = &items[self.tool_index];
-		if let Some(crate::styling::Ink::Indexed(n)) = current.ink
-			&& matches!(
-				key.code,
-				KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown
-			) {
-			let down = matches!(key.code, KeyCode::Down | KeyCode::PageDown);
-			let distance = if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
-				35
-			} else {
-				7
+		if matches!(action, A::NextField | A::PreviousField) {
+			self.tool_index = self
+				.panel
+				.next_field(self.tool_index, action == A::PreviousField);
+		} else if let Control::Field(field) = current.control {
+			let value = self.panel.fields[field].parse::<u8>().unwrap_or(0);
+			let adjusted = match action {
+				A::RangeDecrease => Some(value.saturating_sub(1)),
+				A::RangeIncrease => Some(value.saturating_add(1)),
+				A::RangeDecrease10 => Some(value.saturating_sub(10)),
+				A::RangeIncrease10 => Some(value.saturating_add(10)),
+				A::RangeMinimum => Some(0),
+				A::RangeMaximum => Some(255),
+				_ => None,
 			};
-			let next = if down {
-				n as i32 + distance
-			} else {
-				n as i32 - distance
-			};
-			let control = if next < 0 {
-				Control::Palette(1)
-			} else if next > 255 {
-				Control::Style(self.panel.color_action(crate::styling::Ink::Default))
-			} else {
-				Control::Style(
-					self.panel
-						.color_action(crate::styling::Ink::Indexed(next as u8)),
-				)
-			};
-			if let Some(index) = items.iter().position(|item| item.control == control) {
-				self.tool_index = index;
-			}
-			self.reveal_tool();
-			return;
-		}
-
-		if let Control::Field(field) = current.control {
-			if field > 0
-				&& matches!(
-					key.code,
-					KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End
-				) {
-				let current = self.panel.fields[field].parse::<u8>().unwrap_or(0);
-				let step = if key.modifiers.contains(KeyModifiers::SHIFT) {
-					10
-				} else {
-					1
-				};
-				let value = match key.code {
-					KeyCode::Left => current.saturating_sub(step),
-					KeyCode::Right => current.saturating_add(step),
-					KeyCode::Home => 0,
-					_ => 255,
-				};
+			if let Some(value) = adjusted {
 				self.panel.set_component(field, value);
 				return;
 			}
-
-			match key.code {
-				KeyCode::Enter => {
-					self.apply_rgb();
-					return;
+			match action {
+				A::RgbApply | A::Submit => self.apply_rgb(),
+				A::SelectAll => self.panel.replace_field = true,
+				A::FieldDeleteBefore => self.panel.edit(field, "", true),
+				A::FieldLeft | A::FieldRight | A::FieldHome | A::FieldEnd => {
+					self.panel.move_caret(field, action)
 				}
-				KeyCode::Backspace => {
-					self.panel.edit(field, "", true);
-					return;
+				A::FieldUp | A::FieldDown => {
+					self.tool_index = self.panel.next_field(self.tool_index, action == A::FieldUp)
 				}
-				KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-					self.panel.replace_field = true;
-					return;
-				}
-				KeyCode::Char(ch)
-					if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT =>
-				{
-					self.panel.edit(field, &ch.to_string(), false);
-					return;
-				}
+				A::Paste => self.paste_rgb(field),
 				_ => (),
 			}
-		}
-		match key.code {
-			KeyCode::BackTab | KeyCode::Left => {
-				self.tool_index = self.tool_index.checked_sub(1).unwrap_or(items.len() - 1)
-			}
-			KeyCode::Tab | KeyCode::Right => self.tool_index = (self.tool_index + 1) % items.len(),
-			KeyCode::Up | KeyCode::Down | KeyCode::PageUp | KeyCode::PageDown => {
-				let down = matches!(key.code, KeyCode::Down | KeyCode::PageDown);
-				let distance = if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) {
-					self.panel.height.max(1)
-				} else {
-					1
-				};
-				let row = if down {
-					current.row.saturating_add(distance)
-				} else {
-					current.row.saturating_sub(distance)
-				};
-				if let Some((index, _)) = items
-					.iter()
-					.enumerate()
-					.filter(|(_, item)| item.row != usize::MAX)
-					.filter(|(_, item)| {
-						if down {
-							item.row > current.row
-						} else {
-							item.row < current.row
-						}
-					})
-					.min_by_key(|(_, item)| {
-						(item.row.abs_diff(row), item.column.abs_diff(current.column))
-					}) {
-					self.tool_index = index;
+			self.reveal_tool();
+			return;
+		} else if action == A::Activate {
+			self.activate_tool();
+			return;
+		} else {
+			let group = current.group();
+			let members: Vec<_> = items
+				.iter()
+				.enumerate()
+				.filter(|(_, item)| item.group() == group)
+				.collect();
+			let at = members
+				.iter()
+				.position(|(i, _)| *i == self.tool_index)
+				.unwrap_or(0);
+			let columns = current.columns.max(1);
+			let grid = matches!(
+				group,
+				crate::panel::Group::Colors(_) | crate::panel::Group::Glyphs(_)
+			);
+			let rows = if matches!(current.ink, Some(crate::styling::Ink::Indexed(_))) {
+				5
+			} else {
+				(self.panel.height / 2).max(1)
+			};
+			let next = match action {
+				A::FieldHome => 0,
+				A::FieldEnd => members.len() - 1,
+				A::FieldLeft => at.saturating_sub(1),
+				A::FieldRight => (at + 1).min(members.len() - 1),
+				A::FieldUp if grid => {
+					if at >= columns {
+						at - columns
+					} else {
+						at
+					}
 				}
+				A::FieldDown if grid => {
+					if at / columns < (members.len() - 1) / columns {
+						(at + columns).min(members.len() - 1)
+					} else {
+						at
+					}
+				}
+				A::FieldPageUp if grid => at.saturating_sub(columns * rows),
+				A::FieldPageDown if grid => (at + columns * rows).min(members.len() - 1),
+				A::FieldUp | A::FieldDown | A::FieldPageUp | A::FieldPageDown => {
+					self.tool_index = self.panel.next_field(
+						self.tool_index,
+						matches!(action, A::FieldUp | A::FieldPageUp),
+					);
+					self.reveal_tool();
+					return;
+				}
+				_ => at,
+			};
+			self.tool_index = members[next].0;
+			if next != at
+				&& matches!(
+					current.control,
+					Control::Target(_) | Control::Palette(_) | Control::GlyphTab(_)
+				) {
+				self.activate_tool();
 			}
-			KeyCode::Home => self.tool_index = 0,
-			KeyCode::End => self.tool_index = items.len() - 1,
-			KeyCode::Enter | KeyCode::Char(' ') => self.activate_tool(),
-			_ => (),
 		}
 		self.panel.replace_field = true;
 		self.reveal_tool();
@@ -699,101 +795,84 @@ impl App {
 
 	/// Returns true only when the user has chosen to exit.
 	pub fn handle(&mut self, event: Event) -> bool {
-		if let Some(exit) = self.file_event(&event) {
-			return exit;
+		use crate::shortcuts::{Dispatch, ShortcutKey};
+		if self.settings.is_some() {
+			self.settings_event(event);
+			return false;
 		}
-		match event {
-			Event::Key(key) if key.kind != KeyEventKind::Release => {
-				self.notice = None;
-				let control = key.modifiers.contains(KeyModifiers::CONTROL);
-				if self.overlay == Overlay::Help {
-					if matches!(key.code, KeyCode::Esc | KeyCode::F(1)) {
-						self.overlay = Overlay::None;
-					}
-					return false;
-				}
-				if key.code == KeyCode::F(1) {
-					self.editor.break_group();
-					self.overlay = Overlay::Help;
-					return false;
-				}
-				if self.workspace_key(key) {
-					return false;
-				}
-				let selecting = key.modifiers.contains(KeyModifiers::SHIFT);
-				let now = Instant::now();
-				let word = key
-					.modifiers
-					.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
-				if word {
-					match key.code {
-						KeyCode::Left => {
-							self.editor.navigate(Movement::WordLeft, selecting);
-							return false;
+		let scope = self.input_scope();
+		if let Event::Key(key) = event {
+			if key.kind == KeyEventKind::Release {
+				return false;
+			}
+			let decoded = ShortcutKey::from(key);
+			if decoded.opener() {
+				self.shortcuts.cancel();
+				self.editor.break_group();
+				self.settings = Some(crate::shortcuts::settings::Settings::for_scope(
+					&self.shortcuts.config,
+					scope,
+				));
+				return false;
+			}
+			self.notice = None;
+			match self
+				.shortcuts
+				.dispatch(decoded.clone(), scope, Instant::now())
+			{
+				Dispatch::Action(action) => self.execute_action(action),
+				Dispatch::Unbound => {
+					if let Some(ch) = decoded.printable() {
+						if self.files.dialog.is_some() {
+							self.file_event(&Event::Paste(ch.to_string()));
+						} else if self.focus == 0 {
+							self.editor
+								.insert(&ch.to_string(), EditKind::Typing, Instant::now());
+						} else if self.focus == 1
+							&& let Some(item) = self.panel.items().get(self.tool_index)
+							&& let Control::Field(field) = item.control
+						{
+							self.panel.edit(field, &ch.to_string(), false);
 						}
-						KeyCode::Right => {
-							self.editor.navigate(Movement::WordRight, selecting);
-							return false;
-						}
-						KeyCode::Backspace => {
-							self.editor.delete_word(now);
-							return false;
-						}
-						_ => (),
+					} else {
+						self.editor.break_group();
 					}
 				}
-				match (key.code, control) {
-					(KeyCode::Char('z' | 'Z'), true) => {
+				Dispatch::Pending | Dispatch::Consumed => (),
+			}
+		} else {
+			// A mouse/paste/resize/focus event ends any pending keyboard sequence.
+			self.shortcuts.cancel();
+			if self.file_event(&event).is_none() {
+				match event {
+					Event::Paste(text) if self.focus == 1 => {
+						if let Some(item) = self.panel.items().get(self.tool_index)
+							&& let Control::Field(field) = item.control
+						{
+							self.panel.edit(field, text.trim(), false);
+						}
+					}
+					Event::Paste(text) if self.focus == 0 => {
 						self.editor
-							.undo(key.modifiers.contains(KeyModifiers::SHIFT));
+							.insert(&sanitize(&text), EditKind::Atomic, Instant::now())
 					}
-					(KeyCode::Char('y' | 'Y'), true) => self.editor.undo(true),
-					(KeyCode::Home, true) => self.editor.navigate(Movement::Start, selecting),
-					(KeyCode::End, true) => self.editor.navigate(Movement::Finish, selecting),
-					(KeyCode::Left, false) => self.editor.navigate(Movement::Left, selecting),
-					(KeyCode::Right, false) => self.editor.navigate(Movement::Right, selecting),
-					(KeyCode::Up, false) => self.editor.navigate(Movement::Up, selecting),
-					(KeyCode::Down, false) => self.editor.navigate(Movement::Down, selecting),
-					(KeyCode::Home, false) => self.editor.navigate(Movement::Home, selecting),
-					(KeyCode::End, false) => self.editor.navigate(Movement::End, selecting),
-					(KeyCode::PageUp, false) => self.editor.navigate(Movement::PageUp, selecting),
-					(KeyCode::PageDown, false) => {
-						self.editor.navigate(Movement::PageDown, selecting)
-					}
-					(KeyCode::Backspace, false) => self.editor.delete(true, now),
-					(KeyCode::Delete, false) => self.editor.delete(false, now),
-					(KeyCode::Enter, false) => self.editor.insert("\n", EditKind::Atomic, now),
-					(KeyCode::Tab, false) => self.editor.insert("\t", EditKind::Atomic, now),
-					(KeyCode::Char(ch), false)
-						if !key.modifiers.contains(KeyModifiers::ALT) && !ch.is_control() =>
-					{
-						self.editor.insert(&ch.to_string(), EditKind::Typing, now)
-					}
-					_ => self.editor.break_group(),
+					Event::Mouse(mouse) => self.mouse(mouse),
+					Event::Resize(_, _) | Event::FocusLost => self.editor.break_group(),
+					_ => (),
 				}
 			}
-			Event::Paste(text) if self.overlay == Overlay::None && self.focus == 1 => {
-				if let Some(item) = self.panel.items().get(self.tool_index)
-					&& let Control::Field(field) = item.control
-				{
-					self.panel.edit(field, text.trim(), false);
-				}
-			}
-			Event::Paste(text) if self.overlay == Overlay::None && self.focus == 0 => self
-				.editor
-				.insert(&sanitize(&text), EditKind::Atomic, Instant::now()),
-			Event::Mouse(mouse) if self.overlay == Overlay::None => self.mouse(mouse),
-			Event::Resize(_, _) | Event::FocusLost => self.editor.break_group(),
-			_ => (),
 		}
-		false
+		if self.input_scope() != scope {
+			self.shortcuts.cancel();
+		}
+		self.files.exiting()
 	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crossterm::event::KeyEvent;
+	use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 	fn key(code: KeyCode, modifiers: KeyModifiers) -> Event {
 		Event::Key(KeyEvent::new(code, modifiers))
@@ -945,9 +1024,9 @@ mod tests {
 		assert!(!app.handle(Event::Paste("y".into())));
 		assert_eq!(app.editor.document.lines, ["hello"]);
 		app.handle(key(KeyCode::Esc, KeyModifiers::NONE));
-		assert!(app.overlay == Overlay::None);
+		assert!(app.settings.is_none());
 		app.handle(key(KeyCode::Char('q'), KeyModifiers::CONTROL));
-		assert!(app.handle(key(KeyCode::Char('y'), KeyModifiers::NONE)));
+		assert!(app.handle(key(KeyCode::Char('d'), KeyModifiers::NONE)));
 	}
 
 	#[test]

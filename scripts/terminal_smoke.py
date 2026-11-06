@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class Session:
 	def __init__(self, binary, *args, env=None):
+		self.config_directory = tempfile.TemporaryDirectory(prefix="tuxd-smoke-config-")
 		self.master, self.slave = pty.openpty()
 		self.original = termios.tcgetattr(self.slave)
 		self.screen = pyte.Screen(80, 24)
@@ -42,7 +43,7 @@ class Session:
 
 		self.process = subprocess.Popen(
 			[binary, *args], stdin=self.slave, stdout=self.slave, stderr=self.slave,
-			env={key: value for key, value in {**os.environ, "TERM": "xterm-256color", **(env or {})}.items() if value is not None}, preexec_fn=controlling_terminal,
+			env={key: value for key, value in {**os.environ, "TERM": "xterm-256color", "XDG_CONFIG_HOME": self.config_directory.name, **(env or {})}.items() if value is not None}, preexec_fn=controlling_terminal,
 		)
 		self.drain()
 
@@ -118,6 +119,143 @@ class Session:
 			os.close(self.master)
 			os.close(self.slave)
 			self.master = None
+		self.config_directory.cleanup()
+
+
+def shortcut_settings_checks(binary):
+	with tempfile.TemporaryDirectory(prefix="tuxd-shortcut-settings-") as directory:
+		env = {"XDG_CONFIG_HOME": directory}
+		path = Path(directory) / "tuxd" / "shortcuts.json"
+		session = Session(binary, env=env)
+		def category(index):
+			session.send("\x0cgg" + "j" * index + "\r")
+		def click(label):
+			for _ in range(40):
+				for y, row in enumerate(session.rows()):
+					x = row.find(label)
+					if x >= 0:
+						session.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<0;{x+1};{y+1}m")
+						return
+				session.send("\x1b[<65;76;7M")
+			raise AssertionError(f"Missing {label}: {session.rows()}")
+		try:
+			# Record a new primary binding, then explicitly save it.
+			session.send("\x1bOP")
+			category(1)
+			click("New document")
+			session.send("1\x1b[19~")  # Record F8 for the selected action
+			assert "unsaved" in "\n".join(session.rows())
+			assert not path.exists()
+			session.send("\x13")
+			config = json.loads(path.read_text())
+			assert config["bindings"]["new"][0][0]["code"] == {"F": 8}
+			session.send("\x1b[14~")
+			assert any("New document" in row and "F8" in row for row in session.rows())
+			session.send("\x1b")
+			# Capture a two-input sequence, change timeout, and save together.
+			session.send("\x1bOP")
+			category(1)
+			click("Focus Code")
+			session.send("2\x17\x1b[C")
+			assert "Recorded: Ctrl+W Right" in "\n".join(session.rows())
+			session.send("\x14250\r\x13")  # fixed Ctrl+T timeout editor, fixed Ctrl+S
+			assert json.loads(path.read_text())["timeout_ms"] == 250
+			session.send("\x17\x1b[C\x1bOR")  # focus Code, F3 changes only Code wrap
+			assert sum("Wrap: off" in row for row in session.rows()) == 1
+			session.send("\x1b")
+			# A single-key prefix assignment conflicts; fixed keys can recover.
+			session.send("\x1bOP")
+			category(1)
+			click("Focus Tools")
+			session.send("1\x17")
+			assert "conflicts" in "\n".join(session.rows())
+			session.send("\x13")
+			assert "Shortcut Settings" in "\n".join(session.rows())
+			category(1)
+			session.send("\r\x1b[3~")  # return to the selected binding and unset it
+			session.send("\x1b")
+			assert "Shortcut Settings" not in "\n".join(session.rows())
+			# Every opener works inside the picker and returns to its list.
+			session.send("\x0f")
+			for opener in ["\x1bOP", "\x1f", "\x1b[44;5u"]:
+				session.send(opener)
+				assert any(label in "\n".join(session.rows()) for label in ["File Explorer", "Select all"]), session.rows()
+				for columns, rows in [(140,40),(64,20),(24,8),(80,24)]:
+					session.resize(columns, rows)
+				session.send("\x1b")
+				assert "Open document" in "\n".join(session.rows())
+			session.send("\x1b")
+			session.send("\x11")
+			session.finish()
+		finally:
+			session.close()
+		# Restart proves dispatch loads saved bindings; canceled settings leave disk intact.
+		session = Session(binary, env=env)
+		try:
+			session.paste("preserved")
+			session.send("\x1b[19~")
+			assert "Save changes before continuing?" in "\n".join(session.rows())
+			session.send("\x1b")
+			before = path.read_bytes()
+			session.send("\x1bOP")
+			category(1)
+			click("New document")
+			session.send("\r\x1b[3~")
+			session.send("\x1b")
+			assert "Discard unsaved shortcut changes?" in "\n".join(session.rows())
+			session.send("\r")  # Keep editing is the default.
+			assert "Shortcut Settings" in "\n".join(session.rows())
+			session.send("\x1b")
+			session.send("\x1b[D\r")
+			assert path.read_bytes() == before
+			session.send("\x11d")
+			session.finish()
+		finally:
+			session.close()
+		path.write_text("malformed settings")
+		session = Session(binary, env=env)
+		try:
+			assert "Shortcuts:" in "\n".join(session.rows())
+			assert path.read_text() == "malformed settings"
+			session.send("\x11")
+			session.finish()
+		finally:
+			session.close()
+	print("PASS: shortcut capture, sequence dispatch, conflict recovery, explicit save, inline hints, context return, resize, restart and malformed config")
+
+
+def shared_clipboard_checks(binary):
+	with tempfile.TemporaryDirectory(prefix="tuxd-shared-clipboard-") as directory:
+		folder = Path(directory)
+		clipboard = folder / "clipboard.txt"
+		clipboard.write_text("#aabbcc")
+		helper = folder / "xclip"
+		helper.write_text("#!/bin/sh\ncase \"$*\" in\n*-out*) /bin/cat " + shlex.quote(str(clipboard)) + ";;\n*) /bin/cat > " + shlex.quote(str(clipboard)) + ";;\nesac\n")
+		helper.chmod(0o700)
+		session = Session(binary, env={"PATH": directory, "DISPLAY": ":test", "WAYLAND_DISPLAY": None})
+		try:
+			session.click_tool("RGB")
+			session.click_tool("Hex:")
+			session.send("\x01\x16")
+			assert "#aabbcc" in "\n".join(session.rows())
+			session.send("\x01\x03")
+			assert clipboard.read_text() == "#aabbcc"
+			session.send("\t\x01\x03")
+			assert clipboard.read_text() == "170"
+			clipboard.write_text("128")
+			session.send("\x16")
+			assert "#80bbcc" in "\n".join(session.rows())
+			session.send("\x1b")
+			session.send("\x0f\x0c")
+			session.paste(directory)
+			session.send("\x01\x03")
+			assert clipboard.read_text() == directory
+			session.send("\x1b")
+			session.send("\x11")
+			session.finish()
+		finally:
+			session.close()
+	print("PASS: shared Copy/Paste/Select all in Hex, RGB ranges and path fields; RGB remains staged")
 
 
 def main():
@@ -155,9 +293,9 @@ def main():
 		session.send("\x1b[1;5H")
 		session.send("\x1b[3~")  # Delete the entire combining grapheme.
 		assert session.screen.cursor.x == 7
-		# Help blocks edits and is dismissible.
+		# Shortcut Settings blocks edits and is dismissible.
 		session.send("\x1bOP")
-		assert "F4: files" in "\n".join(session.rows())
+		assert "Shortcut Settings" in "\n".join(session.rows())
 		session.paste("ignored")
 		session.send("\x1b")
 		assert "ignored" not in "\n".join(session.rows())
@@ -176,11 +314,11 @@ def main():
 		assert "Discard" in "\n".join(session.rows())
 		session.send("\r")  # Unsaved changes defaults to Cancel.
 		assert "Editor" in session.row(1)
-		session.send("\x11y")
+		session.send("\x11d")
 		session.finish()
 	finally:
 		session.close()
-	print("PASS: typing, navigation, mouse, Unicode, atomic paste, undo/redo, help, scrolling, resize, quit")
+	print("PASS: typing, navigation, mouse, Unicode, atomic paste, undo/redo, settings, scrolling, resize, quit")
 	session = Session(binary)
 	try:
 		session.paste("Hello\nworld")
@@ -212,7 +350,7 @@ def main():
 		assert "Characters" in "\n".join(session.rows())
 		session.send("\x1b")
 		session.resize(80, 24)
-		session.send("\x11y")
+		session.send("\x11d")
 		session.finish()
 	finally:
 		session.close()
@@ -254,14 +392,14 @@ def main():
 		session.send("\x1b[17~")
 		session.resize(40, 12)
 		session.send("\x1b[1;3C\x1b[1;3C")  # Style -> Color -> Characters tabs
-		session.send("\x1b[F\r\r")
+		session.send("\t\x1b[F\r\r")
 		assert "Characters" in "\n".join(session.rows())
 		session.send("\x1b")
 		session.resize(80, 24)
 		assert "sampleZ╬╬" in session.row(2), session.rows()
 		session.send("\x1a")
 		assert "sampleZ╬" in session.row(2)
-		session.send("\x11y")
+		session.send("\x11d")
 		session.finish()
 	finally:
 		session.close()
@@ -312,7 +450,7 @@ def main():
 			assert "Copy failed" in session.row(23)
 			session.send("\x1b")
 			assert "alpha" in session.row(2)
-			session.send("\x11y")
+			session.send("\x11d")
 			session.finish()
 		finally:
 			session.close()
@@ -406,9 +544,9 @@ def main():
 			session.send("\x1b[46;5u")  # Ctrl+. hidden alias
 			assert ".hidden.tuxd.json" in "\n".join(session.rows())
 			session.send("\x1b[46;5u\x1f")  # Hide files; legacy Ctrl+/ shortcuts
-			assert "Shortcuts" in "\n".join(session.rows())
-			session.send("\x1b[63;5u")  # Ctrl+? hides shortcuts
-			assert "Shortcuts" not in "\n".join(session.rows())
+			assert "Shortcut Settings" in "\n".join(session.rows())
+			session.send("\x1b")  # Close settings and return to the picker
+			assert "Shortcut Settings" not in "\n".join(session.rows())
 			session.send("\x06")  # Ctrl+F includes non-project files.
 			assert "other.txt" in "\n".join(session.rows())
 			session.send("\x06jggMG\r")  # Project filter; Vim navigation selects the document.
@@ -438,7 +576,10 @@ def main():
 			session.finish()
 		finally:
 			session.close()
-	print("PASS: file browsing, Vim navigation, hidden alias, shortcut panel, format radios, import offer, Ctrl+V, Save As and overwrite guard")
+	print("PASS: file browsing, Vim navigation, hidden alias, shortcut settings, format radios, import offer, Ctrl+V, Save As and overwrite guard")
+
+	shared_clipboard_checks(binary)
+	shortcut_settings_checks(binary)
 
 	for argument, expected in [("--diagnostic-error", 1), ("--diagnostic-panic", 101)]:
 		session = Session(binary, argument)

@@ -1,7 +1,7 @@
 //! File actions and modal state. Candidate documents are validated before replacement.
 use crate::{
 	ansi_import::{self, Import, Mode},
-	app::{App, Overlay},
+	app::App,
 	document::{Document, sanitize},
 	editor::Editor,
 	layout::Layout,
@@ -9,7 +9,7 @@ use crate::{
 	scrollbar::{self, Bar, Target},
 	styling,
 };
-use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
+use crossterm::event::{Event, MouseButton, MouseEventKind};
 use ratatui::{
 	Frame,
 	layout::Rect,
@@ -30,14 +30,28 @@ pub enum Action {
 	ExportEscaped,
 	Quit,
 }
+impl Action {
+	pub fn shortcut(self) -> crate::shortcuts::ActionId {
+		use crate::shortcuts::ActionId as A;
+		match self {
+			Self::New => A::New,
+			Self::Open => A::Open,
+			Self::Save => A::Save,
+			Self::SaveAs => A::SaveAs,
+			Self::ImportRaw | Self::ImportEscaped => A::Import,
+			Self::ExportRaw | Self::ExportEscaped => A::Export,
+			Self::Quit => A::Quit,
+		}
+	}
+}
 pub const MENU: [(Action, &str); 7] = [
-	(Action::New, "New document          Ctrl+N"),
-	(Action::Open, "Open document         Ctrl+O"),
-	(Action::Save, "Save                  Ctrl+S"),
-	(Action::SaveAs, "Save as         Ctrl+Shift+S"),
+	(Action::New, "New document"),
+	(Action::Open, "Open document"),
+	(Action::Save, "Save"),
+	(Action::SaveAs, "Save as"),
 	(Action::ImportEscaped, "Import"),
-	(Action::ExportEscaped, "Export                Ctrl+E"),
-	(Action::Quit, "Quit                  Ctrl+Q"),
+	(Action::ExportEscaped, "Export"),
+	(Action::Quit, "Quit"),
 ];
 
 pub enum Pending {
@@ -80,6 +94,11 @@ pub struct Files {
 	choice: usize,
 	drag: Option<usize>,
 	exit: bool,
+}
+impl Files {
+	pub fn exiting(&self) -> bool {
+		self.exit
+	}
 }
 impl Default for Files {
 	fn default() -> Self {
@@ -136,7 +155,11 @@ impl App {
 		);
 	}
 
+	pub fn open_file_menu(&mut self) {
+		self.file_dialog(Dialog::Menu { index: 0 });
+	}
 	fn file_dialog(&mut self, dialog: Dialog) {
+		self.shortcuts.cancel();
 		self.files.dialog = Some(dialog);
 		self.files.choice = if matches!(self.files.dialog, Some(Dialog::Dirty)) {
 			2
@@ -154,6 +177,7 @@ impl App {
 		self.editor.break_group();
 	}
 	fn cancel_file(&mut self) {
+		self.shortcuts.cancel();
 		self.files.dialog = None;
 		self.files.pending = None;
 		self.files.error = None;
@@ -393,37 +417,79 @@ impl App {
 		}
 	}
 
-	/// Some means the file workflow consumed this event; the bool requests exit.
-	pub fn file_event(&mut self, event: &Event) -> Option<bool> {
-		if self.files.dialog.is_none() {
-			if self.overlay != Overlay::None {
-				return None;
-			}
-			let Event::Key(key) = event else {
-				return None;
-			};
-			if key.kind == KeyEventKind::Release {
-				return None;
-			}
-			let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-			match key.code {
-				KeyCode::F(4) => self.file_dialog(Dialog::Menu { index: 0 }),
-				KeyCode::Char('e' | 'E') if ctrl => self.file_action(Action::ExportEscaped),
-				KeyCode::Char(ch) if ctrl => {
-					let action = match ch.to_ascii_lowercase() {
-						'n' => Action::New,
-						'o' => Action::Open,
-						'q' => Action::Quit,
-						's' if key.modifiers.contains(KeyModifiers::SHIFT) => Action::SaveAs,
-						's' => Action::Save,
-						_ => return None,
-					};
-					self.file_action(action);
+	pub fn file_shortcut(&mut self, action: crate::shortcuts::ActionId) {
+		use crate::shortcuts::ActionId as A;
+		if let Some(Dialog::Path {
+			action: file_action,
+			picker,
+		}) = &mut self.files.dialog
+		{
+			let outcome = picker.shortcut(action);
+			*file_action = picker.action();
+			let file_action = *file_action;
+			match outcome {
+				crate::file_picker::Outcome::Submit(path) => {
+					self.submit_path(file_action, path.to_string_lossy().into_owned())
 				}
-				_ => return None,
+				crate::file_picker::Outcome::Cancel => self.cancel_file(),
+				_ => (),
 			}
-			return Some(self.files.exit);
+			return;
 		}
+		if matches!(self.files.dialog, Some(Dialog::Review(_))) {
+			if let Some(choice) = self.files.review.shortcut(action) {
+				self.activate_file(choice);
+			}
+			return;
+		}
+		if action == A::Close {
+			self.cancel_file();
+			return;
+		}
+		let mut activate = None;
+		match &mut self.files.dialog {
+			Some(Dialog::Menu { index }) => match action {
+				A::NextField | A::FieldRight | A::FieldDown => {
+					*index = (*index + 1).min(MENU.len() - 1)
+				}
+				A::PreviousField | A::FieldLeft | A::FieldUp => *index = index.saturating_sub(1),
+				A::Activate => activate = Some(*index),
+				A::FieldHome => *index = 0,
+				A::FieldEnd => *index = MENU.len() - 1,
+				_ => (),
+			},
+			Some(Dialog::Dirty) => match action {
+				A::NextField | A::FieldRight | A::FieldDown => {
+					self.files.choice = (self.files.choice + 1) % 3
+				}
+				A::PreviousField | A::FieldLeft | A::FieldUp => {
+					self.files.choice = (self.files.choice + 2) % 3
+				}
+				A::Activate => activate = Some(self.files.choice),
+				A::Positive => activate = Some(0),
+				A::Negative => activate = Some(1),
+				A::Abort => activate = Some(2),
+				_ => (),
+			},
+			Some(Dialog::Overwrite { .. }) => match action {
+				A::NextField | A::PreviousField | A::FieldLeft | A::FieldUp => {
+					self.files.choice = 1 - self.files.choice
+				}
+				A::Activate => activate = Some(self.files.choice),
+				A::Positive => activate = Some(0),
+				A::Negative | A::Abort => activate = Some(1),
+				_ => (),
+			},
+			_ => (),
+		}
+		self.files.follow_focus = true;
+		if let Some(choice) = activate {
+			self.activate_file(choice);
+		}
+	}
+	/// Non-key events. All shortcuts are resolved by the central registry first.
+	pub fn file_event(&mut self, event: &Event) -> Option<bool> {
+		self.files.dialog.as_ref()?;
 		if let Some(Dialog::Path { action, picker }) = &mut self.files.dialog {
 			let outcome = picker.event(event);
 			*action = picker.action();
@@ -445,77 +511,8 @@ impl App {
 			return Some(self.files.exit);
 		}
 
-		match event {
-			Event::Key(key) if key.kind != KeyEventKind::Release => {
-				if key.code == KeyCode::Esc {
-					self.cancel_file();
-					return Some(false);
-				}
-				self.files.follow_focus = true;
-				let menu_count = if matches!(self.files.dialog, Some(Dialog::Menu { .. })) {
-					MENU.len()
-				} else {
-					2
-				};
-				let mut activate = None;
-				match self.files.dialog.as_mut().unwrap() {
-					Dialog::Path { .. } => unreachable!(),
-					Dialog::Menu { index } => {
-						let count = menu_count;
-						match key.code {
-							KeyCode::Up | KeyCode::BackTab => *index = index.saturating_sub(1),
-							KeyCode::Down | KeyCode::Tab => {
-								*index = (*index + 1).min(count.saturating_sub(1))
-							}
-							KeyCode::Enter => activate = Some(*index),
-							_ => (),
-						}
-					}
-					Dialog::Dirty => match key.code {
-						KeyCode::Tab | KeyCode::Right | KeyCode::Down => {
-							self.files.choice = (self.files.choice + 1) % 3
-						}
-						KeyCode::BackTab | KeyCode::Left | KeyCode::Up => {
-							self.files.choice = (self.files.choice + 2) % 3
-						}
-						KeyCode::Enter => activate = Some(self.files.choice),
-						KeyCode::Char('s' | 'S') => activate = Some(0),
-						KeyCode::Char('d' | 'D' | 'y' | 'Y') => activate = Some(1),
-						KeyCode::Char('c' | 'C' | 'n' | 'N') => activate = Some(2),
-						_ => (),
-					},
-					Dialog::Overwrite { .. } => match key.code {
-						KeyCode::Char('y' | 'Y') => activate = Some(0),
-						KeyCode::Char('n' | 'N') => activate = Some(1),
-						_ => (),
-					},
-					Dialog::Review(_) => match key.code {
-						KeyCode::Char('s' | 'S') => activate = Some(0),
-						KeyCode::Char('a' | 'A') => activate = Some(1),
-						_ => (),
-					},
-				}
-				if let Some(choice) = activate {
-					self.activate_file(choice);
-				} else if !matches!(self.files.dialog, Some(Dialog::Path { .. })) {
-					match key.code {
-						KeyCode::Up => self.files.scroll = self.files.scroll.saturating_sub(1),
-						KeyCode::Down => self.files.scroll = self.files.scroll.saturating_add(1),
-						KeyCode::PageUp => {
-							self.files.scroll =
-								self.files.scroll.saturating_sub(self.files.viewport)
-						}
-						KeyCode::PageDown => {
-							self.files.scroll =
-								self.files.scroll.saturating_add(self.files.viewport)
-						}
-						KeyCode::Home => self.files.scroll = 0,
-						KeyCode::End => self.files.scroll = usize::MAX,
-						_ => (),
-					}
-				}
-			}
-			Event::Mouse(mouse) => match mouse.kind {
+		if let Event::Mouse(mouse) = event {
+			match mouse.kind {
 				MouseEventKind::ScrollUp => self.files.scroll = self.files.scroll.saturating_sub(3),
 				MouseEventKind::ScrollDown => {
 					self.files.scroll = self.files.scroll.saturating_add(3)
@@ -553,8 +550,7 @@ impl App {
 					}
 				}
 				_ => (),
-			},
-			_ => (),
+			}
 		}
 		Some(self.files.exit)
 	}
@@ -639,7 +635,16 @@ fn draw_dirty(frame: &mut Frame, app: &mut App) {
 
 fn draw_menu(frame: &mut Frame, app: &mut App, index: usize) {
 	let area = frame.area();
-	let width = area.width.min(33);
+	let width = area.width.min(
+		MENU.iter()
+			.map(|(action, label)| {
+				label.len() + app.shortcuts.config.hint(action.shortcut()).chars().count() + 5
+			})
+			.max()
+			.unwrap_or(33)
+			.max(33)
+			.min(u16::MAX as usize) as u16,
+	);
 	let height = area.height.min(12);
 	let popup = Rect::new(
 		(area.width - width) / 2,
@@ -659,7 +664,13 @@ fn draw_menu(frame: &mut Frame, app: &mut App, index: usize) {
 		.map(|i| i + usize::from(i >= 2) + usize::from(i >= 4) + usize::from(i >= 6))
 		.collect();
 	let top = rows[index].saturating_sub(inner.height.saturating_sub(1) as usize);
-	for (i, (_, label)) in MENU.iter().enumerate() {
+	for (i, (action, label)) in MENU.iter().enumerate() {
+		let hint = app.shortcuts.config.hint(action.shortcut());
+		let padding = inner
+			.width
+			.saturating_sub(3 + label.len() as u16 + hint.chars().count() as u16)
+			as usize;
+		let label = format!("{label}{}{hint}", " ".repeat(padding));
 		let y = rows[i];
 		if y < top || y - top >= inner.height as usize {
 			continue;
@@ -758,9 +769,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		Dialog::Dirty => unreachable!(),
 		Dialog::Overwrite { path, .. } => {
 			lines.push(sanitize(&path.to_string_lossy()));
-			for (i, label) in ["Y · Overwrite", "N / Esc · Cancel"].iter().enumerate() {
+			for (i, label) in ["Overwrite", "Cancel"].iter().enumerate() {
 				actions.push((lines.len(), i));
-				lines.push(label.to_string());
+				lines.push(format!(
+					"{} {label}",
+					if app.files.choice == i { ">" } else { " " }
+				));
 			}
 		}
 		Dialog::Review(_) => unreachable!(),
@@ -837,7 +851,7 @@ mod tests {
 		editor::Movement,
 		styling::{Action as StyleAction, Ink},
 	};
-	use crossterm::event::KeyEvent;
+	use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 	fn type_text(app: &mut App, text: &str) {
 		app.handle(Event::Paste(text.into()));

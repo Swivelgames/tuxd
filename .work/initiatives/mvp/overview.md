@@ -1,6 +1,6 @@
 # MVP initiative
 
-Status: In progress — Slices 1–4 complete
+Status: In progress — Slices 1–4a complete; Slice 5 next
 
 ## Outcome
 
@@ -14,6 +14,7 @@ The [initial concept](../../initial-concept.md) records product direction. The [
 - Slice 2: visible range formatting and a live ANSI drawer; the first complete design-to-output workflow.
 - Slice 3: the complete initial tools panel.
 - Slice 4: a reusable workflow with document save/open, ANSI import, copy, and export.
+- Slice 4a: configurable contextual shortcuts and sequences, before compatibility hardening.
 - Slice 5: broader compatibility and integration confidence; the MVP release checkpoint.
 - Slice 6: follow-on code-output improvements, tracked here but not required for MVP release.
 

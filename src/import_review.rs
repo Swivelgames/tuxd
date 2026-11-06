@@ -5,7 +5,7 @@ use crate::{
 	layout::Layout,
 	scrollbar::{self, Bar, Target},
 };
-use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
+use crossterm::event::{Event, MouseButton, MouseEventKind};
 use ratatui::{
 	Frame,
 	layout::{Constraint, Rect},
@@ -52,79 +52,84 @@ impl Review {
 	pub fn scrolled(&self) -> bool {
 		self.top.iter().any(|x| *x > 0)
 	}
-	pub fn event(&mut self, event: &Event) -> Option<usize> {
-		match event {
-			Event::Key(key) if key.kind != KeyEventKind::Release => match key.code {
-				KeyCode::Esc | KeyCode::Char('a' | 'A') => return Some(1),
-				KeyCode::Char('s' | 'S') => return Some(0),
-				KeyCode::Tab => self.focus = (self.focus + 1) % 4,
-				KeyCode::BackTab => self.focus = (self.focus + 3) % 4,
-				KeyCode::Enter if self.focus >= 2 => return Some(self.focus - 2),
-				KeyCode::Left | KeyCode::Right if self.focus >= 2 => self.focus = 5 - self.focus,
-				code => {
-					let at = self.focus.min(1);
-					match code {
-						KeyCode::Up => self.top[at] = self.top[at].saturating_sub(1),
-						KeyCode::Down => self.top[at] = self.top[at].saturating_add(1),
-						KeyCode::PageUp => self.top[at] = self.top[at].saturating_sub(5),
-						KeyCode::PageDown => self.top[at] = self.top[at].saturating_add(5),
-						KeyCode::Home => self.top[at] = 0,
-						KeyCode::End => self.top[at] = usize::MAX,
-						_ => (),
-					}
-				}
-			},
-			Event::Mouse(mouse) => {
-				let point = (mouse.column, mouse.row).into();
-				match mouse.kind {
-					MouseEventKind::Up(MouseButton::Left) => self.drag = None,
-					MouseEventKind::Drag(MouseButton::Left) => {
-						if let Some((i, grab)) = self.drag
-							&& let Some(bar) = self.bars[i]
-						{
-							self.top[i] =
-								bar.offset_at(bar.coordinate(mouse.column, mouse.row), grab);
-						}
-					}
-					MouseEventKind::Down(MouseButton::Left) => {
-						for (rect, choice) in &self.buttons {
-							if rect.contains(point) {
-								return Some(*choice);
-							}
-						}
-						for i in 0..2 {
-							if self.areas[i].contains(point) {
-								self.focus = i;
-							}
-							if let Some(bar) = self.bars[i].filter(|bar| bar.area.contains(point)) {
-								let at = bar.coordinate(mouse.column, mouse.row);
-								let (start, size) = bar.thumb();
-								let grab = if (start..start + size).contains(&at) {
-									at - start
-								} else {
-									size / 2
-								};
-								self.top[i] = bar.offset_at(at, grab);
-								self.drag = Some((i, grab));
-							}
-						}
-					}
-					MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-						for i in 0..2 {
-							if self.areas[i].contains(point) {
-								self.focus = i;
-								self.top[i] = if mouse.kind == MouseEventKind::ScrollUp {
-									self.top[i].saturating_sub(3)
-								} else {
-									self.top[i].saturating_add(3)
-								};
-							}
-						}
-					}
-					_ => (),
-				}
+	pub fn input_scope(&self) -> crate::shortcuts::InputScope {
+		if self.focus >= 2 {
+			crate::shortcuts::InputScope::ReviewButtons
+		} else {
+			crate::shortcuts::InputScope::ReviewContent
+		}
+	}
+	pub fn shortcut(&mut self, action: crate::shortcuts::ActionId) -> Option<usize> {
+		use crate::shortcuts::ActionId as A;
+		let at = self.focus.min(1);
+		match action {
+			A::Close | A::Abort | A::Negative => return Some(1),
+			A::Positive => return Some(0),
+			A::NextField => self.focus = (self.focus + 1) % 4,
+			A::PreviousField => self.focus = (self.focus + 3) % 4,
+			A::FieldLeft | A::FieldRight | A::FieldUp | A::FieldDown if self.focus >= 2 => {
+				self.focus = 5 - self.focus
 			}
+			A::Activate if self.focus >= 2 => return Some(self.focus - 2),
+			A::FieldUp => self.top[at] = self.top[at].saturating_sub(1),
+			A::FieldDown => self.top[at] = self.top[at].saturating_add(1),
+			A::FieldPageUp => self.top[at] = self.top[at].saturating_sub(5),
+			A::FieldPageDown => self.top[at] = self.top[at].saturating_add(5),
+			A::FieldHome => self.top[at] = 0,
+			A::FieldEnd => self.top[at] = usize::MAX,
 			_ => (),
+		}
+		None
+	}
+	pub fn event(&mut self, event: &Event) -> Option<usize> {
+		if let Event::Mouse(mouse) = event {
+			let point = (mouse.column, mouse.row).into();
+			match mouse.kind {
+				MouseEventKind::Up(MouseButton::Left) => self.drag = None,
+				MouseEventKind::Drag(MouseButton::Left) => {
+					if let Some((i, grab)) = self.drag
+						&& let Some(bar) = self.bars[i]
+					{
+						self.top[i] = bar.offset_at(bar.coordinate(mouse.column, mouse.row), grab);
+					}
+				}
+				MouseEventKind::Down(MouseButton::Left) => {
+					for (rect, choice) in &self.buttons {
+						if rect.contains(point) {
+							return Some(*choice);
+						}
+					}
+					for i in 0..2 {
+						if self.areas[i].contains(point) {
+							self.focus = i;
+						}
+						if let Some(bar) = self.bars[i].filter(|bar| bar.area.contains(point)) {
+							let at = bar.coordinate(mouse.column, mouse.row);
+							let (start, size) = bar.thumb();
+							let grab = if (start..start + size).contains(&at) {
+								at - start
+							} else {
+								size / 2
+							};
+							self.top[i] = bar.offset_at(at, grab);
+							self.drag = Some((i, grab));
+						}
+					}
+				}
+				MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
+					for i in 0..2 {
+						if self.areas[i].contains(point) {
+							self.focus = i;
+							self.top[i] = if mouse.kind == MouseEventKind::ScrollUp {
+								self.top[i].saturating_sub(3)
+							} else {
+								self.top[i].saturating_add(3)
+							};
+						}
+					}
+				}
+				_ => (),
+			}
 		}
 		None
 	}
@@ -404,10 +409,7 @@ mod tests {
 				.any(|cell| cell.fg == Color::Red && cell.modifier.contains(Modifier::BOLD))
 		);
 		review.focus = 0;
-		review.event(&Event::Key(crossterm::event::KeyEvent::new(
-			KeyCode::End,
-			crossterm::event::KeyModifiers::NONE,
-		)));
+		review.shortcut(crate::shortcuts::ActionId::FieldEnd);
 		terminal.draw(|frame| review.draw(frame, &import)).unwrap();
 		assert!(review.top[0] > 0);
 		assert_eq!(review.top[1], 0);

@@ -11,6 +11,7 @@ mod panel;
 mod panel_ui;
 mod persistence;
 mod scrollbar;
+mod shortcuts;
 mod styling;
 mod terminal;
 mod ui;
@@ -30,7 +31,7 @@ fn main() -> io::Result<()> {
 		Some("--diagnostic-panic") => Some(true),
 		Some("--help" | "-h") => {
 			println!(
-				"Terminal UX Designer\n\nUsage: terminal-ux-designer [document.tuxd.json]\nF4 files · Ctrl+S save · Ctrl+Q quit · F1 help"
+				"Terminal UX Designer\n\nUsage: terminal-ux-designer [document.tuxd.json]\nF4 files · Ctrl+S save · Ctrl+Q quit · F1 shortcuts"
 			);
 			return Ok(());
 		}
@@ -52,11 +53,20 @@ fn main() -> io::Result<()> {
 		app.load_document(document, document_path.clone(), false);
 	}
 	app.document_path = document_path;
+	if let Err(error) = app.shortcuts.load() {
+		app.notice = Some(format!(
+			"Shortcuts: {}; using defaults",
+			crate::document::sanitize(&error)
+		));
+	}
 	loop {
 		app.poll_clipboard();
 		terminal.draw(|frame| {
 			ui::draw(frame, &mut app);
 			files::draw(frame, &mut app);
+			if let Some(settings) = &mut app.settings {
+				settings.draw(frame);
+			}
 		})?;
 		if let Some(panic) = diagnostic {
 			if panic {
@@ -71,7 +81,7 @@ fn main() -> io::Result<()> {
 				}
 				break;
 			}
-			if app.poll_clipboard() {
+			if app.poll_clipboard() || app.shortcuts.expire(std::time::Instant::now()) {
 				break;
 			}
 		}

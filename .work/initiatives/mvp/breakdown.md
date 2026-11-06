@@ -1,6 +1,6 @@
 # MVP slice breakdown
 
-Status: In progress — Slices 1–4 complete
+Status: In progress — Slices 1–4a complete; Slice 5 next
 
 Each slice builds on the preceding checkpoint and includes its own stability work. Estimates are planning ranges for one developer and modest document sizes, not deadlines. Revise them after the editor and styling foundations are validated.
 
@@ -10,10 +10,11 @@ Each slice builds on the preceding checkpoint and includes its own stability wor
 | [2. Styling loop](slice-02-styling-loop.md) | Select text, apply visible styles/colors, and inspect live ANSI | 3–5 days | Slice 1 |
 | [3. Tool panel](slice-03-tool-panel.md) | Use all initial color modes, style controls, and character categories | 2–3 days | Slice 2 |
 | [4. Save and export workflow](slice-04-save-and-export.md) | Save/reopen documents, import/export ANSI, and copy output | 3–5 days | Slice 3 |
-| [5. Compatibility and hardening](slice-05-compatibility-and-hardening.md) | Use the integrated workflow reliably across the declared support matrix | 3–5 days | Slice 4 |
+| [4a. Contextual shortcuts and settings](slice-04a-shortcut-settings.md) | Configure contextual keys/sequences, save settings, and use them across the full UI | 4–6 days | Slice 4 + layout refinement |
+| [5. Compatibility and hardening](slice-05-compatibility-and-hardening.md) | Use the integrated workflow reliably across the declared support matrix | 3–5 days | Slice 4a |
 | [6. Code output](slice-06-code-output.md) | Inspect highlighted sequences and copy valid Rust snippets | 2–4 days | Slice 5; after MVP |
 
-The first complete styling loop is approximately 5–8 developer days. The MVP is approximately 13–21 days, with another 2–4 days for the initial code-output improvements. Additional language generators are separately estimated once their output contracts are chosen.
+The first complete styling loop is approximately 5–8 developer days. With the added shortcuts/settings slice, the MVP is approximately 17–27 days, with another 2–4 days for the initial code-output improvements. Additional language generators are separately estimated once their output contracts are chosen.
 
 ## How to implement each slice
 
@@ -23,7 +24,7 @@ The slice specifications distinguish deliverables, stability requirements, hands
 
 ## Sequence rationale
 
-Slice 1 validates editing and terminal lifecycle. Slice 2 proves the hardest product assumption: text and formatting remain coherent through selection and edits, and output matches the document. Slice 3 expands the available operations on that foundation. Slice 4 makes work persistent and reusable outside the app. Slice 5 broadens compatibility and stress coverage. Slice 6 improves how developers consume the generated code.
+Slice 1 validates editing and terminal lifecycle. Slice 2 proves the hardest product assumption: text and formatting remain coherent through selection and edits, and output matches the document. Slice 3 expands the available operations on that foundation. Slice 4 makes work persistent and reusable outside the app. Slice 4a centralizes shortcut routing and delivers transactional user configuration. Slice 5 then broadens compatibility and stress coverage, including custom keymaps. Slice 6 improves how developers consume the generated code.
 
 ## Checkpoint evidence
 

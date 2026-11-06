@@ -1,13 +1,12 @@
 //! Shared local file picker. Explorer owns directory discovery/filtering; our rows
 //! keep mouse hit targets and scrollbar offsets consistent with the other panels.
+use crate::shortcuts::{ActionId as A, InputScope};
 use crate::{
 	document::sanitize,
 	files::Action,
 	scrollbar::{self, Bar, Target},
 };
-use crossterm::event::{
-	Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
-};
+use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
 use ratatui::{
 	Frame,
 	layout::Rect,
@@ -67,53 +66,43 @@ impl Field {
 		self.text.insert_str(self.cursor, &clean);
 		self.cursor += clean.len();
 	}
-	fn key(&mut self, key: KeyEvent) {
-		if key.modifiers.contains(KeyModifiers::CONTROL)
-			&& matches!(key.code, KeyCode::Char('a' | 'A'))
-		{
+	fn shortcut(&mut self, action: A) {
+		if action == A::SelectAll {
 			self.selected = true;
 			return;
 		}
-		if matches!(key.code, KeyCode::Backspace | KeyCode::Delete) && self.selected {
+		if matches!(action, A::FieldDeleteBefore | A::FieldDeleteAfter) && self.selected {
 			self.set(String::new());
 			return;
 		}
-		match key.code {
-			KeyCode::Char(ch)
-				if !key
-					.modifiers
-					.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
-					&& !ch.is_control() =>
-			{
-				self.insert(&ch.to_string())
-			}
-			KeyCode::Home => {
+		match action {
+			A::FieldHome => {
 				self.cursor = 0;
 				self.selected = false;
 			}
-			KeyCode::End => {
+			A::FieldEnd => {
 				self.cursor = self.text.len();
 				self.selected = false;
 			}
-			KeyCode::Left | KeyCode::Backspace if self.cursor > 0 => {
+			A::FieldLeft | A::FieldDeleteBefore if self.cursor > 0 => {
 				let previous = self.text[..self.cursor]
 					.grapheme_indices(true)
 					.next_back()
 					.map_or(0, |(i, _)| i);
-				if key.code == KeyCode::Backspace {
+				if action == A::FieldDeleteBefore {
 					self.text.replace_range(previous..self.cursor, "");
 				}
 				self.cursor = previous;
 				self.selected = false;
 			}
-			KeyCode::Right | KeyCode::Delete if self.cursor < self.text.len() => {
+			A::FieldRight | A::FieldDeleteAfter if self.cursor < self.text.len() => {
 				let next = self.cursor
 					+ self.text[self.cursor..]
 						.graphemes(true)
 						.next()
 						.unwrap()
 						.len();
-				if key.code == KeyCode::Delete {
+				if action == A::FieldDeleteAfter {
 					self.text.replace_range(self.cursor..next, "");
 				} else {
 					self.cursor = next;
@@ -165,6 +154,8 @@ pub enum Outcome {
 	Cancel,
 }
 pub struct Picker {
+	#[cfg(test)]
+	test_shortcuts: crate::shortcuts::Runtime,
 	explorer: Option<FileExplorer>,
 	cwd: PathBuf,
 	action: Action,
@@ -172,12 +163,8 @@ pub struct Picker {
 	name: Field,
 	focus: Focus,
 	projects_only: bool,
-	show_shortcuts: bool,
 	import_prompt: bool,
-	help_area: Rect,
-	help_top: usize,
 	format_buttons: Vec<(Rect, bool)>,
-	pending_g: bool,
 	error: Option<String>,
 	top: usize,
 	list_area: Rect,
@@ -200,6 +187,8 @@ impl Picker {
 			.unwrap_or(&base)
 			.to_path_buf();
 		let mut picker = Self {
+			#[cfg(test)]
+			test_shortcuts: Default::default(),
 			explorer: None,
 			cwd,
 			action,
@@ -207,12 +196,8 @@ impl Picker {
 			name: Field::default(),
 			focus: Focus::List,
 			projects_only: matches!(action, Action::Open | Action::Save | Action::SaveAs),
-			show_shortcuts: false,
 			import_prompt: false,
-			help_area: Rect::default(),
-			help_top: 0,
 			format_buttons: Vec::new(),
-			pending_g: false,
 			error: None,
 			top: 0,
 			list_area: Rect::default(),
@@ -440,140 +425,112 @@ impl Picker {
 			(action, _) => action,
 		};
 	}
+	pub fn selected_text(&self) -> Option<String> {
+		let field = match self.focus {
+			Focus::Location => &self.location,
+			Focus::Name => &self.name,
+			_ => return None,
+		};
+		field.selected.then(|| field.text.clone())
+	}
+	pub fn input_scope(&self) -> InputScope {
+		match self.focus {
+			Focus::Location => InputScope::Location,
+			Focus::Name => InputScope::Filename,
+			Focus::List => InputScope::Explorer,
+			Focus::Format => InputScope::Format,
+			_ => InputScope::FileButtons,
+		}
+	}
+	pub fn shortcut(&mut self, action: A) -> Outcome {
+		match action {
+			A::Close | A::Abort | A::Negative => return Outcome::Cancel,
+			A::Positive => return self.submit(),
+			A::NextField | A::PreviousField => {
+				self.focus = self
+					.focus
+					.next(matches!(action, A::PreviousField), self.has_format())
+			}
+			A::PickerLocation => {
+				self.focus = Focus::Location;
+				self.location.selected = true;
+			}
+			A::PickerCwd => match std::env::current_dir() {
+				Ok(path) => {
+					self.navigate(path);
+					self.focus = Focus::List;
+				}
+				Err(error) => self.error = Some(error.to_string()),
+			},
+			A::Paste if self.paste.is_none() => {
+				let (sender, receiver) = std::sync::mpsc::channel();
+				self.paste = Some((self.focus, receiver));
+				std::thread::spawn(move || {
+					let _ = sender.send(crate::clipboard::paste());
+				});
+			}
+			A::PickerHidden => {
+				if let Some(explorer) = &mut self.explorer {
+					if let Err(error) = explorer.set_show_hidden(!explorer.show_hidden()) {
+						self.error = Some(error.to_string());
+					}
+					self.top = 0;
+				}
+			}
+			A::PickerFilter => {
+				self.projects_only = !self.projects_only;
+				self.filter();
+			}
+			A::Submit | A::Activate => match self.focus {
+				Focus::Location => {
+					self.navigate(self.resolve(&self.location.text));
+					self.focus = Focus::List;
+				}
+				Focus::List => return self.choose(),
+				Focus::Format => return self.submit(),
+				Focus::Cancel => return Outcome::Cancel,
+				_ => return self.submit(),
+			},
+			A::ExplorerParent => {
+				if let Some(parent) = self.cwd.parent() {
+					self.navigate(parent.to_path_buf());
+				}
+			}
+			A::ExplorerEnter => {
+				if let Some((path, true)) = self.selected() {
+					self.navigate(path);
+				}
+			}
+			A::ExplorerUp => self.move_selection(KeyCode::Up),
+			A::ExplorerDown => self.move_selection(KeyCode::Down),
+			A::ExplorerFirst => self.move_selection(KeyCode::Home),
+			A::ExplorerLast => self.move_selection(KeyCode::End),
+			A::ExplorerPageUp => self.move_selection(KeyCode::PageUp),
+			A::ExplorerPageDown => self.move_selection(KeyCode::PageDown),
+			A::ExplorerMiddle => self.move_selection(KeyCode::Char('M')),
+			A::FieldLeft if self.focus == Focus::Format => self.set_format(false),
+			A::FieldRight if self.focus == Focus::Format => self.set_format(true),
+			A::FieldLeft | A::FieldUp | A::FieldRight | A::FieldDown
+				if matches!(self.focus, Focus::Submit | Focus::Cancel) =>
+			{
+				self.focus = if self.focus == Focus::Submit {
+					Focus::Cancel
+				} else {
+					Focus::Submit
+				};
+			}
+			_ if self.focus == Focus::Location => self.location.shortcut(action),
+			_ if self.focus == Focus::Name => self.name.shortcut(action),
+			_ => (),
+		}
+		Outcome::None
+	}
 	pub fn event(&mut self, event: &Event) -> Outcome {
 		match event {
 			Event::Paste(text) => self.insert(self.focus, text),
-			Event::Key(key) if key.kind != KeyEventKind::Release => {
-				let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-				let plain = !key
-					.modifiers
-					.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
-				let second_g = self.pending_g
-					&& self.focus == Focus::List
-					&& plain && key.code == KeyCode::Char('g');
-				self.pending_g = false;
-				match key.code {
-					// Legacy Ctrl+/ (0x1f) is decoded by Crossterm as Ctrl+7.
-					KeyCode::Char('/' | '?' | '_' | '7') if ctrl => {
-						self.show_shortcuts = !self.show_shortcuts;
-						self.help_top = 0;
-					}
-					KeyCode::F(1) => {
-						self.show_shortcuts = !self.show_shortcuts;
-						self.help_top = 0;
-					}
-					KeyCode::Char('M') if self.focus == Focus::List && plain => {
-						self.move_selection(KeyCode::Char('M'))
-					}
-					KeyCode::Char('g') if self.focus == Focus::List && plain => {
-						if second_g {
-							self.move_selection(KeyCode::Home);
-						} else {
-							self.pending_g = true;
-						}
-					}
-					KeyCode::Char('G') if self.focus == Focus::List && plain => {
-						self.move_selection(KeyCode::End)
-					}
-					KeyCode::Char('j' | 'k') if self.focus == Focus::List && plain => self
-						.move_selection(if key.code == KeyCode::Char('j') {
-							KeyCode::Down
-						} else {
-							KeyCode::Up
-						}),
-					KeyCode::Char('h') if self.focus == Focus::List && plain => {
-						if let Some(parent) = self.cwd.parent() {
-							self.navigate(parent.to_path_buf());
-						}
-					}
-					KeyCode::Char('l') if self.focus == Focus::List && plain => {
-						if let Some((path, true)) = self.selected() {
-							self.navigate(path);
-						}
-					}
-					KeyCode::Left | KeyCode::Right | KeyCode::Char(' ')
-						if self.focus == Focus::Format =>
-					{
-						self.set_format(match key.code {
-							KeyCode::Left => false,
-							KeyCode::Right => true,
-							_ => !self.escaped(),
-						})
-					}
-					KeyCode::Esc => return Outcome::Cancel,
-					KeyCode::Tab | KeyCode::BackTab => {
-						self.focus = self.focus.next(
-							key.code == KeyCode::BackTab
-								|| key.modifiers.contains(KeyModifiers::SHIFT),
-							self.has_format(),
-						)
-					}
-					KeyCode::Char('g' | 'G') if ctrl => match std::env::current_dir() {
-						Ok(path) => {
-							self.navigate(path);
-							self.focus = Focus::List;
-						}
-						Err(error) => self.error = Some(error.to_string()),
-					},
-					KeyCode::Char('l' | 'L') if ctrl => {
-						self.focus = Focus::Location;
-						self.location.selected = true;
-					}
-					KeyCode::Char('v' | 'V') if ctrl && self.paste.is_none() => {
-						let (sender, receiver) = std::sync::mpsc::channel();
-						self.paste = Some((self.focus, receiver));
-						std::thread::spawn(move || {
-							let _ = sender.send(crate::clipboard::paste());
-						});
-					}
-					KeyCode::Char('h' | 'H' | '.') if ctrl => {
-						if let Some(explorer) = &mut self.explorer {
-							if let Err(error) = explorer.set_show_hidden(!explorer.show_hidden()) {
-								self.error = Some(error.to_string());
-							}
-							self.top = 0;
-						}
-					}
-					KeyCode::Char('f' | 'F') if ctrl => {
-						self.projects_only = !self.projects_only;
-						self.filter();
-					}
-					KeyCode::Enter => match self.focus {
-						Focus::Location => {
-							self.navigate(self.resolve(&self.location.text));
-							self.focus = Focus::List;
-						}
-						Focus::List => return self.choose(),
-						Focus::Cancel => return Outcome::Cancel,
-						Focus::Format => return self.submit(),
-						_ => return self.submit(),
-					},
-					KeyCode::Left | KeyCode::Backspace if self.focus == Focus::List => {
-						if let Some(parent) = self.cwd.parent() {
-							self.navigate(parent.to_path_buf());
-						}
-					}
-					KeyCode::Right if self.focus == Focus::List => {
-						if let Some((path, true)) = self.selected() {
-							self.navigate(path);
-						}
-					}
-					code if self.focus == Focus::List => self.move_selection(code),
-					_ if self.focus == Focus::Location => self.location.key(*key),
-					_ if self.focus == Focus::Name => self.name.key(*key),
-					_ => (),
-				}
-			}
 			Event::Mouse(mouse) => {
 				let point = (mouse.column, mouse.row).into();
-				self.pending_g = false;
 				match mouse.kind {
-					MouseEventKind::ScrollUp if self.help_area.contains(point) => {
-						self.help_top = self.help_top.saturating_sub(3)
-					}
-					MouseEventKind::ScrollDown if self.help_area.contains(point) => {
-						self.help_top = self.help_top.saturating_add(3)
-					}
 					MouseEventKind::Up(MouseButton::Left) => self.drag = None,
 					MouseEventKind::Drag(MouseButton::Left) => {
 						if let (Some(bar), Some(grab)) = (self.bar, self.drag) {
@@ -661,57 +618,13 @@ impl Picker {
 		let available = area
 			.height
 			.saturating_sub(if area.height > 16 { 2 } else { 0 });
-		let help_lines = self.shortcut_lines(width.saturating_sub(4) as usize);
-		let help_height = if self.show_shortcuts {
-			(help_lines.len() as u16 + 2).min(available.saturating_sub(10))
-		} else {
-			0
-		};
-		let height = available.saturating_sub(help_height).min(34);
+		let height = available.min(34);
 		let popup = Rect::new(
 			(area.width - width) / 2,
-			(area.height - height - help_height) / 2,
+			(area.height - height) / 2,
 			width,
 			height,
 		);
-		self.help_area = Rect::new(popup.x, popup.bottom(), width, help_height);
-		if help_height > 0 {
-			frame.render_widget(Clear, self.help_area);
-			let block = Block::bordered()
-				.border_type(BorderType::Rounded)
-				.title(" Shortcuts ");
-			let inner = block.inner(self.help_area);
-			frame.render_widget(block, self.help_area);
-			self.help_top = self
-				.help_top
-				.min(help_lines.len().saturating_sub(inner.height as usize));
-			frame.render_widget(
-				Paragraph::new(help_lines).scroll((self.help_top.min(u16::MAX as usize) as u16, 0)),
-				Rect::new(
-					inner.x + 1.min(inner.width),
-					inner.y,
-					inner.width.saturating_sub(2),
-					inner.height,
-				),
-			);
-			let mut bars = Vec::new();
-			scrollbar::draw(
-				frame,
-				&mut bars,
-				Bar {
-					target: Target::Tools,
-					area: Rect::new(
-						self.help_area.right().saturating_sub(1),
-						inner.y,
-						1,
-						inner.height,
-					),
-					content: self.shortcut_lines(width.saturating_sub(4) as usize).len(),
-					viewport: inner.height as usize,
-					offset: self.help_top,
-				},
-			);
-		}
 		frame.render_widget(Clear, popup);
 		let block =
 			Block::bordered()
@@ -951,67 +864,29 @@ impl Picker {
 			self.format_buttons.push((rect, escaped));
 		}
 	}
-	fn shortcut_lines(&self, width: usize) -> Vec<Line<'static>> {
-		let hidden = self
-			.explorer
-			.as_ref()
-			.is_some_and(FileExplorer::show_hidden);
-		let entries = [
-			("Ctrl+L", "Focus Location".to_owned()),
-			("Ctrl+G", "Go back to CWD".to_owned()),
-			("Backspace", "Parent".to_owned()),
-			(
-				"Ctrl+H / Ctrl+.",
-				format!("Hidden files: {}", if hidden { "on" } else { "off" }),
-			),
-			(
-				"Ctrl+F",
-				format!(
-					"Filter: {}",
-					if self.projects_only {
-						"documents"
-					} else {
-						"all"
-					}
-				),
-			),
-			("Esc", "Cancel".to_owned()),
-		];
-		let columns = if width >= 72 { 2 } else { 1 };
-		let cell_width = width / columns;
-		let cell = |index: usize| {
-			let (key, description) = &entries[index];
-			let key = format!(" {key:<14} ");
-			let key: String = key.chars().take(cell_width).collect();
-			let remaining = cell_width.saturating_sub(key.width());
-			let label: String = format!(" {description}").chars().take(remaining).collect();
-			let padding = cell_width.saturating_sub(key.width() + label.width());
-			vec![
-				Span::styled(key, Style::default().bg(SELECTED).fg(Color::Cyan)),
-				Span::raw(label),
-				Span::raw(" ".repeat(padding)),
-			]
-		};
-		if columns == 2 {
-			(0..3)
-				.map(|i| {
-					let mut spans = cell(i);
-					spans.extend(cell(i + 3));
-					Line::from(spans)
-				})
-				.collect()
-		} else {
-			(0..6).map(|i| Line::from(cell(i))).collect()
-		}
-	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crossterm::event::{KeyEvent, KeyModifiers};
 	use ratatui::{Terminal, backend::TestBackend};
 	fn key(picker: &mut Picker, code: KeyCode, modifiers: KeyModifiers) -> Outcome {
-		picker.event(&Event::Key(KeyEvent::new(code, modifiers)))
+		{
+			let scope = picker.input_scope();
+			let key = crate::shortcuts::ShortcutKey::from(KeyEvent::new(code, modifiers));
+			match picker
+				.test_shortcuts
+				.dispatch(key.clone(), scope, Instant::now())
+			{
+				crate::shortcuts::Dispatch::Action(action) => picker.shortcut(action),
+				crate::shortcuts::Dispatch::Unbound => key
+					.printable()
+					.map(|ch| picker.event(&Event::Paste(ch.to_string())))
+					.unwrap_or(Outcome::None),
+				_ => Outcome::None,
+			}
+		}
 	}
 	fn selected(picker: &mut Picker, name: &str) {
 		let explorer = picker.explorer.as_mut().unwrap();
@@ -1022,32 +897,6 @@ mod tests {
 			.unwrap();
 		explorer.set_selected_idx(index);
 		picker.focus = Focus::List;
-	}
-	#[test]
-	fn shortcut_encodings_work_from_every_picker_focus() {
-		let mut picker = Picker::new(Action::ExportRaw, "", None);
-		for focus in [
-			Focus::List,
-			Focus::Location,
-			Focus::Format,
-			Focus::Name,
-			Focus::Submit,
-			Focus::Cancel,
-		] {
-			picker.focus = focus;
-			for code in [
-				KeyCode::Char('7'),
-				KeyCode::Char('/'),
-				KeyCode::Char('?'),
-				KeyCode::Char('_'),
-			] {
-				key(&mut picker, code, KeyModifiers::CONTROL);
-				assert!(picker.show_shortcuts);
-				key(&mut picker, KeyCode::F(1), KeyModifiers::NONE);
-				assert!(!picker.show_shortcuts);
-			}
-			assert!(picker.focus == focus);
-		}
 	}
 	#[test]
 	fn shift_m_selects_middle_of_visible_entries_without_scrolling() {
@@ -1098,21 +947,6 @@ mod tests {
 		assert_eq!(picker.explorer.as_ref().unwrap().selected_idx(), 0);
 		key(&mut picker, KeyCode::Char('.'), KeyModifiers::CONTROL);
 		assert!(picker.explorer.as_ref().unwrap().show_hidden());
-		key(&mut picker, KeyCode::Char('/'), KeyModifiers::CONTROL);
-		let mut terminal = Terminal::new(TestBackend::new(90, 32)).unwrap();
-		terminal
-			.draw(|frame| picker.draw(frame, "Open", None))
-			.unwrap();
-		assert!(picker.help_area.height > 0);
-		assert!(
-			picker
-				.shortcut_lines(86)
-				.iter()
-				.flat_map(|line| &line.spans)
-				.any(|span| span.style.bg == Some(SELECTED))
-		);
-		key(&mut picker, KeyCode::Char('?'), KeyModifiers::CONTROL);
-		assert!(!picker.show_shortcuts);
 		picker.focus = Focus::Name;
 		key(&mut picker, KeyCode::Char('a'), KeyModifiers::CONTROL);
 		for ch in "hjklggG".chars() {

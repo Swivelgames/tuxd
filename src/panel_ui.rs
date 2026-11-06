@@ -12,6 +12,8 @@ use ratatui::{
 	widgets::{Block, BorderType, Gauge, Paragraph, Tabs, Widget},
 };
 
+use unicode_width::UnicodeWidthStr;
+
 const BORDER: Color = Color::Rgb(62, 78, 106);
 const SURFACE: Color = Color::Reset;
 const MUTED: Color = Color::Rgb(136, 150, 179);
@@ -187,9 +189,22 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 					Color::Rgb(23, 28, 44)
 				};
 				if field == 0 {
-					Paragraph::new(app.panel.fields[0].clone())
+					let value = &app.panel.fields[0];
+					let cursor = value[..app.panel.field_cursors[0].min(value.len())].width();
+					let scroll = if focused && !app.panel.replace_field {
+						(cursor + 1).saturating_sub(input.width as usize)
+					} else {
+						0
+					};
+					Paragraph::new(value.clone())
+						.scroll((0, scroll as u16))
 						.style(style.bg(background))
 						.render(input, &mut buffer);
+					if focused && !app.panel.replace_field && input.width > 0 {
+						buffer[(input.x + (cursor - scroll) as u16, input.y)]
+							.set_style(Style::default().add_modifier(Modifier::REVERSED));
+					}
+
 					let preview = Rect::new(rect.right().saturating_sub(5), rect.y, 5, 1);
 					Paragraph::new(if app.panel.rgb().is_ok() { "" } else { "  ?" })
 						.style(

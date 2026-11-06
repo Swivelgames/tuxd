@@ -6,8 +6,9 @@ use std::{
 use crossterm::{
 	cursor::Show,
 	event::{
-		DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-		KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+		DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+		EnableFocusChange, EnableMouseCapture, KeyboardEnhancementFlags,
+		PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 	},
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
@@ -38,7 +39,8 @@ impl Session {
 			io::stdout(),
 			EnterAlternateScreen,
 			EnableBracketedPaste,
-			EnableMouseCapture
+			EnableMouseCapture,
+			EnableFocusChange
 		)?;
 		KEYBOARD_PUSHED.store(true, Ordering::SeqCst);
 		execute!(
@@ -55,7 +57,7 @@ fn restore() {
 		let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
 	}
 	// Attempt each restoration even if an earlier write fails.
-	let _ = execute!(io::stdout(), DisableMouseCapture);
+	let _ = execute!(io::stdout(), DisableMouseCapture, DisableFocusChange);
 	let _ = execute!(io::stdout(), DisableBracketedPaste);
 	let _ = execute!(io::stdout(), Show, LeaveAlternateScreen);
 	let _ = disable_raw_mode();

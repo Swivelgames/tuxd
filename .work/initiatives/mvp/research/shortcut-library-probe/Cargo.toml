@@ -1,0 +1,9 @@
+[package]
+name = "tuxd-shortcut-library-probe"
+version = "0.0.0"
+edition = "2024"
+[dependencies]
+ratatui-which-key = "=0.14.0"
+crossterm = "0.29"
+keybinds = { version = "=0.2.0", features = ["crossterm", "serde"] }
+serde_json = "1"

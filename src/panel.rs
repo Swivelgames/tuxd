@@ -21,7 +21,47 @@ pub struct Item {
 	pub ink: Option<Ink>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Group {
+	Section(usize),
+	Styles,
+	Target,
+	Palette,
+	Colors(usize),
+	Field(usize),
+	Apply,
+	Reset,
+	GlyphTabs,
+	Glyphs(usize),
+}
+impl Item {
+	pub fn group(&self) -> Group {
+		match self.control {
+			Control::Section(n) => Group::Section(n),
+			Control::Target(_) => Group::Target,
+			Control::Palette(_) => Group::Palette,
+			Control::GlyphTab(_) => Group::GlyphTabs,
+			Control::Field(n) => Group::Field(n),
+			Control::Apply => Group::Apply,
+			Control::Glyph(ch) => Group::Glyphs(if BOX.iter().any(|(c, _)| *c == ch) {
+				0
+			} else if BLOCKS.iter().any(|(c, _)| *c == ch) {
+				1
+			} else {
+				2
+			}),
+			Control::Style(Action::Foreground(ink) | Action::Background(ink)) => match ink {
+				Ink::Ansi(_) => Group::Colors(0),
+				Ink::Indexed(_) => Group::Colors(1),
+				_ => Group::Reset,
+			},
+			Control::Style(_) => Group::Styles,
+		}
+	}
+}
 pub struct Panel {
+	pub field_cursors: [usize; 4],
+	group_memory: std::collections::BTreeMap<Group, Control>,
 	pub active_section: Option<usize>,
 	pub gauge_areas: Vec<(ratatui::layout::Rect, usize)>,
 	pub gauge_drag: Option<usize>,
@@ -42,6 +82,8 @@ pub struct Panel {
 impl Default for Panel {
 	fn default() -> Self {
 		Self {
+			field_cursors: [7, 3, 3, 3],
+			group_memory: Default::default(),
 			active_section: None,
 			gauge_areas: Vec::new(),
 			gauge_drag: None,
@@ -135,14 +177,30 @@ impl Panel {
 	}
 	pub fn edit(&mut self, field: usize, text: &str, backspace: bool) {
 		let text = crate::document::sanitize(text).replace(['\n', '\t'], " ");
-		if self.replace_field && !backspace {
-			self.fields[field].clear();
+		use unicode_segmentation::UnicodeSegmentation;
+		let cursor = self.field_cursors[field].min(self.fields[field].len());
+		let mut cursor = cursor;
+		while !self.fields[field].is_char_boundary(cursor) {
+			cursor -= 1;
 		}
+		self.field_cursors[field] = cursor;
+		if self.replace_field {
+			self.fields[field].clear();
+			self.field_cursors[field] = 0;
+		}
+		let was_selected = self.replace_field;
 		self.replace_field = false;
-		if backspace {
-			self.fields[field].pop();
-		} else if self.fields[field].len() + text.len() <= 16 {
-			self.fields[field].push_str(&text);
+		if backspace && !was_selected {
+			let cursor = self.field_cursors[field];
+			let previous = self.fields[field][..cursor]
+				.grapheme_indices(true)
+				.next_back()
+				.map_or(0, |(at, _)| at);
+			self.fields[field].replace_range(previous..cursor, "");
+			self.field_cursors[field] = previous;
+		} else if !backspace && self.fields[field].len() + text.len() <= 16 {
+			self.fields[field].insert_str(self.field_cursors[field], &text);
+			self.field_cursors[field] += text.len();
 		}
 		if field == 0 {
 			let value = self.fields[0].trim();
@@ -160,7 +218,59 @@ impl Panel {
 		) {
 			self.fields[0] = format!("#{r:02x}{g:02x}{b:02x}");
 		}
+		for n in 0..4 {
+			if n != field {
+				self.field_cursors[n] = self.fields[n].len();
+			}
+		}
 		self.error = self.rgb().err();
+	}
+	pub fn move_caret(&mut self, field: usize, action: crate::shortcuts::ActionId) {
+		use crate::shortcuts::ActionId as A;
+		use unicode_segmentation::UnicodeSegmentation;
+		let text = &self.fields[field];
+		let cursor = self.field_cursors[field].min(text.len());
+		self.field_cursors[field] = match action {
+			A::FieldHome => 0,
+			A::FieldEnd => text.len(),
+			A::FieldLeft => text[..cursor]
+				.grapheme_indices(true)
+				.next_back()
+				.map_or(0, |(i, _)| i),
+			A::FieldRight => cursor + text[cursor..].graphemes(true).next().map_or(0, str::len),
+			_ => cursor,
+		};
+		self.replace_field = false;
+	}
+	pub fn next_field(&mut self, index: usize, back: bool) -> usize {
+		let items = self.items();
+		if items.is_empty() {
+			return 0;
+		}
+		let current = &items[index.min(items.len() - 1)];
+		self.group_memory.insert(current.group(), current.control);
+		let mut groups = Vec::new();
+		for item in &items {
+			if !groups.contains(&item.group()) {
+				groups.push(item.group());
+			}
+		}
+		let at = groups
+			.iter()
+			.position(|g| *g == current.group())
+			.unwrap_or(0);
+		let target = groups[(at + if back { groups.len() - 1 } else { 1 }) % groups.len()];
+		let preferred = match target {
+			Group::Target => Some(Control::Target(self.background)),
+			Group::Palette => Some(Control::Palette(self.palette)),
+			Group::GlyphTabs => Some(Control::GlyphTab(self.glyph_tab)),
+			_ => self.group_memory.get(&target).copied(),
+		};
+		items
+			.iter()
+			.position(|i| i.group() == target && Some(i.control) == preferred)
+			.or_else(|| items.iter().position(|i| i.group() == target))
+			.unwrap_or(0)
 	}
 	pub fn display_row(&self, item: &Item) -> Option<usize> {
 		if let Some(Ink::Indexed(n)) = item.ink {

@@ -2,7 +2,7 @@
 
 Status: Planned
 
-Depends on: [Slice 4](slice-04-save-and-export.md)
+Depends on: [Slice 4a — contextual shortcuts and settings](slice-04a-shortcut-settings.md)
 
 Estimate: 3–5 developer days, including validation.
 

@@ -40,17 +40,17 @@ The editor uses the alternate screen. The title shows the document filename and 
 | F3 or pane Wrap button | Toggle soft wrapping for the editor or code pane |
 | Ctrl+C in code | Copy the entire escaped ANSI output, excluding display-only line breaks and line numbers |
 | F6 | Cycle editor, tools, and open code drawer |
-| Tab/Shift+Tab, arrows in tools | Choose a control; Enter/Space applies it |
+| Tab/Shift+Tab, arrows in tools | Tab between groups; arrows within a group; Enter/Space activates |
 | Home/End, Page Up/Down in tools | Reach the first/last control or move a page |
 | Enter in RGB fields | Apply the staged RGB color; typing replaces a newly focused field |
 | Arrows, Page Up/Down in code | Scroll generated output |
 | Mouse wheel | Scroll three lines; the next edit/navigation returns to the cursor |
-| F1 | Open / close help; Esc also closes it |
+| F1 / Ctrl+/ / Ctrl+, | Open Shortcut Settings (fixed); Esc closes settings |
 | F4 | File menu: New, Open, Save, Save As, Import, Export, Quit |
 | Ctrl+N / Ctrl+O | New / open document |
 | Ctrl+S / Ctrl+Shift+S | Save / Save As |
 | Ctrl+E | Export ANSI (Raw / Escaped selector in the picker) |
-| Ctrl+Q | Quit; when dirty, S saves, D/Y discards, C/N/Esc cancels |
+| Ctrl+Q | Quit; when dirty, S/Y saves, D/N discards, A/C/Esc cancels |
 
 Ctrl+Shift+Z requires the terminal to report Shift separately from Ctrl+Z. The app requests enhanced keyboard reporting where supported; Ctrl+Y is also available.
 
@@ -102,7 +102,7 @@ Word movement uses Unicode word-boundary segments, skips intervening whitespace 
 
 ## Color and character tools
 
-The sidebar contains separate collapsible Style, Color, and Characters boxes. Click a box title, or focus it and press Enter/Space, to collapse or expand it. Color and character categories use compact dot-separated tab strips. Use the mouse wheel over the panel or keyboard navigation with F6 focus; Home returns to the first control. ANSI16 places basic colors (0–7) in the first row and bright colors (8–15) in the second. The 256 tab exposes every indexed value in seven-column rows, with right-aligned numbers. Both palettes use fixed-width buttons aligned left: Basic has two-space gaps and 256 has one-space gaps. The 256 grid shows at most five rows; mouse-wheel scrolling over it and keyboard navigation scroll its contents independently of Characters. Switching tabs or the foreground/background target only changes the tool view. Choosing a swatch applies it immediately to the selection or pending typing style. Reset restores the targeted channel to its terminal-default color; Clear resets all attributes and both channels. Formatting and character insertion participate in undo/redo.
+The sidebar contains separate collapsible Style, Color, and Characters boxes. Click a box title, or focus it and press Enter/Space, to collapse or expand it. Color and character categories use compact dot-separated tab strips. Use the mouse wheel over the panel or keyboard navigation with F6 focus; Home selects the beginning of the focused group. ANSI16 places basic colors (0–7) in the first row and bright colors (8–15) in the second. The 256 tab exposes every indexed value in seven-column rows, with right-aligned numbers. Both palettes use fixed-width buttons aligned left: Basic has two-space gaps and 256 has one-space gaps. The 256 grid shows at most five rows; mouse-wheel scrolling over it and keyboard navigation scroll its contents independently of Characters. Switching tabs or the foreground/background target only changes the tool view. Choosing a swatch applies it immediately to the selection or pending typing style. Reset restores the targeted channel to its terminal-default color; Clear resets all attributes and both channels. Formatting and character insertion participate in undo/redo.
 
 The compact RGB form has synchronized hex (`#RRGGBB`) and decimal R/G/B fields (0–255). Typing or pasting into a newly focused field replaces its value; Backspace edits its end, and Ctrl+A makes the next input replace it. A separate swatch beside Hex previews a valid candidate. R/G/B gauges accept clicks, drags, and mouse-wheel adjustments. Left/Right adjusts by one, Shift+Left/Right by ten, and Home/End sets 0/255; direct numeric typing still works. Enter or Apply commits it. Invalid/incomplete input shows local feedback and never changes the document.
 
@@ -114,6 +114,32 @@ Style controls use a compact row of B/I/U/D/S buttons, each previewing its attri
 
 Scrollbars appear when content exceeds its viewport: vertical bars for Editor, Code, the tool sidebar, and the indexed-color grid; horizontal bars for Editor and Code when wrapping is off. Click a track to jump, drag its thumb, or scroll the wheel over it. Thumb size reflects the visible portion. Scrolling changes only the viewport, preserving text, selection, and undo history.
 
+## Shortcut Settings
+
+F1, Ctrl+/, and Ctrl+, always open Shortcut Settings, including from file dialogs and prompts. Settings starts at the related context and preserves the underlying selection, document, and dialog. The shortcuts documented above are defaults; the File menu and workspace hints reflect saved bindings.
+
+Sequence Timeout has its own first destination, followed by Workspace, Editor, Code, Tools, Dialogs, and File Explorer. Wide terminals show a category navigator beside the current category; narrower terminals use a category selector. Subsections start expanded in every category and can be collapsed independently. Workspace groups Files, Panes, Field Actions, Field Navigation, Text Fields, and Range Controls; Editor separates Tools, Movement, Selection, and Editing. Toggle Editor and Toggle Code live in their respective categories, with Toggle wrapping at the top level in both. Blank rows separate subsection headings and related action groups.
+
+The action list shows compact binding summaries. Selecting an action opens its description and Primary / Alternate 1 / Alternate 2 fields below the list. Reset binding and Unset binding operate on the selected slot; Reset all, Save, and Cancel stay in the footer. Focus Editor, Focus Code, and Focus Tools begin unset; Cycle panes defaults to F6.
+
+- Ctrl+L focuses the category navigator (opens the selector on narrow terminals). Arrows or h/j/k/l navigate; Enter opens a subsection or focuses the selected action's bindings. Tab / Shift+Tab traverse controls; gg / G select first / last, M selects the middle visible row, and Page Up/Down move a page. Mouse clicks, wheel scrolling, and scrollbar dragging also work.
+- Enter on a binding records one decoded press. Press 1–9 on an action or binding to record that many inputs: for example, 2 followed by Ctrl+W and Right. Esc cancels capture; repeated/released keys do not fill extra slots. Capture reports what the terminal actually sent.
+- Delete or Backspace unsets the focused binding. Reset binding restores that slot's default. Reset all (also Ctrl+R) restores bindings and timeout in the draft.
+- Sequence Timeout edits the inter-key deadline in milliseconds (default 1000; range 1–60000). Enter confirms the field edit; Esc cancels it. Ctrl+T opens this editor directly.
+- Save (also Ctrl+S) validates, writes configuration, and activates the complete draft. Cancel / Esc offers Discard or Keep editing if anything changed; Keep editing is initially focused. These settings controls remain fixed regardless of custom bindings.
+
+The four shared-control subsections in Workspace configure activation/submission, field navigation, text-field editing/clipboard, and range adjustment once. Tab visits each radio group, tab strip, and grid as one field, remembering its highlighted item. Left/Right selects radios and tabs immediately; grid arrows move the highlight and Enter/Space applies the swatch or inserts the character. Home/End operate within the focused control. RGB range adjustments remain staged until Apply or Submit. Editor movement, selection, literal-tab Indent, and Code scrolling remain independent.
+
+Shared Copy copies all escaped ANSI from Code or selected text from a path/RGB field. Select all selects a field for copying or replacement; Paste reads the clipboard into the targeted path/RGB field. Editor selection clipboard operations remain a future feature; terminal bracketed paste continues to work.
+
+Complete bindings execute immediately. Proper sequence prefixes wait for the next input. Esc, an unmatched continuation, timeout, focus/context changes, or opening/closing a dialog cancel a pending sequence; buffered keys never become document text. A short pending indicator appears only while waiting. Both exact conflicts and ambiguous prefixes are rejected in overlapping contexts. Bare printable bindings/prefixes are prohibited in editable text contexts, while explorer letter navigation remains configurable. The fixed settings openers cannot be assigned to other actions.
+
+Configuration lives at `$XDG_CONFIG_HOME/tuxd/shortcuts.json`, falling back to `~/.config/tuxd/shortcuts.json`. Version 2 stores stable action IDs, three explicit binding slots (null means unset), structured decoded keys/modifiers, and the timeout, using tab-indented JSON and atomic replacement. Missing known actions inherit defaults. Unknown actions, unknown fields, unsupported versions, invalid keys, and conflicts reject the whole file. Missing configuration uses defaults; invalid/unreadable configuration reports an error and uses defaults without modifying the file. Failed saves retain both the draft and the previous active map. Version 1 files are converted in memory: compatible custom bindings and explicit unsets are retained; incompatible merges or more than three distinct bindings produce an error. Loading never rewrites the file; an explicit Save writes version 2.
+
+The registry uses `ratatui-which-key` scopes for concrete input contexts and categories for settings sections. Shared actions expand into applicable scopes; prefix groups derive their labels from the effective bindings. A custom key adapter retains combined modifiers and Unicode. BackTab normalizes to Shift+Tab; printable ASCII Shift is represented by character case, modified uppercase ASCII is represented by lowercase plus Shift, and legacy Ctrl+7/Ctrl+_ normalize to Ctrl+/. Terminal encodings that cannot distinguish physical keys remain indistinguishable.
+
+Shared prompt responses default to S/Y positive, D/N negative, A/C abort, and Esc close. Unsaved documents map these to Save / Discard / Cancel; two-choice overwrite/import-review prompts map Negative and Abort to the secondary choice. File fields and scrollable views retain their own context-specific navigation.
+
 ## Documents, import, and export
 
 Each `.tuxd.json` file contains one editable document. Open, Save As, Import, and Export share a directory picker powered by `ratatui-explorer`. It starts beside the current document, or beside its import source. An untitled document exported before saving remembers its export directory. Otherwise it starts in the working directory. Ctrl+G returns to the working directory. Relative filenames resolve against the displayed directory; absolute paths and `~/` also work. Save As adds `.tuxd.json` when no extension is entered.
@@ -122,8 +148,8 @@ Each `.tuxd.json` file contains one editable document. Open, Save As, Import, an
 - In the list, arrows, Home/End, and Page Up/Down select entries. Vim-style `h/j/k/l` navigate parent/down/up/into-directory, and `gg` / `G` select the first / last entry. Shift+M selects the middle visible entry. These letter bindings apply only to the file list. Left/Backspace goes to the parent directory; Right enters a directory. Enter or double-click opens a directory/file; for Save As/Export, choosing an existing file fills the filename for review. Single-click selects; the wheel and scrollbar scroll the list.
 - Ctrl+H or Ctrl+. toggles hidden files. Ctrl+F toggles `.tuxd.json`/all-files filtering. Open/Save As default to documents; Import/Export default to all files.
 - Both text fields accept terminal paste and Ctrl+V (using `wl-paste` on Wayland or `xclip`/`xsel` on X11). Clipboard reads run in the background. Ctrl+A selects the field contents for replacement; Left/Right, Home/End, and Backspace/Delete edit the path.
-- Ctrl+/, Ctrl+?, or F1 toggles a separate shortcuts panel beneath the picker. Key labels have contrasting backgrounds; use the mouse wheel over the panel if its contents exceed the available height. Legacy Ctrl+/ is supported; terminals that encode Ctrl+? identically to Backspace need Ctrl+/ or F1 instead. Ctrl+. and distinct Ctrl+I require terminal support for disambiguated keys; Ctrl+H and the Style tool remain alternatives.
-- Import and Export have Raw ANSI / Escaped ANSI radios: click an option, or focus the group and use Left/Right or Space. Enter submits the selected format and filename.
+- F1, Ctrl+/, or Ctrl+, opens Shortcut Settings at the File Explorer section. Closing settings returns to the same picker and focus. Legacy Ctrl+/ is supported; Ctrl+? is not a settings alias. Ctrl+. and distinct Ctrl+I require terminal support for disambiguated keys; Ctrl+H and the Style tool remain alternatives.
+- Import and Export have Raw ANSI / Escaped ANSI radios: click an option, or focus the group and use Left/Right. Enter/Space submits the selected format and filename.
 - Enter submits the filename; Esc cancels. Existing destinations still require overwrite confirmation. F4 provides alternatives for terminals that cannot distinguish Ctrl+Shift+S. Menu entries and confirmation choices can also be clicked.
 
 Save preserves editing history. Dirty state compares the current document to its saved snapshot, so undoing back to saved clears `*`. View changes and pending typing styles do not mark the document dirty. New/Open/import replaces the document only after validation and any Save/Discard/Cancel prompt. A successful replacement starts fresh history. Save As/export asks before overwriting an existing destination. Exports cannot replace the active document file.

@@ -8,7 +8,7 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
-	app::{App, Overlay},
+	app::App,
 	document::{Position, column_at},
 	layout::Layout,
 };
@@ -141,6 +141,15 @@ fn draw_lines(frame: &mut Frame, view: View<'_>, style_at: impl Fn(Position) -> 
 	}
 }
 
+fn shortcut_hint(app: &App, action: crate::shortcuts::ActionId, label: &str) -> String {
+	let key = app.shortcuts.config.hint(action);
+	if key.is_empty() {
+		String::new()
+	} else {
+		format!(" · {key} {label}")
+	}
+}
+
 pub fn draw(frame: &mut Frame, app: &mut App) {
 	let area = frame.area();
 	frame.render_widget(Clear, area);
@@ -176,12 +185,26 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	if area.width < 20 || area.height < 5 {
 		app.editor_area = Rect::default();
 		app.editor.resize(0, 0);
-		frame.render_widget(Paragraph::new("Resize · F4 files · Ctrl+Q quit"), area);
+		frame.render_widget(Paragraph::new("Resize · F1 shortcuts"), area);
 		return;
 	}
 	frame.render_widget(
-		Paragraph::new(" Terminal UX Designer · F2 code · F3 wrap · F4 files · F6 focus")
-			.style(Style::default().fg(Color::Cyan)),
+		Paragraph::new(format!(
+			" Terminal UX Designer{}{}{}{}",
+			shortcut_hint(app, crate::shortcuts::ActionId::ToggleCode, "code"),
+			shortcut_hint(
+				app,
+				if app.focus == 2 {
+					crate::shortcuts::ActionId::CodeWrap
+				} else {
+					crate::shortcuts::ActionId::EditorWrap
+				},
+				"wrap"
+			),
+			shortcut_hint(app, crate::shortcuts::ActionId::FileMenu, "files"),
+			shortcut_hint(app, crate::shortcuts::ActionId::CyclePanes, "focus")
+		))
+		.style(Style::default().fg(Color::Cyan)),
 		Rect::new(area.x, area.y, area.width, 1),
 	);
 	app.code_toggle = Rect::new(area.right() - 11, area.y, 11, 1);
@@ -450,7 +473,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	}
 
 	let (cursor_row, cursor_x) = layout.location(editor.cursor);
-	if app.overlay == Overlay::None
+	if app.settings.is_none()
 		&& app.focus == 0
 		&& app.files.dialog.is_none()
 		&& cursor_row >= editor.top
@@ -463,17 +486,24 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 			app.editor_area.y + (cursor_row - editor.top) as u16,
 		));
 	}
-	let status = app.notice.clone().unwrap_or_else(|| {
-		format!(
-			" Ln {}, Col {} · {} lines · Ctrl+Z/Y undo/redo · F1 help · Ctrl+Q quit",
-			editor.cursor.row + 1,
-			column_at(
-				&editor.document.lines[editor.cursor.row],
-				editor.cursor.byte
-			) + 1,
-			editor.document.lines.len()
-		)
-	});
+	let status = app
+		.shortcuts
+		.pending_label()
+		.or_else(|| app.notice.clone())
+		.unwrap_or_else(|| {
+			format!(
+				" Ln {}, Col {} · {} lines{}{} · F1 shortcuts{}",
+				editor.cursor.row + 1,
+				column_at(
+					&editor.document.lines[editor.cursor.row],
+					editor.cursor.byte
+				) + 1,
+				editor.document.lines.len(),
+				shortcut_hint(app, crate::shortcuts::ActionId::Undo, "undo"),
+				shortcut_hint(app, crate::shortcuts::ActionId::Redo, "redo"),
+				shortcut_hint(app, crate::shortcuts::ActionId::Quit, "quit"),
+			)
+		});
 	frame.render_widget(
 		Paragraph::new(status).style(Style::default().fg(Color::Gray)),
 		Rect::new(area.x, area.bottom() - 1, area.width, 1),
@@ -494,52 +524,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		app.code_area = Rect::default();
 		app.code_pane = Rect::default();
 		app.code_wrap_toggle = Rect::default();
-	}
-
-	if app.overlay != Overlay::None {
-		if area.width < 50 || area.height < 15 {
-			frame.render_widget(Clear, area);
-			let text = "F1 / Esc: close help
-F4: file menu
-Ctrl+N/O/S: new/open/save
-Ctrl+Shift+S: save as
-Ctrl+E: export · Ctrl+Q: quit
-Ctrl+Z/Y: undo/redo
-Shift+arrows / drag: select
-F2 code · F3 wrap · F6 focus";
-			frame.render_widget(
-				Paragraph::new(text).wrap(ratatui::widgets::Wrap { trim: false }),
-				area,
-			);
-			return;
-		}
-		let (title, text, height) = match app.overlay {
-			Overlay::Help => (
-				" Help · F1 / Esc close ",
-				"Arrows · Home/End · Page Up/Down\nCtrl+Home/End: document start/end\nCtrl+Z: undo · Ctrl+Y: redo\nTab: literal tab (4-column stops)\nClick: cursor · Wheel: scroll\nCtrl+Q: quit (Save/Discard/Cancel if dirty)\nF4: files · Ctrl+N/O/S: new/open/save\nCtrl+Shift+S: save as · Ctrl+E: export\nShift+arrows / drag: select · Esc: clear\nCtrl+B/I/U: styles · F6: focus · F2: code\nF5: collapse editor · Alt+←/→: slim tabs\nF3: wrap focused pane · Ctrl+C: copy code\nCtrl/Alt+arrows: words · +Backspace: delete\nTools: Tab / arrows / PgUp/Dn · Enter applies\nRGB: type replaces field · Ctrl+A replaces\nANSI colors / dim / italic depend on terminal\nRGB needs true color · Nerd needs Nerd Font",
-				21,
-			),
-			Overlay::None => unreachable!(),
-		};
-		let width = area.width.saturating_sub(2).min(64);
-		let height = area.height.saturating_sub(2).min(height);
-		let popup = Rect::new(
-			area.x + (area.width - width) / 2,
-			area.y + (area.height - height) / 2,
-			width,
-			height,
-		);
-		frame.render_widget(Clear, popup);
-		frame.render_widget(
-			Paragraph::new(text)
-				.wrap(ratatui::widgets::Wrap { trim: false })
-				.block(
-					Block::bordered()
-						.border_type(ratatui::widgets::BorderType::Rounded)
-						.title(title),
-				),
-			popup,
-		);
 	}
 }
 
@@ -717,7 +701,7 @@ mod tests {
 	}
 
 	#[test]
-	fn keyboard_reaches_every_palette_control_in_wide_and_narrow_layouts() {
+	fn keyboard_reaches_control_groups_and_grid_members_in_all_layouts() {
 		use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 		for (width, height) in [(80, 24), (64, 24), (40, 12), (20, 12)] {
 			for palette in 0..3 {
@@ -725,7 +709,7 @@ mod tests {
 				let mut app = App::default();
 				app.panel.palette = palette;
 				terminal.draw(|frame| draw(frame, &mut app)).unwrap();
-				let tabs: Vec<usize> = if width <= 64 { vec![1, 2, 3] } else { vec![0] };
+				let tabs = if width <= 64 { vec![1, 2, 3] } else { vec![0] };
 				for tab in tabs {
 					if width <= 64 {
 						app.select_slim_tab(tab);
@@ -734,23 +718,49 @@ mod tests {
 						app.focus = 1;
 					}
 					app.tool_index = 0;
-					for index in 0..app.panel.items().len() {
+					let items = app.panel.items();
+					let groups: std::collections::BTreeSet<_> =
+						items.iter().map(|item| item.group()).collect();
+					let mut visited = std::collections::BTreeSet::new();
+					for _ in 0..groups.len() {
 						terminal.draw(|frame| draw(frame, &mut app)).unwrap();
-						assert_eq!(app.tool_index, index);
+						let group = app.panel.items()[app.tool_index].group();
+						visited.insert(group);
 						assert!(
 							app.tool_areas
 								.iter()
-								.any(|(rect, tool)| *tool == index
-									&& rect.width > 0 && rect.height > 0),
-							"unreachable {index} tab {tab} at {width}x{height}"
+								.any(|(rect, index)| *index == app.tool_index && !rect.is_empty()),
+							"unreachable group {group:?} at {width}x{height}"
 						);
 						app.handle(Event::Key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)));
+					}
+					assert_eq!(visited, groups);
+					// A grid is one field; internal arrows can reach the last partial row.
+					if let Some(index) = app.panel.items().iter().position(|item| {
+						matches!(
+							item.group(),
+							crate::panel::Group::Colors(_) | crate::panel::Group::Glyphs(_)
+						)
+					}) {
+						app.tool_index = index;
+						let group = app.panel.items()[index].group();
+						let last = app
+							.panel
+							.items()
+							.iter()
+							.rposition(|item| item.group() == group)
+							.unwrap();
+						app.handle(Event::Key(KeyEvent::new(KeyCode::End, KeyModifiers::NONE)));
+						terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+						assert_eq!(app.tool_index, last);
+						assert!(app.tool_areas.iter().any(|(_, index)| *index == last));
 					}
 				}
 				assert!(app.editor.document.is_empty());
 			}
 		}
 	}
+
 	#[test]
 	fn collapsed_panes_reallocate_space_and_slim_layout_tracks_resize() {
 		let mut app = App::default();
@@ -986,8 +996,13 @@ mod tests {
 			.insert("keep me", EditKind::Atomic, Instant::now());
 		for (width, height) in [(1, 1), (12, 3), (20, 5), (50, 15), (120, 30)] {
 			let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-			for overlay in [Overlay::None, Overlay::Help] {
-				app.overlay = overlay;
+			for settings in [false, true] {
+				app.settings = settings.then(|| {
+					crate::shortcuts::settings::Settings::new(
+						&app.shortcuts.config,
+						crate::shortcuts::SettingsSection::Editor,
+					)
+				});
 				terminal.draw(|frame| draw(frame, &mut app)).unwrap();
 				assert_eq!(app.editor.document.lines, ["keep me"]);
 			}
