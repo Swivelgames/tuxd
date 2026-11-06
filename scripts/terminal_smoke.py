@@ -209,7 +209,7 @@ def main():
 		# Focus tools, navigate to italic, and apply it without losing the insertion point.
 		session.send("\x1b[17~")
 		session.resize(40, 12)
-		assert "Editor" not in "\n".join(session.rows())
+		assert "Characters" in "\n".join(session.rows())
 		session.send("\x1b")
 		session.resize(80, 24)
 		session.send("\x11y")
@@ -250,11 +250,12 @@ def main():
 		assert "6 hex digits" in "\n".join(session.rows())
 		session.click_tool("Clear")
 		session.send("\x1b")
-		# Keyboard-only character navigation works in the narrow overlay.
+		# Keyboard-only character navigation works in the slim tabs.
 		session.send("\x1b[17~")
 		session.resize(40, 12)
+		session.send("\x1b[1;3C\x1b[1;3C")  # Style -> Color -> Characters tabs
 		session.send("\x1b[F\r\r")
-		assert "Editor" not in "\n".join(session.rows())
+		assert "Characters" in "\n".join(session.rows())
 		session.send("\x1b")
 		session.resize(80, 24)
 		assert "sampleZ╬╬" in session.row(2), session.rows()

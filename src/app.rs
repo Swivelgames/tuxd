@@ -18,6 +18,11 @@ pub enum Overlay {
 }
 
 pub struct App {
+	pub editor_open: bool,
+	pub slim: bool,
+	pub slim_tab: usize,
+	pub pane_toggles: [Rect; 2],
+	pub slim_tabs: Vec<(Rect, usize)>,
 	pub files: crate::files::Files,
 	pub document_path: Option<std::path::PathBuf>,
 	pub scrollbars: Vec<crate::scrollbar::Bar>,
@@ -50,6 +55,11 @@ impl Default for App {
 		let mut editor = Editor::default();
 		editor.wrap = true;
 		Self {
+			editor_open: true,
+			slim: false,
+			slim_tab: 0,
+			pane_toggles: [Rect::default(); 2],
+			slim_tabs: Vec::new(),
 			files: Default::default(),
 			document_path: None,
 			scrollbars: Vec::new(),
@@ -129,6 +139,39 @@ impl App {
 		}
 	}
 
+	pub fn toggle_pane(&mut self, code: bool) {
+		if code {
+			self.code_open = !self.code_open;
+			if !self.code_open {
+				self.editor_open = true;
+				if self.focus == 2 || self.slim {
+					self.focus = 0;
+				}
+			}
+		} else {
+			self.editor_open = !self.editor_open;
+			if !self.editor_open {
+				self.code_open = true;
+				if self.focus == 0 {
+					self.focus = if self.slim && self.slim_tab > 0 { 1 } else { 2 };
+				}
+			}
+		}
+		self.dragging = false;
+		self.scrollbar_drag = None;
+		self.editor.break_group();
+	}
+	pub fn select_slim_tab(&mut self, tab: usize) {
+		self.slim_tab = tab;
+		self.code_open = true;
+		self.focus = if tab == 0 { 2 } else { 1 };
+		self.panel.active_section = tab.checked_sub(1);
+		self.panel.top = 0;
+		self.tool_index = 0;
+		self.panel.gauge_drag = None;
+		self.scrollbar_drag = None;
+		self.editor.break_group();
+	}
 	fn workspace_key(&mut self, key: crossterm::event::KeyEvent) -> bool {
 		let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 		match key.code {
@@ -143,24 +186,48 @@ impl App {
 				return true;
 			}
 			KeyCode::F(2) => {
-				self.code_open = !self.code_open;
-				if !self.code_open && self.focus == 2 {
-					self.focus = 0;
-				}
-				self.editor.break_group();
+				self.toggle_pane(true);
+				return true;
+			}
+			KeyCode::F(5) => {
+				self.toggle_pane(false);
+				return true;
+			}
+			KeyCode::Left | KeyCode::Right
+				if self.slim && self.focus != 0 && key.modifiers.contains(KeyModifiers::ALT) =>
+			{
+				self.select_slim_tab(
+					(self.slim_tab + if key.code == KeyCode::Left { 3 } else { 1 }) % 4,
+				);
 				return true;
 			}
 			KeyCode::F(6) => {
-				self.focus = (self.focus + 1) % if self.code_open { 3 } else { 2 };
-				self.editor.break_group();
-				if self.focus == 1 {
-					self.reveal_tool();
+				if self.slim {
+					if self.focus == 0 {
+						self.select_slim_tab(self.slim_tab);
+					} else {
+						self.editor_open = true;
+						self.focus = 0;
+					}
+				} else {
+					self.focus = (self.focus + 1) % 3;
+					if self.focus == 0 {
+						self.editor_open = true;
+					}
+					if self.focus == 2 {
+						self.code_open = true;
+					}
+					if self.focus == 1 {
+						self.reveal_tool();
+					}
 				}
+				self.editor.break_group();
 				return true;
 			}
 			KeyCode::Esc => {
 				self.editor.anchor = None;
 				self.focus = 0;
+				self.editor_open = true;
 				self.dragging = false;
 				self.editor.break_group();
 				return true;
@@ -559,13 +626,24 @@ impl App {
 				self.toggle_wrap(true);
 				return;
 			}
-			if self.code_toggle.contains(point) {
-				self.code_open = !self.code_open;
-				if !self.code_open && self.focus == 2 {
-					self.focus = 0;
-				}
+			if self.pane_toggles[0].contains(point) {
+				self.toggle_pane(false);
 				return;
 			}
+			if self.code_toggle.contains(point) || self.pane_toggles[1].contains(point) {
+				self.toggle_pane(true);
+				return;
+			}
+			if let Some((_, tab)) = self
+				.slim_tabs
+				.iter()
+				.find(|(rect, _)| rect.contains(point))
+				.copied()
+			{
+				self.select_slim_tab(tab);
+				return;
+			}
+
 			if let Some((_, tool)) = self
 				.tool_areas
 				.iter()

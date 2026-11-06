@@ -108,6 +108,7 @@ impl App {
 	}
 
 	pub fn load_document(&mut self, document: Document, path: Option<PathBuf>, imported: bool) {
+		self.editor_open = true;
 		self.files.saved = if imported {
 			None
 		} else {

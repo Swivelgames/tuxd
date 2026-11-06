@@ -34,6 +34,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 	let top = app.panel.top;
 	let mut buffer = Buffer::empty(Rect::new(0, 0, area.width, count as u16));
 	for &(start, height) in &sections {
+		if height == 0 || app.panel.active_section.is_some() {
+			continue;
+		}
 		Block::bordered()
 			.border_type(BorderType::Rounded)
 			.border_style(Style::default().fg(BORDER))
@@ -82,6 +85,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 		let mut line = Line::from(item.label.clone());
 		match item.control {
 			Control::Section(section) => {
+				if app.panel.active_section.is_some() {
+					continue;
+				}
 				line = Line::from(format!(
 					" {} {} ",
 					if app.panel.collapsed[section] {
@@ -356,7 +362,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 			));
 		}
 	}
-	if !app.panel.collapsed[1] && app.panel.palette == 1 {
+	if sections[1].1 > 2 && app.panel.palette == 1 {
 		let first = (sections[1].0 + 5).max(top);
 		let end = (sections[1].0 + 14).min(top + app.panel.height);
 		if end > first {
@@ -369,7 +375,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 		}
 	}
 
-	if !app.panel.collapsed[1] && app.panel.palette == 2 && app.panel.error.is_some() {
+	if sections[1].1 > 2 && app.panel.palette == 2 && app.panel.error.is_some() {
 		let row = sections[1].0 + 10;
 		Paragraph::new(app.panel.error.as_deref().unwrap_or("Enter to apply"))
 			.style(
@@ -383,7 +389,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 			)
 			.render(Rect::new(2, row as u16, width as u16, 1), &mut buffer);
 	}
-	if !app.panel.collapsed[2] {
+	if sections[2].1 > 2 {
 		let detail = items.get(app.tool_index).and_then(|item| {
 			if let Control::Glyph(ch) = item.control {
 				app.panel

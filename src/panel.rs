@@ -22,6 +22,7 @@ pub struct Item {
 }
 
 pub struct Panel {
+	pub active_section: Option<usize>,
 	pub gauge_areas: Vec<(ratatui::layout::Rect, usize)>,
 	pub gauge_drag: Option<usize>,
 	pub indexed_top: usize,
@@ -41,6 +42,7 @@ pub struct Panel {
 impl Default for Panel {
 	fn default() -> Self {
 		Self {
+			active_section: None,
 			gauge_areas: Vec::new(),
 			gauge_drag: None,
 			indexed_top: 0,
@@ -186,6 +188,10 @@ impl Panel {
 		let mut sections = Vec::new();
 		let mut start = 0;
 		for section in 0..3 {
+			if self.active_section.is_some_and(|active| active != section) {
+				sections.push((start, 0));
+				continue;
+			}
 			let mut add = |label: String, control, row, column, columns, ink| {
 				items.push(Item {
 					label,
@@ -204,7 +210,7 @@ impl Panel {
 				1,
 				None,
 			);
-			let height = if self.collapsed[section] {
+			let height = if self.active_section.is_none() && self.collapsed[section] {
 				2
 			} else {
 				match section {
@@ -305,6 +311,9 @@ impl Panel {
 			};
 			sections.push((start, height));
 			start += height + 1;
+		}
+		if self.active_section.is_some() {
+			items.retain(|item| !matches!(item.control, Control::Section(_)));
 		}
 		(items, sections)
 	}

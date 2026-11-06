@@ -90,9 +90,9 @@ Drag or use Shift+navigation to select text. Clicking a tool preserves the selec
 
 With no selection, tools set the style for subsequent typing. Cursor movement adopts the style immediately before the cursor; document start uses defaults. Replacing a selection inherits its first character's style. Text replacement and formatting changes are undoable. When editing joins Unicode characters into one grapheme, that grapheme takes its leading character's style.
 
-The right panel appears on wider terminals. On narrow terminals, F6 opens tools in the editor area; Esc returns. Ctrl+I requires a terminal that distinguishes it from Tab; the tools panel always provides keyboard access to italic.
+The right panel appears on wider terminals. At 64 columns or fewer, Code, Style, Color, and Characters share tabs in the lower pane. Click a tab, or use Alt+Left/Right while the lower pane is focused. F6 switches between Editor and the selected lower tab; Esc returns to Editor. Ctrl+I requires a terminal that distinguishes it from Tab; the tools panel always provides keyboard access to italic.
 
-The Code pane starts open and shows read-only ANSI for the whole document; F2 toggles it. Every document newline appears as a visible `\n` followed by an actual display line break. Tabs appear as `\t`, and literal backslashes are doubled. These display line breaks are presentation only; raw ANSI generation preserves the original newline bytes. Selection highlighting is never included. Code wraps by default; turn wrapping off to scroll long code lines horizontally after focusing the drawer with F6 or a click.
+The Code pane starts open and shows read-only ANSI for the whole document; F2 collapses or expands it. Every document newline appears as a visible `\n` followed by an actual display line break. Tabs appear as `\t`, and literal backslashes are doubled. These display line breaks are presentation only; raw ANSI generation preserves the original newline bytes. Selection highlighting is never included. Code wraps by default; turn wrapping off to scroll long code lines horizontally after focusing the drawer with F6 or a click.
 
 The interactive preview enables color output even when `NO_COLOR` is set, because colors and attributes are document content. Attribute appearance still depends on your terminal/font. Syntax highlighting, drag autoscroll, and customizable application themes arrive later.
 
@@ -141,3 +141,5 @@ Malformed or unsupported controls open **Unsupported ANSI Sequences** with a num
 Automatic styled clipboard paste, stdin import, workspaces/multiple open files, autosave/recovery, and character search remain future work.
 
 The compact unsaved-changes prompt defaults to **Cancel**. Use Tab/Shift+Tab or arrows to select Save, Discard, or Cancel, then Enter; mouse clicks and the existing S/D/C shortcuts also work.
+
+Editor and Code have clickable collapse indicators in their titles. F5 toggles Editor; F2 toggles Code (including the shared lower pane in slim mode). Collapsing one leaves its title bar visible and gives the remaining vertical space to the other. At least one pane stays expanded. These are session layout preferences and do not change document contents.

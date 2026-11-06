@@ -145,6 +145,24 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	let area = frame.area();
 	frame.render_widget(Clear, area);
 	app.tool_areas.clear();
+	app.pane_toggles = [Rect::default(); 2];
+	app.slim_tabs.clear();
+	let slim = area.width <= 64;
+	if app.slim != slim {
+		app.slim = slim;
+		app.panel.top = 0;
+		app.tool_index = 0;
+		if slim && app.focus == 1 {
+			app.select_slim_tab(1);
+		} else if slim && app.focus == 2 {
+			app.select_slim_tab(0);
+		}
+	}
+	app.panel.active_section = if slim {
+		app.slim_tab.checked_sub(1)
+	} else {
+		None
+	};
 	app.scrollbars.clear();
 	app.panel.area = Rect::default();
 	app.panel.indexed_area = Rect::default();
@@ -176,12 +194,15 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		app.code_toggle,
 	);
 	let tools_width = if area.width >= 65 { 35 } else { 0 };
-	let code_height = if app.code_open && app.focus == 2 && area.height < 10 {
-		area.height - 2
-	} else if app.code_open && area.height >= 10 {
-		(area.height / 3).max(4)
+	let available = area.height - 2;
+	let code_height = if !app.code_open {
+		2.min(available)
+	} else if !app.editor_open {
+		available.saturating_sub(2)
+	} else if slim && app.slim_tab > 0 {
+		(area.height / 2).max(8).min(available.saturating_sub(3))
 	} else {
-		0
+		(area.height / 3).max(4).min(available.saturating_sub(2))
 	};
 	let body = Rect::new(
 		area.x,
@@ -193,15 +214,89 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		let code_rect = Rect::new(body.x, body.bottom(), body.width, code_height);
 		let block = Block::bordered()
 			.border_type(ratatui::widgets::BorderType::Rounded)
-			.title(if app.focus == 2 {
-				" Code * · Ctrl+C copy "
+			.title(if slim && app.code_open {
+				" ▾ "
+			} else if slim {
+				" ▸ "
+			} else if app.code_open {
+				" ▾ Code "
 			} else {
-				" Code · escaped ANSI "
+				" ▸ Code "
 			});
-		let inner = block.inner(code_rect);
+		let mut inner = block.inner(code_rect);
 		app.code_pane = inner;
 		frame.render_widget(block, code_rect);
-		app.code_wrap_toggle = wrap_button(frame, code_rect, app.code_wrap);
+		app.pane_toggles[1] = Rect::new(
+			code_rect.x + 1,
+			code_rect.y,
+			(if slim { 3 } else { 8 }).min(code_rect.width.saturating_sub(1)),
+			1,
+		);
+		if slim {
+			let labels = if code_rect.width < 40 {
+				["Code", "Style", "Color", "Chars"]
+			} else {
+				["Code", "Style", "Color", "Characters"]
+			};
+			let end = if app.code_open && app.slim_tab == 0 && code_rect.width >= 53 {
+				code_rect.right() - 13
+			} else {
+				code_rect.right().saturating_sub(1)
+			};
+			let start = if code_rect.width < 35 {
+				app.slim_tab.saturating_sub(1)
+			} else {
+				0
+			};
+			let mut x = code_rect.x + 4;
+			for (i, label) in labels.iter().enumerate().skip(start) {
+				let width = label.len() as u16;
+				if x + width > end {
+					break;
+				}
+				let rect = Rect::new(x, code_rect.y, width, 1);
+				frame.render_widget(
+					Paragraph::new(*label).style(
+						Style::default()
+							.fg(Color::Cyan)
+							.bg(if app.slim_tab == i {
+								Color::Rgb(41, 54, 83)
+							} else {
+								Color::Reset
+							})
+							.add_modifier(if app.slim_tab == i {
+								Modifier::BOLD
+							} else {
+								Modifier::empty()
+							}),
+					),
+					rect,
+				);
+				app.slim_tabs.push((rect, i));
+				x += width;
+				if x < end {
+					frame.render_widget(Paragraph::new(" "), Rect::new(x, code_rect.y, 1, 1));
+				}
+				if i < 3 && x + 3 + labels[i + 1].len() as u16 <= end {
+					frame.render_widget(Paragraph::new(" · "), Rect::new(x, code_rect.y, 3, 1));
+					x += 3;
+				} else {
+					break;
+				}
+			}
+		}
+
+		if slim && app.slim_tab > 0 {
+			inner = Rect::default();
+		}
+		app.code_pane = inner;
+
+		app.code_wrap_toggle =
+			if app.code_open && (!slim || (app.slim_tab == 0 && code_rect.width >= 53)) {
+				wrap_button(frame, code_rect, app.code_wrap)
+			} else {
+				Rect::default()
+			};
 		let lines: Vec<String> = crate::styling::code(&app.editor.document)
 			.split('\n')
 			.map(str::to_owned)
@@ -284,12 +379,18 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	let border = Block::bordered()
 		.border_type(ratatui::widgets::BorderType::Rounded)
 		.title(format!(
-			" Editor · {name}{} ",
+			" {} Editor · {name}{} ",
+			if app.editor_open { "▾" } else { "▸" },
 			if app.dirty() { " *" } else { "" }
 		));
 	let inner = border.inner(body);
 	frame.render_widget(border, body);
-	app.editor_wrap_toggle = wrap_button(frame, body, app.editor.wrap);
+	app.pane_toggles[0] = Rect::new(body.x + 1, body.y, 10.min(body.width.saturating_sub(1)), 1);
+	app.editor_wrap_toggle = if app.editor_open {
+		wrap_button(frame, body, app.editor.wrap)
+	} else {
+		Rect::default()
+	};
 	app.editor_pane = inner;
 	app.editor_area = text_area(inner, app.editor.document.lines.len());
 	app.editor.resize(
@@ -377,26 +478,24 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		Paragraph::new(status).style(Style::default().fg(Color::Gray)),
 		Rect::new(area.x, area.bottom() - 1, area.width, 1),
 	);
-	if tools_width > 0 || app.focus == 1 {
-		let tool_rect = if tools_width > 0 {
-			Rect::new(body.right(), body.y, tools_width, area.height - 2)
-		} else {
-			Rect::new(body.x, body.y, body.width, area.height - 2)
-		};
+	if tools_width > 0 {
+		let tool_rect = Rect::new(body.right(), body.y, tools_width, area.height - 2);
 		frame.render_widget(Clear, tool_rect);
-		if tools_width == 0 {
-			app.scrollbars.clear();
-		}
 		crate::panel_ui::draw(frame, app, tool_rect);
-
-		if tools_width == 0 {
-			app.editor_pane = Rect::default();
-			app.editor_area = Rect::default();
-			app.code_pane = Rect::default();
-			app.editor_wrap_toggle = Rect::default();
-			app.code_wrap_toggle = Rect::default();
-		}
+	} else if app.code_open && app.slim_tab > 0 {
+		let tool_rect = Rect::new(
+			body.x + 1,
+			body.bottom() + 1,
+			body.width.saturating_sub(2),
+			code_height.saturating_sub(2),
+		);
+		frame.render_widget(Clear, tool_rect);
+		crate::panel_ui::draw(frame, app, tool_rect);
+		app.code_area = Rect::default();
+		app.code_pane = Rect::default();
+		app.code_wrap_toggle = Rect::default();
 	}
+
 	if app.overlay != Overlay::None {
 		if area.width < 50 || area.height < 15 {
 			frame.render_widget(Clear, area);
@@ -417,7 +516,7 @@ F2 code · F3 wrap · F6 focus";
 		let (title, text, height) = match app.overlay {
 			Overlay::Help => (
 				" Help · F1 / Esc close ",
-				"Arrows · Home/End · Page Up/Down\nCtrl+Home/End: document start/end\nCtrl+Z: undo · Ctrl+Y: redo\nTab: literal tab (4-column stops)\nClick: cursor · Wheel: scroll\nCtrl+Q: quit (Save/Discard/Cancel if dirty)\nF4: files · Ctrl+N/O/S: new/open/save\nCtrl+Shift+S: save as · Ctrl+E: export\nShift+arrows / drag: select · Esc: clear\nCtrl+B/I/U: styles · F6: focus · F2: code\nF3: wrap focused pane · Ctrl+C: copy code\nCtrl/Alt+arrows: words · +Backspace: delete\nTools: Tab / arrows / PgUp/Dn · Enter applies\nRGB: type replaces field · Ctrl+A replaces\nANSI colors / dim / italic depend on terminal\nRGB needs true color · Nerd needs Nerd Font",
+				"Arrows · Home/End · Page Up/Down\nCtrl+Home/End: document start/end\nCtrl+Z: undo · Ctrl+Y: redo\nTab: literal tab (4-column stops)\nClick: cursor · Wheel: scroll\nCtrl+Q: quit (Save/Discard/Cancel if dirty)\nF4: files · Ctrl+N/O/S: new/open/save\nCtrl+Shift+S: save as · Ctrl+E: export\nShift+arrows / drag: select · Esc: clear\nCtrl+B/I/U: styles · F6: focus · F2: code\nF5: collapse editor · Alt+←/→: slim tabs\nF3: wrap focused pane · Ctrl+C: copy code\nCtrl/Alt+arrows: words · +Backspace: delete\nTools: Tab / arrows / PgUp/Dn · Enter applies\nRGB: type replaces field · Ctrl+A replaces\nANSI colors / dim / italic depend on terminal\nRGB needs true color · Nerd needs Nerd Font",
 				21,
 			),
 			Overlay::None => unreachable!(),
@@ -620,30 +719,63 @@ mod tests {
 	#[test]
 	fn keyboard_reaches_every_palette_control_in_wide_and_narrow_layouts() {
 		use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-		for (width, height) in [(80, 24), (40, 12), (20, 5)] {
+		for (width, height) in [(80, 24), (64, 24), (40, 12), (20, 12)] {
 			for palette in 0..3 {
 				let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
 				let mut app = App::default();
-				app.focus = 1;
 				app.panel.palette = palette;
-				let original = app.editor.document.clone();
-				for index in 0..app.panel.items().len() {
-					terminal.draw(|frame| draw(frame, &mut app)).unwrap();
-					assert_eq!(app.tool_index, index);
-					assert!(
-						app.tool_areas
-							.iter()
-							.any(|(rect, tool)| *tool == index && rect.width > 0 && rect.height > 0),
-						"unreachable {index} palette {palette} at {width}x{height}"
-					);
-					app.handle(Event::Key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)));
+				terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+				let tabs: Vec<usize> = if width <= 64 { vec![1, 2, 3] } else { vec![0] };
+				for tab in tabs {
+					if width <= 64 {
+						app.select_slim_tab(tab);
+						app.editor_open = false;
+					} else {
+						app.focus = 1;
+					}
+					app.tool_index = 0;
+					for index in 0..app.panel.items().len() {
+						terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+						assert_eq!(app.tool_index, index);
+						assert!(
+							app.tool_areas
+								.iter()
+								.any(|(rect, tool)| *tool == index
+									&& rect.width > 0 && rect.height > 0),
+							"unreachable {index} tab {tab} at {width}x{height}"
+						);
+						app.handle(Event::Key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)));
+					}
 				}
-				assert_eq!(app.editor.document, original);
-				if width < 65 {
-					assert_eq!(app.code_pane, Rect::default());
-				}
+				assert!(app.editor.document.is_empty());
 			}
 		}
+	}
+	#[test]
+	fn collapsed_panes_reallocate_space_and_slim_layout_tracks_resize() {
+		let mut app = App::default();
+		let mut terminal = Terminal::new(TestBackend::new(64, 30)).unwrap();
+		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+		assert!(app.slim);
+		assert_eq!(app.slim_tabs.len(), 4);
+		let initial = app.code_area.height;
+		app.toggle_pane(false);
+		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+		assert_eq!(app.editor_area.height, 0);
+		assert!(app.code_area.height > initial);
+		app.toggle_pane(true);
+		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+		assert!(app.editor_open);
+		assert_eq!(app.code_area.height, 0);
+		app.select_slim_tab(2);
+		terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+		assert!(!app.tool_areas.is_empty());
+		assert!(app.editor_area.height > 0);
+		let mut wide = Terminal::new(TestBackend::new(65, 30)).unwrap();
+		wide.draw(|frame| draw(frame, &mut app)).unwrap();
+		assert!(!app.slim);
+		assert!(app.panel.active_section.is_none());
+		assert!(app.slim_tabs.is_empty());
 	}
 
 	#[test]
