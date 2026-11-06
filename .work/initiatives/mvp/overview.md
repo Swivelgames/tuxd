@@ -1,10 +1,10 @@
 # MVP initiative
 
-Status: In progress — Slices 1–3 complete
+Status: In progress — Slices 1–4 complete
 
 ## Outcome
 
-Deliver a small terminal text editor in which a user can type, select and style text, insert special characters, inspect ANSI, save an editable project, and export its rendered representation.
+Deliver a small terminal text editor in which a user can type, select and style text, insert special characters, inspect ANSI, save an editable document, and export its rendered representation.
 
 The [initial concept](../../initial-concept.md) records product direction. The [breakdown](breakdown.md) records sequencing and estimates. Individual slice files define runnable checkpoints and acceptance criteria.
 
@@ -13,7 +13,7 @@ The [initial concept](../../initial-concept.md) records product direction. The [
 - Slice 1: an editable text box users can play around in.
 - Slice 2: visible range formatting and a live ANSI drawer; the first complete design-to-output workflow.
 - Slice 3: the complete initial tools panel.
-- Slice 4: a reusable workflow with project save/open, copy, and export.
+- Slice 4: a reusable workflow with document save/open, ANSI import, copy, and export.
 - Slice 5: broader compatibility and integration confidence; the MVP release checkpoint.
 - Slice 6: follow-on code-output improvements, tracked here but not required for MVP release.
 
@@ -30,7 +30,7 @@ Tests should protect behavior and meaningful boundaries. Use focused document/ex
 
 ## MVP acceptance scenario
 
-Create a multiline snippet. Select a word with the mouse and apply bold, italic, and underline. Set foreground and background colors using the available palettes. Insert box-drawing and other glyphs. Edit around styled ranges, then undo and redo. Inspect the corresponding escaped ANSI. Save, close, reopen, and verify text and styles. Export an ANSI file and verify the intended rendering in a supported terminal.
+Create a multiline snippet. Select a word with the mouse and apply bold, italic, and underline. Set foreground and background colors using the available palettes. Insert box-drawing and other glyphs. Edit around styled ranges, then undo and redo. Inspect the corresponding escaped ANSI. Import a supported Raw or Escaped ANSI file. Save, close, reopen, and verify text and styles. Export an ANSI file and verify the intended rendering in a supported terminal.
 
 Repeat core selection and tool operations using keyboard navigation. Verify resize behavior, narrow layouts, and clean terminal restoration on normal exit and recoverable failures.
 
@@ -48,7 +48,7 @@ Defer rectangular selections, multi-document tabs, arbitrary ANSI import, bidire
 - Shared coordinate mapping for cursor placement, selection, and hit testing.
 - Editing commands unify text/style mutations and undo/redo.
 - Read-only generated output; actual escape bytes are distinct from their displayed escaped form.
-- Versioned project format selected in slice 4, with validation and safe writes.
+- Versioned document format selected in slice 4, with validation and safe writes.
 
 ## Risks to resolve incrementally
 

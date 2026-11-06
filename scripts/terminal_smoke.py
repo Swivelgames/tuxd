@@ -157,7 +157,7 @@ def main():
 		assert session.screen.cursor.x == 7
 		# Help blocks edits and is dismissible.
 		session.send("\x1bOP")
-		assert "No saving yet" in "\n".join(session.rows())
+		assert "F4: files" in "\n".join(session.rows())
 		session.paste("ignored")
 		session.send("\x1b")
 		assert "ignored" not in "\n".join(session.rows())
@@ -174,7 +174,7 @@ def main():
 		assert "second" in session.row(3)
 		session.send("\x11")
 		assert "Discard" in "\n".join(session.rows())
-		session.send("n")
+		session.send("\r")  # Unsaved changes defaults to Cancel.
 		assert "Editor" in session.row(1)
 		session.send("\x11y")
 		session.finish()
@@ -316,6 +316,129 @@ def main():
 		finally:
 			session.close()
 	print("PASS: per-pane wrap, gutters, wrapped navigation, word bindings, clipboard payload and failure feedback")
+	with tempfile.TemporaryDirectory(prefix="terminal-ux-files-") as directory:
+		folder = Path(directory)
+		document = folder / "saved.tuxd.json"
+		raw = folder / "snippet.ansi"
+		escaped = folder / "snippet.txt"
+		bad = folder / "review.tuxd.json"
+		bad.write_text(r"\x1b[31mImported\x1b[2J\nUnicode 界\q")
+		session = Session(binary)
+		try:
+			session.paste("Save me\n界")
+			session.send("\x13")  # Ctrl+S: first save requires a path.
+			assert "Save document as" in "\n".join(session.rows())
+			session.paste(str(document))
+			session.send("\r")
+			assert json.loads(document.read_text())["text"] == "Save me\n界"
+			# Export both representations without changing the document path.
+			for index, destination in [(0, raw), (1, escaped)]:
+				session.send("\x05")
+				if not index:
+					session.send("\t\x1b[D")  # List -> format; select Raw.
+				session.paste(str(destination))
+				session.send("\r")
+			assert raw.read_bytes() == b"\x1b[0mSave me\n" + "界".encode() + b"\x1b[0m"
+			assert escaped.read_text() == r"\x1b[0mSave me\n界\x1b[0m"
+			# Open malformed JSON: the active document survives.
+			session.send("\x0f")
+			session.paste(str(bad))
+			session.send("\r")
+			assert "Error:" in "\n".join(session.rows())
+			session.send("\x1b")
+			assert "Save me" in session.row(2)
+			# Add an unsaved edit, import via F4, review all controls, then cancel dirty replacement.
+			session.send("X")
+			session.send("\x1b[14~" + "\x1b[B" * 4 + "\r")
+			session.paste(str(bad))
+			session.send("\r")
+			assert "Unsupported ANSI Sequences" in "\n".join(session.rows())
+			assert "Seq." in "\n".join(session.rows())
+			session.send("s")
+			assert "Save changes before continuing?" in "\n".join(session.rows())
+			session.send("c")
+			assert "Save me" in session.row(2)
+			# Retry and explicitly discard the old working document.
+			session.send("\x1b[14~" + "\x1b[B" * 4 + "\r")
+			session.paste(str(bad))
+			session.send("\r")
+			session.send("s")
+			session.send("d")
+			assert "Imported" in session.row(2)
+			assert session.screen.buffer[2][7].fg in ("red", "cd0000")
+			# Imported content is untitled and asks for a new save destination.
+			session.send("\x13")
+			assert "Save document as" in "\n".join(session.rows())
+			session.send("\x1b")
+			session.send("\x11d")
+			session.finish()
+		finally:
+			session.close()
+		session = Session(binary, str(document))
+		try:
+			assert "Save me" in session.row(2)
+			# Clean loaded documents quit directly.
+			session.send("\x11")
+			session.finish()
+		finally:
+			session.close()
+	print("PASS: save/open, raw and escaped export, failed open, import review, dirty cancellation, CLI reopen and clean quit")
+
+	# A real directory picker and Ctrl+V, isolated from the desktop clipboard.
+	with tempfile.TemporaryDirectory(prefix="terminal-ux-picker-") as directory:
+		folder = Path(directory)
+		document = folder / "browse.tuxd.json"
+		document.write_bytes((ROOT / "examples/welcome.tuxd.json").read_bytes())
+		(folder / "other.txt").write_text("not a document")
+		(folder / ".hidden.tuxd.json").write_bytes(document.read_bytes())
+		destination = folder / "clipboard path.tuxd.json"
+		helper = folder / "xclip"
+		helper.write_text("#!/bin/sh\nprintf '%s' " + shlex.quote(str(destination)) + "\n")
+		helper.chmod(0o700)
+		session = Session(binary, env={"PATH": directory, "DISPLAY": ":test", "WAYLAND_DISPLAY": None})
+		try:
+			session.send("\x0f\x0c")  # Open, Ctrl+L selects the location field.
+			session.paste(directory)
+			session.send("\r")
+			assert "browse.tuxd.json" in "\n".join(session.rows())
+			assert "other.txt" not in "\n".join(session.rows())
+			session.send("\x1b[46;5u")  # Ctrl+. hidden alias
+			assert ".hidden.tuxd.json" in "\n".join(session.rows())
+			session.send("\x1b[46;5u\x1f")  # Hide files; legacy Ctrl+/ shortcuts
+			assert "Shortcuts" in "\n".join(session.rows())
+			session.send("\x1b[63;5u")  # Ctrl+? hides shortcuts
+			assert "Shortcuts" not in "\n".join(session.rows())
+			session.send("\x06")  # Ctrl+F includes non-project files.
+			assert "other.txt" in "\n".join(session.rows())
+			session.send("\x06jggMG\r")  # Project filter; Vim navigation selects the document.
+			assert "Terminal UX Designer" in session.row(2)
+			session.send("Z")
+			session.send("\x1b[14~" + "\x1b[B" * 3 + "\r")  # Save As
+			session.send("\x01\x16")  # Ctrl+A, Ctrl+V reads the helper asynchronously.
+			session.send("\r")
+			assert json.loads(destination.read_text())["text"].startswith("ZTerminal UX Designer")
+			# Selecting the same destination invokes the existing overwrite guard.
+			session.send("\x1b[14~" + "\x1b[B" * 3 + "\r\t\r")
+			assert "Overwrite existing file?" in "\n".join(session.rows())
+			session.send("n")
+			session.send("\x0f")
+			session.paste(str(folder / "other.txt"))
+			session.send("\r")
+			assert "Import this file as ANSI?" in "\n".join(session.rows())
+			assert "Raw ANSI" in "\n".join(session.rows()) and "Escaped ANSI" in "\n".join(session.rows())
+			session.send("\x1b")  # Cancel offered import, preserving the saved document.
+			assert "ZTerminal UX Designer" in session.row(2)
+			session.send("\x0f")
+			session.paste(str(folder / "other.txt"))
+			session.send("\r")
+			session.send("\x1b[C\r")  # Choose Escaped, then import directly from the radio.
+			assert "not a document" in session.row(2)
+			session.send("\x11d")
+			session.finish()
+		finally:
+			session.close()
+	print("PASS: file browsing, Vim navigation, hidden alias, shortcut panel, format radios, import offer, Ctrl+V, Save As and overwrite guard")
+
 	for argument, expected in [("--diagnostic-error", 1), ("--diagnostic-panic", 101)]:
 		session = Session(binary, argument)
 		session.finish(expected)

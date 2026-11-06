@@ -1,6 +1,6 @@
 # MVP slice breakdown
 
-Status: In progress — Slices 1–3 complete
+Status: In progress — Slices 1–4 complete
 
 Each slice builds on the preceding checkpoint and includes its own stability work. Estimates are planning ranges for one developer and modest document sizes, not deadlines. Revise them after the editor and styling foundations are validated.
 
@@ -9,17 +9,17 @@ Each slice builds on the preceding checkpoint and includes its own stability wor
 | [1. Editor foundation](slice-01-editor-foundation.md) | Launch, type, navigate, paste, scroll, undo, and redo in a real text box | 2–3 days | None |
 | [2. Styling loop](slice-02-styling-loop.md) | Select text, apply visible styles/colors, and inspect live ANSI | 3–5 days | Slice 1 |
 | [3. Tool panel](slice-03-tool-panel.md) | Use all initial color modes, style controls, and character categories | 2–3 days | Slice 2 |
-| [4. Save and export workflow](slice-04-save-and-export.md) | Save/reopen projects, copy output, and export ANSI | 2–3 days | Slice 3 |
+| [4. Save and export workflow](slice-04-save-and-export.md) | Save/reopen documents, import/export ANSI, and copy output | 3–5 days | Slice 3 |
 | [5. Compatibility and hardening](slice-05-compatibility-and-hardening.md) | Use the integrated workflow reliably across the declared support matrix | 3–5 days | Slice 4 |
 | [6. Code output](slice-06-code-output.md) | Inspect highlighted sequences and copy valid Rust snippets | 2–4 days | Slice 5; after MVP |
 
-The first complete styling loop is approximately 5–8 developer days. The MVP is approximately 12–19 days, with another 2–4 days for the initial code-output improvements. Additional language generators are separately estimated once their output contracts are chosen.
+The first complete styling loop is approximately 5–8 developer days. The MVP is approximately 13–21 days, with another 2–4 days for the initial code-output improvements. Additional language generators are separately estimated once their output contracts are chosen.
 
 ## How to implement each slice
 
 Start with its smallest end-to-end workflow, make that runnable, and then complete the scope and acceptance criteria. Keep the app usable during development. Do not merge a nominally complete slice whose central workflow is still stubbed or unstable.
 
-The slice specifications distinguish deliverables, stability requirements, hands-on checks, and deferred work. Checks are planned until implementation evidence is recorded in the corresponding slice. Slices 1–3 now record their implementations and passing verification; subsequent slices remain planned.
+The slice specifications distinguish deliverables, stability requirements, hands-on checks, and deferred work. Checks are planned until implementation evidence is recorded in the corresponding slice. Slices 1–4 now record their implementations and passing verification; subsequent slices remain planned.
 
 ## Sequence rationale
 

@@ -1,0 +1,1 @@
+\x1b[1;36mImported heading\x1b[0m\nText before\x1b[2J and after an unsupported clear-screen control.\n

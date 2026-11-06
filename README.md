@@ -1,6 +1,6 @@
 # Terminal UX Designer
 
-A small Rust terminal editor for designing styled terminal text. Slice 3 adds a complete initial tools panel: text attributes, foreground/background ANSI, indexed and RGB colors, and curated character palettes. The editor and live escaped ANSI drawer start visible with soft wrapping enabled. Saving and export are planned in subsequent slices.
+A small Rust terminal editor for designing styled terminal text. The tools panel provides text attributes, foreground/background ANSI, indexed and RGB colors, and curated character palettes. The editor and live escaped ANSI drawer start visible with soft wrapping enabled. Slice 4 adds document save/open, reviewed ANSI import, and raw/escaped ANSI export.
 
 ## Run
 
@@ -10,7 +10,13 @@ Use a modern Linux terminal with UTF-8 support and Rust 1.88 or newer:
 cargo run --locked
 ```
 
-The editor uses the alternate screen. Text is session-local: Ctrl+Q asks before discarding a nonempty document. Saving is not available yet.
+Try the included styled document:
+
+```sh
+cargo run --locked -- examples/welcome.tuxd.json
+```
+
+The editor uses the alternate screen. The title shows the document filename and `*` for unsaved changes. Ctrl+Q offers Save / Discard / Cancel when there are unsaved changes; clean documents close directly.
 
 ## Controls
 
@@ -40,7 +46,11 @@ The editor uses the alternate screen. Text is session-local: Ctrl+Q asks before 
 | Arrows, Page Up/Down in code | Scroll generated output |
 | Mouse wheel | Scroll three lines; the next edit/navigation returns to the cursor |
 | F1 | Open / close help; Esc also closes it |
-| Ctrl+Q | Quit; Y discards text, N or Esc cancels |
+| F4 | File menu: New, Open, Save, Save As, Import, Export, Quit |
+| Ctrl+N / Ctrl+O | New / open document |
+| Ctrl+S / Ctrl+Shift+S | Save / Save As |
+| Ctrl+E | Export ANSI (Raw / Escaped selector in the picker) |
+| Ctrl+Q | Quit; when dirty, S saves, D/Y discards, C/N/Esc cancels |
 
 Ctrl+Shift+Z requires the terminal to report Shift separately from Ctrl+Z. The app requests enhanced keyboard reporting where supported; Ctrl+Y is also available.
 
@@ -84,7 +94,7 @@ The right panel appears on wider terminals. On narrow terminals, F6 opens tools 
 
 The Code pane starts open and shows read-only ANSI for the whole document; F2 toggles it. Every document newline appears as a visible `\n` followed by an actual display line break. Tabs appear as `\t`, and literal backslashes are doubled. These display line breaks are presentation only; raw ANSI generation preserves the original newline bytes. Selection highlighting is never included. Code wraps by default; turn wrapping off to scroll long code lines horizontally after focusing the drawer with F6 or a click.
 
-The interactive preview enables color output even when `NO_COLOR` is set, because colors and attributes are document content. Attribute appearance still depends on your terminal/font. File export, syntax highlighting, drag autoscroll, and customizable application themes arrive later.
+The interactive preview enables color output even when `NO_COLOR` is set, because colors and attributes are document content. Attribute appearance still depends on your terminal/font. Syntax highlighting, drag autoscroll, and customizable application themes arrive later.
 
 Ctrl+C while Code is focused copies the full escaped output, regardless of scrolling or wrapping. The clipboard contains literal `\x1b`, `\n`, and `\t`; it contains no extra physical newlines, gutters, or wrap markers. Copy uses `wl-copy` on Wayland or `xclip`/`xsel` on X11. Install the appropriate helper for your desktop. A status message reports success or failure, and the editor remains responsive during the operation. The terminal smoke suite uses isolated helpers and never changes your actual desktop clipboard.
 
@@ -103,3 +113,31 @@ ANSI palette appearances follow the terminal's palette. Dim, italic, and strike-
 Style controls use a compact row of B/I/U/D/S buttons, each previewing its attribute, plus Clear. All pane and popup borders are rounded. Tool surfaces inherit the terminal background; selected controls and keyboard focus retain their own highlights.
 
 Scrollbars appear when content exceeds its viewport: vertical bars for Editor, Code, the tool sidebar, and the indexed-color grid; horizontal bars for Editor and Code when wrapping is off. Click a track to jump, drag its thumb, or scroll the wheel over it. Thumb size reflects the visible portion. Scrolling changes only the viewport, preserving text, selection, and undo history.
+
+## Documents, import, and export
+
+Each `.tuxd.json` file contains one editable document. Open, Save As, Import, and Export share a directory picker powered by `ratatui-explorer`. It starts beside the current document, or beside its import source. An untitled document exported before saving remembers its export directory. Otherwise it starts in the working directory. Ctrl+G returns to the working directory. Relative filenames resolve against the displayed directory; absolute paths and `~/` also work. Save As adds `.tuxd.json` when no extension is entered.
+
+- The explorer is focused initially. Tab / Shift+Tab moves between Location, the file list, the ANSI format selector when present, File/path, and the action buttons. Ctrl+L selects Location; enter a directory and press Enter to browse it.
+- In the list, arrows, Home/End, and Page Up/Down select entries. Vim-style `h/j/k/l` navigate parent/down/up/into-directory, and `gg` / `G` select the first / last entry. Shift+M selects the middle visible entry. These letter bindings apply only to the file list. Left/Backspace goes to the parent directory; Right enters a directory. Enter or double-click opens a directory/file; for Save As/Export, choosing an existing file fills the filename for review. Single-click selects; the wheel and scrollbar scroll the list.
+- Ctrl+H or Ctrl+. toggles hidden files. Ctrl+F toggles `.tuxd.json`/all-files filtering. Open/Save As default to documents; Import/Export default to all files.
+- Both text fields accept terminal paste and Ctrl+V (using `wl-paste` on Wayland or `xclip`/`xsel` on X11). Clipboard reads run in the background. Ctrl+A selects the field contents for replacement; Left/Right, Home/End, and Backspace/Delete edit the path.
+- Ctrl+/, Ctrl+?, or F1 toggles a separate shortcuts panel beneath the picker. Key labels have contrasting backgrounds; use the mouse wheel over the panel if its contents exceed the available height. Legacy Ctrl+/ is supported; terminals that encode Ctrl+? identically to Backspace need Ctrl+/ or F1 instead. Ctrl+. and distinct Ctrl+I require terminal support for disambiguated keys; Ctrl+H and the Style tool remain alternatives.
+- Import and Export have Raw ANSI / Escaped ANSI radios: click an option, or focus the group and use Left/Right or Space. Enter submits the selected format and filename.
+- Enter submits the filename; Esc cancels. Existing destinations still require overwrite confirmation. F4 provides alternatives for terminals that cannot distinguish Ctrl+Shift+S. Menu entries and confirmation choices can also be clicked.
+
+Save preserves editing history. Dirty state compares the current document to its saved snapshot, so undoing back to saved clears `*`. View changes and pending typing styles do not mark the document dirty. New/Open/import replaces the document only after validation and any Save/Discard/Cancel prompt. A successful replacement starts fresh history. Save As/export asks before overwriting an existing destination. Exports cannot replace the active document file.
+
+Version 1 JSON stores `version`, `text`, and `styles.runs`. Runs have UTF-8 byte `start`/`end` offsets and a `style` containing the five attribute booleans plus independent foreground/background colors. Colors use `"Default"`, `{"Ansi": 0}`, `{"Indexed": 42}`, or `{"Rgb": [128, 192, 255]}`. Runs must cover the full text contiguously at grapheme boundaries. Loading rejects unknown versions/fields, invalid ranges/colors, and unsupported stored controls. Writes use a temporary file in the destination directory, flush it, and atomically replace the destination; existing file permissions are retained. Symlink and non-regular write targets are rejected. Reads require regular files of at most 16 MiB.
+
+Open offers ANSI import when the selected filename does not end with `.tuxd.json`, keeping the file selected and asking for an explicit Import action. Cancel leaves the document unchanged. F4 has grouped New/Open, Save/Save As, Import/Export, and Quit entries. Import and Export default to **Escaped ANSI**; their radios also offer Raw ANSI. Both require UTF-8. Raw mode interprets actual SGR escape bytes; escaped mode decodes `\x1b`, `\n`, `\t`, and `\\` before parsing. Escaped input is the exported/clipboard payload, without the Code pane’s extra presentation line breaks. Literal Unicode and actual line breaks are preserved; CRLF becomes LF. Use `examples/import-review.txt` with Escaped import to try the review dialog.
+
+Supported SGR parameters are reset (0), bold/dim/italic/underline/strike (1/2/3/4/9), attribute resets (22/23/24/29), ANSI basic/bright foreground/background colors, default foreground/background (39/49), and semicolon-form indexed/RGB colors (`38/48;5;n`, `38/48;2;r;g;b`). Reset 22 clears both bold and dim. If imported styling splits a grapheme, its leading character’s style wins, matching editor behavior.
+
+Malformed or unsupported controls open **Unsupported ANSI Sequences** with a numbered, wrapped source preview and an error table. Erroneous sequences appear bold and red. Each view shows up to five rows and scrolls independently using the wheel or scrollbar; Tab focuses the preview, table, or action buttons for keyboard navigation. **Import anyway** (or S) strips the listed controls and continues; Abort (or A/Esc) cancels. The original file remains unchanged. A sequence containing unsupported SGR parameters is stripped as a whole, leaving the preceding style active. Truncated CSI stops before the next non-parameter text/control boundary. Unterminated OSC/DCS/control strings fail import because their end cannot be identified safely. No import content is executed by the terminal. Imported documents are untitled and unsaved; saving asks for a document destination.
+
+**Raw ANSI export** writes actual escape bytes, original newlines/tabs, and a final style reset. **Escaped ANSI export** writes exactly the Code clipboard payload, without display-only line breaks. Export leaves the document path and dirty state unchanged. It is also the fallback when desktop clipboard helpers are unavailable.
+
+Automatic styled clipboard paste, stdin import, workspaces/multiple open files, autosave/recovery, and character search remain future work.
+
+The compact unsaved-changes prompt defaults to **Cancel**. Use Tab/Shift+Tab or arrows to select Save, Discard, or Cancel, then Enter; mouse clicks and the existing S/D/C shortcuts also work.

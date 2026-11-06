@@ -77,12 +77,21 @@ impl Document {
 	pub fn normalize_styles(&mut self) {
 		let text = self.lines.join("\n");
 		let mut normalized = crate::styling::Styles::default();
+		let mut runs = self.styles.runs.iter().peekable();
 		for (byte, grapheme) in text.grapheme_indices(true) {
-			normalized.push(byte, byte + grapheme.len(), self.styles.at(byte));
+			while runs.peek().is_some_and(|run| run.end <= byte) {
+				runs.next();
+			}
+			let style = runs
+				.peek()
+				.filter(|run| run.start <= byte)
+				.map_or(crate::styling::TextStyle::default(), |run| run.style);
+			normalized.push(byte, byte + grapheme.len(), style);
 		}
 		self.styles = normalized;
 	}
 
+	#[cfg(test)]
 	pub fn is_empty(&self) -> bool {
 		self.lines.len() == 1 && self.lines[0].is_empty()
 	}

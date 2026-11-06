@@ -1,7 +1,8 @@
 use crate::document::Document;
 use ratatui::style::{Color, Modifier, Style};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum Ink {
 	#[default]
 	Default,
@@ -48,7 +49,8 @@ pub enum Action {
 	Background(Ink),
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TextStyle {
 	pub bold: bool,
 	pub italic: bool,
@@ -120,7 +122,8 @@ impl TextStyle {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Run {
 	pub start: usize,
 	pub end: usize,
@@ -128,7 +131,8 @@ pub struct Run {
 }
 
 /// Contiguous, normalized byte ranges covering the document (including newlines).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Styles {
 	pub runs: Vec<Run>,
 }

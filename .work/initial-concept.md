@@ -59,7 +59,7 @@ The tools panel offers bold, italic, underline, strike-through, dim, and clear f
 
 The initial code drawer displays escaped ANSI as read-only text. Each document newline is shown as a visible `\n` followed by a real display line break; tabs are shown as `\t`. ANSI file export will write actual escape bytes. Ctrl+C in the code pane copies escaped ANSI without presentation-only newlines or gutters. Later work adds ANSI token highlighting, sequence explanations, and language-specific string generation, starting with Rust.
 
-Project files preserve editable text and styles. Generated ANSI is an output, not the editable source of truth. Importing arbitrary terminal output or editing generated code bidirectionally is outside the MVP.
+Each `.tuxd.json` document file preserves one document’s editable text and styles. Generated ANSI is an output, not the editable source of truth. Slice 4 includes explicit Raw/Escaped ANSI file import for supported styled text. Full terminal screen reconstruction and bidirectional code editing remain outside the MVP.
 
 ## Implementation direction
 
@@ -117,3 +117,13 @@ See the [MVP initiative](initiatives/mvp/overview.md) and [slice breakdown](init
 - Copy/paste styles independently of text, applying them to a selection or the pending typing style with normal undo behavior.
 
 These are follow-up enhancements. Slice 4 remains focused on persistence and export; existing whole-Code clipboard copying remains available.
+
+
+## Future work: workspaces and multiple documents
+
+Add project/workspace support as a collection of related document files, with a left-hand file explorer and multiple open files. Define navigation between open documents, per-document history and dirty state, workspace metadata, and save/close behavior in that iteration. The initial `.tuxd.json` format remains a single-document format.
+
+
+## Future work: stdin import
+
+Allow styled command output to be piped into the app, for example `some_command --colors=always | tuxd`. Treat stdin as import data while opening the controlling terminal for interactive input. Reuse the ANSI import parser and malformed/unsupported-control review flow, and open the result as an unsaved document. Scope CLI mode selection, end-of-input behavior, noninteractive/no-controlling-terminal errors, and input-size handling in that iteration. This is deferred beyond Slice 4 file import.

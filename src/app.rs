@@ -15,10 +15,11 @@ pub enum Overlay {
 	#[default]
 	None,
 	Help,
-	Quit,
 }
 
 pub struct App {
+	pub files: crate::files::Files,
+	pub document_path: Option<std::path::PathBuf>,
 	pub scrollbars: Vec<crate::scrollbar::Bar>,
 	pub scrollbar_drag: Option<(crate::scrollbar::Target, usize)>,
 	pub panel: Panel,
@@ -49,6 +50,8 @@ impl Default for App {
 		let mut editor = Editor::default();
 		editor.wrap = true;
 		Self {
+			files: Default::default(),
+			document_path: None,
 			scrollbars: Vec::new(),
 			scrollbar_drag: None,
 			panel: Default::default(),
@@ -77,6 +80,12 @@ impl Default for App {
 
 impl App {
 	pub fn poll_clipboard(&mut self) -> bool {
+		let path_updated =
+			if let Some(crate::files::Dialog::Path { picker, .. }) = &mut self.files.dialog {
+				picker.poll_paste()
+			} else {
+				false
+			};
 		let was_pending = self.clipboard_result.is_some();
 		if let Some(receiver) = &self.clipboard_result {
 			match receiver.try_recv() {
@@ -94,7 +103,7 @@ impl App {
 				Err(std::sync::mpsc::TryRecvError::Empty) => (),
 			}
 		}
-		was_pending && self.clipboard_result.is_none()
+		path_updated || (was_pending && self.clipboard_result.is_none())
 	}
 
 	fn copy_code(&mut self) {
@@ -612,31 +621,17 @@ impl App {
 
 	/// Returns true only when the user has chosen to exit.
 	pub fn handle(&mut self, event: Event) -> bool {
+		if let Some(exit) = self.file_event(&event) {
+			return exit;
+		}
 		match event {
 			Event::Key(key) if key.kind != KeyEventKind::Release => {
 				self.notice = None;
 				let control = key.modifiers.contains(KeyModifiers::CONTROL);
-				if self.overlay == Overlay::Quit {
-					if matches!(key.code, KeyCode::Char('y' | 'Y')) {
-						return true;
-					}
-					if matches!(key.code, KeyCode::Esc | KeyCode::Char('n' | 'N')) {
-						self.overlay = Overlay::None;
-					}
-					return false;
-				}
 				if self.overlay == Overlay::Help {
 					if matches!(key.code, KeyCode::Esc | KeyCode::F(1)) {
 						self.overlay = Overlay::None;
 					}
-					return false;
-				}
-				if control && matches!(key.code, KeyCode::Char('q' | 'Q')) {
-					self.editor.break_group();
-					if self.editor.document.is_empty() {
-						return true;
-					}
-					self.overlay = Overlay::Quit;
 					return false;
 				}
 				if key.code == KeyCode::F(1) {
@@ -865,7 +860,10 @@ mod tests {
 		let mut app = App::default();
 		app.handle(Event::Paste("hello".into()));
 		assert!(!app.handle(key(KeyCode::Char('q'), KeyModifiers::CONTROL)));
-		assert!(app.overlay == Overlay::Quit);
+		assert!(matches!(
+			app.files.dialog,
+			Some(crate::files::Dialog::Dirty)
+		));
 		assert!(!app.handle(Event::Paste("y".into())));
 		assert_eq!(app.editor.document.lines, ["hello"]);
 		app.handle(key(KeyCode::Esc, KeyModifiers::NONE));

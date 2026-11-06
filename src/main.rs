@@ -1,10 +1,15 @@
+mod ansi_import;
 mod app;
 mod clipboard;
 mod document;
 mod editor;
+mod file_picker;
+mod files;
+mod import_review;
 mod layout;
 mod panel;
 mod panel_ui;
+mod persistence;
 mod scrollbar;
 mod styling;
 mod terminal;
@@ -15,25 +20,44 @@ use std::io;
 use crossterm::event;
 
 fn main() -> io::Result<()> {
+	if std::env::args_os().len() > 2 {
+		return Err(io::Error::other("Expected at most one document path"));
+	}
+	let mut document_path = None;
 	let diagnostic = match std::env::args().nth(1).as_deref() {
 		None => None,
 		Some("--diagnostic-error") => Some(false),
 		Some("--diagnostic-panic") => Some(true),
 		Some("--help" | "-h") => {
 			println!(
-				"Terminal UX Designer\n\nRun without arguments to edit.\nCtrl+Q quit · F1 help\n\nText is session-local; saving is not available yet."
+				"Terminal UX Designer\n\nUsage: terminal-ux-designer [document.tuxd.json]\nF4 files · Ctrl+S save · Ctrl+Q quit · F1 help"
 			);
 			return Ok(());
 		}
+		Some(arg) if !arg.starts_with('-') => {
+			document_path = Some(std::path::PathBuf::from(arg));
+			None
+		}
 		Some(arg) => return Err(io::Error::other(format!("Unknown argument: {arg}"))),
 	};
+	let loaded = document_path
+		.as_deref()
+		.map(persistence::load)
+		.transpose()?;
 	let _session = terminal::Session::enter()?;
 	let mut terminal =
 		ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(io::stdout()))?;
 	let mut app = app::App::default();
+	if let Some(document) = loaded {
+		app.load_document(document, document_path.clone(), false);
+	}
+	app.document_path = document_path;
 	loop {
 		app.poll_clipboard();
-		terminal.draw(|frame| ui::draw(frame, &mut app))?;
+		terminal.draw(|frame| {
+			ui::draw(frame, &mut app);
+			files::draw(frame, &mut app);
+		})?;
 		if let Some(panic) = diagnostic {
 			if panic {
 				panic!("Intentional terminal cleanup diagnostic");

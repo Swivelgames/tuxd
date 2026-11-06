@@ -158,18 +158,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	if area.width < 20 || area.height < 5 {
 		app.editor_area = Rect::default();
 		app.editor.resize(0, 0);
-		frame.render_widget(
-			Paragraph::new(if app.overlay == Overlay::Quit {
-				"Discard? Y/N"
-			} else {
-				"Resize · Ctrl+Q quit"
-			}),
-			area,
-		);
+		frame.render_widget(Paragraph::new("Resize · F4 files · Ctrl+Q quit"), area);
 		return;
 	}
 	frame.render_widget(
-		Paragraph::new(" Terminal UX Designer · F2 code · F3 wrap · F6 focus")
+		Paragraph::new(" Terminal UX Designer · F2 code · F3 wrap · F4 files · F6 focus")
 			.style(Style::default().fg(Color::Cyan)),
 		Rect::new(area.x, area.y, area.width, 1),
 	);
@@ -282,13 +275,18 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 			);
 		}
 	}
+	let name = app
+		.document_path
+		.as_ref()
+		.and_then(|p| p.file_name())
+		.map(|s| crate::document::sanitize(&s.to_string_lossy()))
+		.unwrap_or_else(|| "untitled".into());
 	let border = Block::bordered()
 		.border_type(ratatui::widgets::BorderType::Rounded)
-		.title(if app.focus == 0 {
-			" Editor · untitled "
-		} else {
-			" Editor "
-		});
+		.title(format!(
+			" Editor · {name}{} ",
+			if app.dirty() { " *" } else { "" }
+		));
 	let inner = border.inner(body);
 	frame.render_widget(border, body);
 	app.editor_wrap_toggle = wrap_button(frame, body, app.editor.wrap);
@@ -353,6 +351,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	let (cursor_row, cursor_x) = layout.location(editor.cursor);
 	if app.overlay == Overlay::None
 		&& app.focus == 0
+		&& app.files.dialog.is_none()
 		&& cursor_row >= editor.top
 		&& cursor_row < editor.top + app.editor_area.height as usize
 		&& cursor_x >= editor.left
@@ -401,22 +400,14 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	if app.overlay != Overlay::None {
 		if area.width < 50 || area.height < 15 {
 			frame.render_widget(Clear, area);
-			let text = if app.overlay == Overlay::Quit {
-				"Discard session?
-Y: quit
-N / Esc: keep editing
-No saving yet."
-			} else {
-				"F1 / Esc: close help
-Ctrl+Q: quit
+			let text = "F1 / Esc: close help
+F4: file menu
+Ctrl+N/O/S: new/open/save
+Ctrl+Shift+S: save as
+Ctrl+E: export · Ctrl+Q: quit
 Ctrl+Z/Y: undo/redo
-Arrows, Home/End, PgUp/Dn
-Ctrl+Home/End: start/end
-Tab: 4 columns
-Click: cursor
-Wheel: scroll
-No saving yet."
-			};
+Shift+arrows / drag: select
+F2 code · F3 wrap · F6 focus";
 			frame.render_widget(
 				Paragraph::new(text).wrap(ratatui::widgets::Wrap { trim: false }),
 				area,
@@ -426,13 +417,8 @@ No saving yet."
 		let (title, text, height) = match app.overlay {
 			Overlay::Help => (
 				" Help · F1 / Esc close ",
-				"Arrows · Home/End · Page Up/Down\nCtrl+Home/End: document start/end\nCtrl+Z: undo · Ctrl+Y: redo\nTab: literal tab (4-column stops)\nClick: cursor · Wheel: scroll\nCtrl+Q: quit (Y/N if text exists)\n\nText is session-local. No saving yet.\nShift+arrows / drag: select · Esc: clear\nCtrl+B/I/U: styles · F6: focus · F2: code\nF3: wrap focused pane · Ctrl+C: copy code\nCtrl/Alt+arrows: words · +Backspace: delete\nTools: Tab / arrows / PgUp/Dn · Enter applies\nRGB: type replaces field · Ctrl+A replaces\nANSI colors / dim / italic depend on terminal\nRGB needs true color · Nerd needs Nerd Font",
+				"Arrows · Home/End · Page Up/Down\nCtrl+Home/End: document start/end\nCtrl+Z: undo · Ctrl+Y: redo\nTab: literal tab (4-column stops)\nClick: cursor · Wheel: scroll\nCtrl+Q: quit (Save/Discard/Cancel if dirty)\nF4: files · Ctrl+N/O/S: new/open/save\nCtrl+Shift+S: save as · Ctrl+E: export\nShift+arrows / drag: select · Esc: clear\nCtrl+B/I/U: styles · F6: focus · F2: code\nF3: wrap focused pane · Ctrl+C: copy code\nCtrl/Alt+arrows: words · +Backspace: delete\nTools: Tab / arrows / PgUp/Dn · Enter applies\nRGB: type replaces field · Ctrl+A replaces\nANSI colors / dim / italic depend on terminal\nRGB needs true color · Nerd needs Nerd Font",
 				21,
-			),
-			Overlay::Quit => (
-				" Discard session? ",
-				"Saving is not available yet.\nDiscard all text and quit?\nY: discard · N / Esc: keep editing",
-				5,
 			),
 			Overlay::None => unreachable!(),
 		};
@@ -868,7 +854,7 @@ mod tests {
 			.insert("keep me", EditKind::Atomic, Instant::now());
 		for (width, height) in [(1, 1), (12, 3), (20, 5), (50, 15), (120, 30)] {
 			let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-			for overlay in [Overlay::None, Overlay::Help, Overlay::Quit] {
+			for overlay in [Overlay::None, Overlay::Help] {
 				app.overlay = overlay;
 				terminal.draw(|frame| draw(frame, &mut app)).unwrap();
 				assert_eq!(app.editor.document.lines, ["keep me"]);
