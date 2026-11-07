@@ -11,7 +11,6 @@ This is the consolidated current backlog. Older slice documents describe what wa
 | Shortcut defaults | Adopt the user's preferred defaults after their keymap walkthrough | User supplies reviewed bindings |
 | Component emoji | Render composed emoji/components reliably instead of display escapes | Shared terminal/multiplexer width strategy; ZWJ, modifiers, flags, selectors, keycaps; redraw/navigation regressions |
 | Character catalogs | More curated glyphs; search by glyph, name and code point | Catalog coverage, metadata and search UI |
-| Themes | User-selectable/customizable application appearance, including gutters, selections, borders and controls | Configuration, presets and persistence; independent from document styles |
 | Style-only clipboard | Copy/paste formatting without text, targeting selection or pending typing style, with undo | Representation, mixed selection behavior and clipboard compatibility |
 | Workspaces | Related files, left explorer and multiple open document tabs | Per-document undo/dirty state, switching, save/close rules and workspace metadata |
 | Proper Vim mode | Modal editing, composable operators/motions, counts and coherent undo | Registers, visual selection, repeat/search and compatibility contract |
@@ -39,6 +38,8 @@ Application-managed font selection/installation and guaranteed terminal capabili
 
 ## Completed work removed from the backlog
 
+- Shared Settings with Midnight-default UI themes and an expanded preset catalog, per-role customization, live preview, independent reset, and persistence.
+
 - Optional shortcut leader and General settings, including staged conversion/unset prompts and resolved conflict validation.
 
 - Explicit raw/escaped CLI imports from files or stdin (`--raw -`, `--escaped -`), with control review and terminal handoff.
@@ -52,4 +53,4 @@ Application-managed font selection/installation and guaranteed terminal capabili
 
 ## Suggested next selection
 
-Character discovery or themes would be self-contained product improvements. Component-emoji rendering and code generation each require more investigation before implementation scope can be estimated confidently. This is sequencing advice, not an approved order.
+Character discovery would be a self-contained product improvement. Component-emoji rendering and code generation each require more investigation before implementation scope can be estimated confidently. This is sequencing advice, not an approved order.

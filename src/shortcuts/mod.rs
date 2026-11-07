@@ -136,7 +136,7 @@ impl Config {
 						));
 					}
 					if key.opener() {
-						return Err(format!("{} is reserved for Shortcut Settings", key.label()));
+						return Err(format!("{} is reserved for Settings", key.label()));
 					}
 				}
 				if keys.len() > 1

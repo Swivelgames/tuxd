@@ -206,6 +206,19 @@ fn composed_emoji_newline_redraw_clears_previous_rows() {
 		app.editor.delete(true, Instant::now());
 		terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
 	}
-	assert_eq!(terminal.backend().buffer(), &initial);
+	// A wide glyph's continuation is not independently drawn by the terminal.
+	// TestBackend may retain its prior style when the glyph moves back over it.
+	for y in 0..36 {
+		let mut x = 0;
+		while x < 110 {
+			let expected = &initial[(x, y)];
+			assert_eq!(
+				&terminal.backend().buffer()[(x, y)],
+				expected,
+				"cell ({x}, {y})"
+			);
+			x += unicode_width::UnicodeWidthStr::width(expected.symbol()).max(1) as u16;
+		}
+	}
 	verify(&app.editor);
 }

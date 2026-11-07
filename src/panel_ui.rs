@@ -1,3 +1,4 @@
+use crate::theme;
 use crate::{
 	app::App,
 	panel::Control,
@@ -9,16 +10,10 @@ use ratatui::{
 	layout::Rect,
 	style::{Color, Modifier, Style},
 	text::{Line, Span},
-	widgets::{Block, BorderType, Gauge, Paragraph, Tabs, Widget},
+	widgets::{BorderType, Gauge, Paragraph, Tabs, Widget},
 };
 
 use unicode_width::UnicodeWidthStr;
-
-const BORDER: Color = Color::Rgb(62, 78, 106);
-const SURFACE: Color = Color::Reset;
-const MUTED: Color = Color::Rgb(136, 150, 179);
-const SELECTED: Color = Color::Rgb(41, 54, 83);
-const FOCUS: Color = Color::Rgb(53, 70, 96);
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 	app.panel.area = area;
@@ -39,10 +34,10 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 		if height == 0 || app.panel.active_section.is_some() {
 			continue;
 		}
-		Block::bordered()
+		theme::block()
 			.border_type(BorderType::Rounded)
-			.border_style(Style::default().fg(BORDER))
-			.style(Style::default().bg(SURFACE))
+			.border_style(Style::default().fg(theme::border_color()))
+			.style(Style::default().bg(theme::surface_color()))
 			.render(
 				Rect::new(0, start as u16, area.width, height as u16),
 				&mut buffer,
@@ -71,18 +66,18 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 			(end - x).saturating_sub(usize::from(item.columns > 1)) as u16,
 			1,
 		);
-		let mut style = Style::default().fg(MUTED).bg(if focused {
-			FOCUS
+		let mut style = Style::default().fg(theme::muted_color()).bg(if focused {
+			theme::focus_color()
 		} else if selected {
-			SELECTED
+			theme::selected_color()
 		} else {
-			SURFACE
+			theme::surface_color()
 		});
 		if focused {
 			style = style.add_modifier(Modifier::UNDERLINED);
 		}
 		if selected {
-			style = style.fg(Color::Rgb(220, 232, 255));
+			style = style.fg(theme::selected_text_color());
 		}
 		let mut line = Line::from(item.label.clone());
 		match item.control {
@@ -99,7 +94,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 					},
 					item.label
 				));
-				style = style.fg(Color::Cyan).add_modifier(Modifier::BOLD);
+				style = style.fg(theme::accent_color()).add_modifier(Modifier::BOLD);
 				rect.width = (item.label.len() as u16 + 4).min(area.width.saturating_sub(4));
 			}
 			Control::Palette(_) | Control::GlyphTab(_) => {
@@ -126,7 +121,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 						"├{}┤",
 						"─".repeat(area.width.saturating_sub(2) as usize)
 					))
-					.style(Style::default().fg(BORDER))
+					.style(Style::default().fg(theme::border_color()))
 					.render(Rect::new(0, rect.y, area.width, 1), &mut buffer);
 					let titles: Vec<Line> = labels
 						.iter()
@@ -137,7 +132,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 								*label,
 								if focus {
 									Style::default()
-										.bg(FOCUS)
+										.bg(theme::focus_color())
 										.add_modifier(Modifier::UNDERLINED)
 								} else {
 									Style::default()
@@ -152,11 +147,19 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 						.sum::<usize>() + 2;
 					Tabs::new(titles)
 						.select(active)
-						.style(Style::default().fg(MUTED).bg(SURFACE))
+						.style(
+							Style::default()
+								.fg(theme::muted_color())
+								.bg(theme::surface_color()),
+						)
 						.highlight_style(
 							Style::default()
-								.fg(Color::Cyan)
-								.bg(if selected_focus { FOCUS } else { SELECTED })
+								.fg(theme::accent_color())
+								.bg(if selected_focus {
+									theme::focus_color()
+								} else {
+									theme::selected_color()
+								})
 								.add_modifier(Modifier::BOLD),
 						)
 						.divider("•")
@@ -168,7 +171,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 			Control::Field(field) => {
 				let label = ["Hex: ", "R: ", "G: ", "B: "][field];
 				Paragraph::new(label)
-					.style(Style::default().fg(MUTED))
+					.style(Style::default().fg(theme::muted_color()))
 					.render(
 						Rect::new(rect.x, rect.y, label.len() as u16, 1),
 						&mut buffer,
@@ -184,9 +187,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 					1,
 				);
 				let background = if focused {
-					FOCUS
+					theme::focus_color()
 				} else {
-					Color::Rgb(23, 28, 44)
+					theme::field_color()
 				};
 				if field == 0 {
 					let value = &app.panel.fields[0];
@@ -209,7 +212,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 					Paragraph::new(if app.panel.rgb().is_ok() { "" } else { "  ?" })
 						.style(
 							Style::default()
-								.fg(MUTED)
+								.fg(theme::muted_color())
 								.bg(app.panel.rgb().map_or(background, |ink| ink.render())),
 						)
 						.render(preview, &mut buffer);
@@ -217,9 +220,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 					let value = app.panel.fields[field].parse::<u8>().unwrap_or(0);
 					let fill = [
 						Color::Reset,
-						Color::Rgb(115, 45, 55),
-						Color::Rgb(35, 95, 65),
-						Color::Rgb(40, 70, 130),
+						theme::rgb_red_color(),
+						theme::rgb_green_color(),
+						theme::rgb_blue_color(),
 					][field];
 					Gauge::default()
 						.ratio(value as f64 / 255.0)
@@ -229,11 +232,13 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 								app.panel.fields[field],
 								width = input.width as usize
 							),
-							Style::default().fg(Color::White).add_modifier(if focused {
-								Modifier::UNDERLINED
-							} else {
-								Modifier::empty()
-							}),
+							Style::default().fg(theme::range_text_color()).add_modifier(
+								if focused {
+									Modifier::UNDERLINED
+								} else {
+									Modifier::empty()
+								},
+							),
 						))
 						.gauge_style(Style::default().fg(fill).bg(background))
 						.render(input, &mut buffer);
@@ -252,7 +257,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 			}
 			Control::Apply => {
 				rect.width = 5;
-				style = style.bg(SURFACE).add_modifier(Modifier::BOLD);
+				style = style
+					.bg(theme::surface_color())
+					.add_modifier(Modifier::BOLD);
 			}
 
 			Control::Target(_) => {
@@ -260,9 +267,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 					Span::styled(
 						"● ",
 						Style::default().fg(if selected {
-							Color::Cyan
+							theme::accent_color()
 						} else {
-							Color::Rgb(54, 65, 86)
+							theme::inactive_indicator_color()
 						}),
 					),
 					Span::raw(&item.label),
@@ -285,11 +292,11 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 					if step >= 4 { 3 } else { 1 }
 				};
 				style = style.bg(if focused {
-					FOCUS
+					theme::focus_color()
 				} else if selected {
-					SELECTED
+					theme::selected_color()
 				} else {
-					Color::Rgb(23, 28, 44)
+					theme::field_color()
 				});
 				let modifier = match action {
 					Action::Bold => Modifier::BOLD,
@@ -308,7 +315,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 			}
 
 			Control::Style(Action::Foreground(Ink::Default) | Action::Background(Ink::Default)) => {
-				style = style.bg(SURFACE).add_modifier(Modifier::BOLD);
+				style = style
+					.bg(theme::surface_color())
+					.add_modifier(Modifier::BOLD);
 				if app.panel.palette == 2 {
 					rect.x = 9;
 				}
@@ -396,11 +405,11 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 			.style(
 				Style::default()
 					.fg(if app.panel.error.is_some() {
-						Color::LightRed
+						theme::error_color()
 					} else {
-						MUTED
+						theme::muted_color()
 					})
-					.bg(SURFACE),
+					.bg(theme::surface_color()),
 			)
 			.render(Rect::new(2, row as u16, width as u16, 1), &mut buffer);
 	}
@@ -418,7 +427,11 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 		});
 		let (start, height) = sections[2];
 		Paragraph::new(detail.as_deref().unwrap_or("Choose a character"))
-			.style(Style::default().fg(MUTED).bg(SURFACE))
+			.style(
+				Style::default()
+					.fg(theme::muted_color())
+					.bg(theme::surface_color()),
+			)
 			.render(
 				Rect::new(2, (start + height - 3) as u16, width as u16, 1),
 				&mut buffer,

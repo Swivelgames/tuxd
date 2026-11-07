@@ -8,6 +8,7 @@ use ratatui::layout::Rect;
 use crate::editor::{EditKind, Editor, Movement};
 
 pub struct App {
+	pub theme: crate::theme::Config,
 	pub cut_target: Option<crate::editor_clipboard::Target>,
 	pub editor_paste: Option<crate::editor_clipboard::PendingPaste>,
 	pub paste_review: Option<crate::editor_clipboard::PasteReview>,
@@ -52,6 +53,7 @@ impl Default for App {
 		let mut editor = Editor::default();
 		editor.wrap = true;
 		Self {
+			theme: crate::theme::Config::default(),
 			cut_target: None,
 			editor_paste: None,
 			paste_review: None,
@@ -832,6 +834,7 @@ impl App {
 					&self.shortcuts.config,
 					scope,
 				));
+				self.settings.as_mut().unwrap().set_theme(&self.theme);
 				return false;
 			}
 			self.notice = None;

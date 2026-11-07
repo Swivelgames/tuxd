@@ -1,4 +1,5 @@
 use crate::scrollbar::{self, Bar, Target};
+use crate::theme;
 use ratatui::{
 	Frame,
 	layout::Rect,
@@ -32,7 +33,7 @@ fn wrap_button(frame: &mut Frame, body: Rect, enabled: bool) -> Rect {
 	let area = Rect::new(body.right() - 12, body.y, 11, 1);
 	frame.render_widget(
 		Paragraph::new(if enabled { "[Wrap: on]" } else { "[Wrap: off]" })
-			.style(Style::default().fg(Color::Cyan)),
+			.style(Style::default().fg(theme::accent_color())),
 		area,
 	);
 	area
@@ -59,8 +60,8 @@ fn draw_lines(frame: &mut Frame, view: View<'_>, style_at: impl Fn(Position) -> 
 		active_line,
 	} = view;
 	let gutter_style = Style::default()
-		.fg(Color::Rgb(136, 150, 179))
-		.bg(Color::Rgb(23, 28, 44));
+		.fg(theme::muted_color())
+		.bg(theme::field_color());
 	frame.render_widget(
 		Block::default().style(gutter_style),
 		Rect::new(inner.x, inner.y, text.x - inner.x, inner.height),
@@ -86,8 +87,8 @@ fn draw_lines(frame: &mut Frame, view: View<'_>, style_at: impl Fn(Position) -> 
 			};
 			let gutter_style = if row.line == active_line {
 				Style::default()
-					.fg(Color::Rgb(220, 232, 255))
-					.bg(Color::Rgb(41, 54, 83))
+					.fg(theme::selected_text_color())
+					.bg(theme::selected_color())
 					.add_modifier(Modifier::BOLD)
 			} else {
 				gutter_style
@@ -165,6 +166,14 @@ fn shortcut_hint(app: &App, action: crate::shortcuts::ActionId, label: &str) -> 
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
 	let area = frame.area();
+	frame.render_widget(
+		Block::default().style(
+			Style::default()
+				.fg(theme::text_color())
+				.bg(theme::surface_color()),
+		),
+		area,
+	);
 	frame.render_widget(Clear, area);
 	app.tool_areas.clear();
 	app.pane_toggles = [Rect::default(); 2];
@@ -198,7 +207,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	if area.width < 20 || area.height < 5 {
 		app.editor_area = Rect::default();
 		app.editor.resize(0, 0);
-		frame.render_widget(Paragraph::new("Resize · F1 shortcuts"), area);
+		frame.render_widget(Paragraph::new("Resize · F1 settings"), area);
 		return;
 	}
 	frame.render_widget(
@@ -217,7 +226,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 			shortcut_hint(app, crate::shortcuts::ActionId::FileMenu, "files"),
 			shortcut_hint(app, crate::shortcuts::ActionId::CyclePanes, "focus")
 		))
-		.style(Style::default().fg(Color::Cyan)),
+		.style(Style::default().fg(theme::accent_color())),
 		Rect::new(area.x, area.y, area.width, 1),
 	);
 	app.code_toggle = Rect::new(area.right() - 11, area.y, 11, 1);
@@ -248,7 +257,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 	);
 	if code_height > 0 {
 		let code_rect = Rect::new(body.x, body.bottom(), body.width, code_height);
-		let block = Block::bordered()
+		let block = theme::block()
 			.border_type(ratatui::widgets::BorderType::Rounded)
 			.title(if slim && app.code_open {
 				" ▾ "
@@ -294,11 +303,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 				frame.render_widget(
 					Paragraph::new(*label).style(
 						Style::default()
-							.fg(Color::Cyan)
+							.fg(theme::accent_color())
 							.bg(if app.slim_tab == i {
-								Color::Rgb(41, 54, 83)
+								theme::selected_color()
 							} else {
-								Color::Reset
+								theme::surface_color()
 							})
 							.add_modifier(if app.slim_tab == i {
 								Modifier::BOLD
@@ -416,7 +425,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		.and_then(|p| p.file_name())
 		.map(|s| crate::document::sanitize(&s.to_string_lossy()))
 		.unwrap_or_else(|| "untitled".into());
-	let border = Block::bordered()
+	let border = theme::block()
 		.border_type(ratatui::widgets::BorderType::Rounded)
 		.title(format!(
 			" {} Editor · {name}{} ",
@@ -437,6 +446,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		app.editor_area.width as usize,
 		app.editor_area.height as usize,
 	);
+	frame.render_widget(
+		Block::default().style(Style::default().fg(Color::Reset).bg(Color::Reset)),
+		app.editor_area,
+	);
 	let editor = &app.editor;
 	let layout = editor.layout();
 	draw_lines(
@@ -453,7 +466,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		|position| {
 			let style = editor.document.style_at(position).render();
 			if editor.selected(position) {
-				style.bg(Color::DarkGray)
+				style.bg(theme::selection_overlay_color())
 			} else {
 				style
 			}
@@ -509,7 +522,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		.or_else(|| app.notice.clone())
 		.unwrap_or_else(|| {
 			format!(
-				" Ln {}, Col {} · {} lines{}{} · F1 shortcuts{}",
+				" Ln {}, Col {} · {} lines{}{} · F1 settings{}",
 				editor.cursor.row + 1,
 				column_at(
 					&editor.document.lines[editor.cursor.row],
@@ -522,7 +535,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 			)
 		});
 	frame.render_widget(
-		Paragraph::new(status).style(Style::default().fg(Color::Gray)),
+		Paragraph::new(status).style(theme::muted()),
 		Rect::new(area.x, area.bottom() - 1, area.width, 1),
 	);
 	if tools_width > 0 {
@@ -568,20 +581,23 @@ mod tests {
 		terminal.draw(|f| draw(f, &mut app)).unwrap();
 		let area = app.code_area;
 		let buffer = terminal.backend().buffer();
-		assert_eq!(buffer[(area.x, area.y)].fg, Color::Cyan);
-		assert_eq!(buffer[(area.x + 5, area.y)].fg, Color::Magenta);
+		assert_eq!(buffer[(area.x, area.y)].fg, theme::syntax_sequence_color());
+		assert_eq!(
+			buffer[(area.x + 5, area.y)].fg,
+			theme::syntax_escape_color()
+		);
 		assert!(
 			buffer[(area.x + 5, area.y)]
 				.modifier
 				.contains(Modifier::BOLD)
 		);
-		assert_eq!(buffer[(area.x + 7, area.y)].fg, Color::Reset);
+		assert_eq!(buffer[(area.x + 7, area.y)].fg, theme::text_color());
 		app.code_wrap = false;
 		app.code_left = 5;
 		terminal.draw(|f| draw(f, &mut app)).unwrap();
 		assert_eq!(
 			terminal.backend().buffer()[(app.code_area.x, app.code_area.y)].fg,
-			Color::Magenta
+			theme::syntax_escape_color()
 		);
 		assert_eq!(app.editor.document, document);
 		assert_eq!(crate::styling::ansi(&app.editor.document), raw);
@@ -909,9 +925,9 @@ mod tests {
 						assert_eq!(
 							cell.bg,
 							if line == active {
-								Color::Rgb(41, 54, 83)
+								theme::selected_color()
 							} else {
-								Color::Rgb(23, 28, 44)
+								theme::field_color()
 							}
 						);
 						assert_eq!(cell.modifier.contains(Modifier::BOLD), line == active);
@@ -953,7 +969,7 @@ mod tests {
 			for x in pane.x..pane.x + 6 {
 				let cell = &buffer[(x, pane.y)];
 				assert_eq!(cell.symbol(), " ");
-				assert_eq!(cell.bg, Color::Rgb(41, 54, 83));
+				assert_eq!(cell.bg, theme::selected_color());
 				assert!(cell.modifier.contains(Modifier::BOLD));
 			}
 		}
@@ -988,7 +1004,7 @@ mod tests {
 		);
 		assert_eq!(
 			buffer[(1, app.editor_area.bottom() - 1)].bg,
-			Color::Rgb(23, 28, 44)
+			theme::field_color()
 		);
 	}
 

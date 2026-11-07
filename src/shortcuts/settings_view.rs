@@ -1,5 +1,6 @@
 use super::*;
 use crate::scrollbar::{self, Target};
+use crate::theme;
 use ratatui::{
 	Frame,
 	style::{Color, Modifier, Style},
@@ -9,21 +10,11 @@ use ratatui::{
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-const SELECTED: Color = Color::Rgb(41, 54, 83);
-const FIELD: Color = Color::Rgb(23, 28, 44);
-const BORDER: Color = Color::Rgb(62, 78, 106);
-fn accent() -> Style {
-	Style::default()
-		.fg(Color::Cyan)
-		.add_modifier(Modifier::BOLD)
-}
-fn muted() -> Style {
-	Style::default().fg(Color::Rgb(137, 151, 183))
-}
+use crate::theme::{accent, muted};
 fn block(title: &str) -> Block<'_> {
-	Block::bordered()
+	theme::block()
 		.border_type(BorderType::Rounded)
-		.border_style(Style::default().fg(BORDER))
+		.border_style(Style::default().fg(theme::border_color()))
 		.title(title)
 }
 fn wrap(text: &str, width: u16) -> Vec<String> {
@@ -67,9 +58,9 @@ impl Settings {
 			return;
 		}
 		let style = if active {
-			accent().bg(SELECTED)
+			accent().bg(theme::selected_color())
 		} else {
-			Style::default().bg(FIELD)
+			Style::default().bg(theme::field_color())
 		};
 		text(frame, area, label, style);
 		self.hits.push((area, hit));
@@ -91,10 +82,10 @@ impl Settings {
 		self.bar = None;
 		self.nav_bar = None;
 		frame.render_widget(Clear, area);
-		let outer = block(if self.draft == self.original {
-			" Shortcut Settings "
+		let outer = block(if !self.dirty() {
+			" Settings "
 		} else {
-			" Shortcut Settings · unsaved "
+			" Settings · unsaved "
 		});
 		let inner = outer.inner(area);
 		frame.render_widget(outer, area);
@@ -131,7 +122,13 @@ impl Settings {
 			Hit::Footer(2),
 			self.focus == Focus::Footer(2),
 		);
-		let status = if self.leader_capture {
+		let status = if self.focus == Focus::Preset {
+			"Enter chooses preset · ←/→ cycles · Overrides are preserved".into()
+		} else if self.focus == Focus::ResetTheme {
+			"Clear theme overrides; keep this preset and all shortcuts".into()
+		} else if self.theme_input.is_some() && self.error.is_none() {
+			"Color: #RRGGBB / ansi:0–255 / default · Enter accepts · Esc cancels".into()
+		} else if self.leader_capture {
 			"Recording Leader · Esc cancels".into()
 		} else if let Some(capture) = &self.capture {
 			format!(
@@ -175,7 +172,7 @@ impl Settings {
 			status_area,
 			status_lines.join("\n"),
 			if self.error.is_some() {
-				Style::default().fg(Color::Red)
+				Style::default().fg(theme::error_color())
 			} else {
 				muted()
 			},
@@ -204,13 +201,26 @@ impl Settings {
 					frame,
 					Rect::new(body.x + 22, y, 1, 1),
 					"│",
-					Style::default().fg(BORDER),
+					Style::default().fg(theme::border_color()),
 				);
 			}
 			body.x += 24;
 			body.width = body.width.saturating_sub(24);
 		}
-		if self.category == SettingsSection::Timeout {
+		if self.category == SettingsSection::Appearance {
+			self.draw_theme(frame, body);
+		} else if matches!(
+			self.category,
+			SettingsSection::ThemeGroup | SettingsSection::ShortcutsGroup
+		) {
+			text(frame, line(body, 0), self.category.label(), accent());
+			text(
+				frame,
+				line(body, 2),
+				"Enter to expand or collapse this group",
+				muted(),
+			);
+		} else if self.category == SettingsSection::Timeout {
 			text(frame, line(body, 0), "Leader", accent());
 			let description = wrap("Optional prefix for multi-key shortcuts.", body.width);
 			text(
@@ -367,7 +377,7 @@ impl Settings {
 			text(
 				frame,
 				line(content, 0),
-				" Discard unsaved shortcut changes?",
+				" Discard unsaved settings changes?",
 				Style::default(),
 			);
 			self.hits.clear();
@@ -390,6 +400,60 @@ impl Settings {
 				!discard,
 			);
 		}
+		if self.preset_open {
+			let width = inner.width.min(38);
+			let height = inner.height.min(12);
+			let popup = Rect::new(
+				inner.x + (inner.width - width) / 2,
+				inner.y + (inner.height - height) / 2,
+				width,
+				height,
+			);
+			frame.render_widget(Clear, popup);
+			let border = block(" Theme preset ");
+			let content = border.inner(popup);
+			frame.render_widget(border, popup);
+			self.hits.clear();
+			let height = content.height as usize;
+			if height > 0 {
+				if self.preset_cursor < self.preset_top {
+					self.preset_top = self.preset_cursor;
+				}
+				if self.preset_cursor >= self.preset_top + height {
+					self.preset_top = self.preset_cursor + 1 - height;
+				}
+				for (index, (_, label)) in crate::theme::PRESETS
+					.iter()
+					.enumerate()
+					.skip(self.preset_top)
+					.take(height)
+				{
+					self.button(
+						frame,
+						Rect::new(
+							content.x,
+							content.y + (index - self.preset_top) as u16,
+							content.width.saturating_sub(1),
+							1,
+						),
+						&format!(" {label}"),
+						Hit::Preset(index),
+						index == self.preset_cursor,
+					);
+				}
+				if crate::theme::PRESETS.len() > height && content.width > 0 {
+					let bar = Bar {
+						target: Target::Tools,
+						area: Rect::new(content.right() - 1, content.y, 1, content.height),
+						content: crate::theme::PRESETS.len(),
+						viewport: height,
+						offset: self.preset_top,
+					};
+					scrollbar::draw(frame, &mut Vec::new(), bar);
+				}
+			}
+		}
+
 		self.follow = false;
 	}
 	fn draw_categories(&mut self, frame: &mut Frame, area: Rect) {
@@ -397,11 +461,12 @@ impl Settings {
 		if height == 0 {
 			return;
 		}
-		let at = SettingsSection::ALL
+		let categories = self.categories();
+		let at = categories
 			.iter()
 			.position(|cat| *cat == self.category)
 			.unwrap();
-		self.nav_top = self.nav_top.min(7usize.saturating_sub(height));
+		self.nav_top = self.nav_top.min(categories.len().saturating_sub(height));
 		if self.follow {
 			if at < self.nav_top {
 				self.nav_top = at;
@@ -409,8 +474,9 @@ impl Settings {
 				self.nav_top = at + 1 - height;
 			}
 		}
-		for (i, cat) in SettingsSection::ALL
-			.into_iter()
+		for (i, cat) in categories
+			.iter()
+			.copied()
 			.enumerate()
 			.skip(self.nav_top)
 			.take(height)
@@ -425,20 +491,37 @@ impl Settings {
 			text(
 				frame,
 				row,
-				format!("{}{}", if selected { "› " } else { "  " }, cat.label()),
+				format!(
+					"{}{}",
+					if matches!(
+						cat,
+						SettingsSection::ThemeGroup | SettingsSection::ShortcutsGroup
+					) {
+						if self.closed_groups.contains(&cat) {
+							"▸ "
+						} else {
+							"▾ "
+						}
+					} else if selected {
+						"  › "
+					} else {
+						"    "
+					},
+					cat.label()
+				),
 				if selected {
-					accent().bg(SELECTED)
+					accent().bg(theme::selected_color())
 				} else {
 					Style::default()
 				},
 			);
 			self.hits.push((row, Hit::Category(cat)));
 		}
-		if height < 7 {
+		if height < categories.len() {
 			let bar = Bar {
 				target: Target::Tools,
 				area: Rect::new(area.right() - 1, area.y, 1, area.height),
-				content: 7,
+				content: categories.len(),
 				viewport: height,
 				offset: self.nav_top,
 			};
@@ -446,6 +529,200 @@ impl Settings {
 			self.nav_bar = Some(bar);
 		}
 	}
+	fn draw_theme(&mut self, frame: &mut Frame, area: Rect) {
+		if area.is_empty() {
+			return;
+		}
+		text(frame, line(area, 0), "Appearance", accent());
+		text(frame, line(area, 2), "Preset", Style::default());
+		let label = crate::theme::PRESETS
+			.iter()
+			.find(|(id, _)| *id == self.theme_draft.preset)
+			.map(|(_, name)| *name)
+			.unwrap_or("Midnight");
+		let row = line(area, 3);
+		self.button(
+			frame,
+			Rect::new(row.x, row.y, row.width.min(30), row.height),
+			&format!(" {label} ▾"),
+			Hit::PresetOpen,
+			self.focus == Focus::Preset,
+		);
+		let reset = line(area, 5);
+		self.button(
+			frame,
+			Rect::new(reset.x, reset.y, reset.width.min(13), reset.height),
+			" Reset theme ",
+			Hit::ResetTheme,
+			self.focus == Focus::ResetTheme,
+		);
+		let offset = area.height.min(7);
+		let list = Rect::new(area.x, area.y + offset, area.width, area.height - offset);
+		self.viewport = list.height as usize;
+		if list.is_empty() {
+			return;
+		}
+		let width = list.width.saturating_sub(1);
+		let stacked = width < 48;
+		let rows = self.theme_rows();
+		let mut positions = Vec::new();
+		let mut total = 0usize;
+		for (index, row) in rows.iter().enumerate() {
+			if matches!(row, ThemeRow::Section(_)) && index > 0 {
+				total += 1;
+			}
+			positions.push(total);
+			total += if matches!(row, ThemeRow::Section(_)) || !stacked {
+				2
+			} else {
+				3
+			};
+		}
+		if self.follow
+			&& let Some(position) = positions.get(self.theme_cursor)
+		{
+			let needed = if stacked && matches!(rows[self.theme_cursor], ThemeRow::Color(_)) {
+				2
+			} else {
+				1
+			};
+			if *position < self.top {
+				self.top = *position;
+			} else if position + needed > self.top + self.viewport {
+				self.top = (position + needed).saturating_sub(self.viewport);
+			}
+		}
+		self.top = self.top.min(total.saturating_sub(self.viewport));
+		let resolved = self.preview();
+		for (index, row) in rows.iter().enumerate() {
+			let position = positions[index];
+			let focused = self.focus == Focus::List && self.theme_cursor == index;
+			if position >= self.top && position < self.top + self.viewport {
+				let rect = Rect::new(list.x, list.y + (position - self.top) as u16, width, 1);
+				match row {
+					ThemeRow::Section(section) => {
+						text(
+							frame,
+							rect,
+							format!(
+								"{} {}",
+								if self.theme_collapsed.contains(section) {
+									"▸"
+								} else {
+									"▾"
+								},
+								THEME_SECTIONS[*section].0
+							),
+							if focused {
+								accent().bg(theme::selected_color())
+							} else {
+								accent()
+							},
+						);
+						self.hits.push((rect, Hit::ThemeRow(index)));
+					}
+					ThemeRow::Color(role) => {
+						let label_width = if stacked {
+							width
+						} else {
+							width.saturating_sub(29)
+						};
+						let label = Rect::new(rect.x, rect.y, label_width, 1);
+						text(
+							frame,
+							label,
+							format!("  {}", crate::theme::ROLES[*role].1),
+							if focused {
+								Style::default().add_modifier(Modifier::BOLD)
+							} else {
+								Style::default()
+							},
+						);
+						self.hits.push((label, Hit::ThemeRow(index)));
+					}
+				}
+			}
+			let ThemeRow::Color(role_index) = row else {
+				continue;
+			};
+			let field_position = position + usize::from(stacked);
+			if field_position < self.top || field_position >= self.top + self.viewport {
+				continue;
+			}
+			let role = crate::theme::ROLES[*role_index].0;
+			let color = resolved.color(role);
+			let value = if *role_index == self.theme_row {
+				self.theme_input.clone()
+			} else {
+				None
+			}
+			.unwrap_or_else(|| {
+				self.theme_draft
+					.colors
+					.get(role)
+					.cloned()
+					.unwrap_or_else(|| match color {
+						Color::Reset => "default".into(),
+						Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+						Color::Indexed(n) => format!("ansi:{n}"),
+						other => format!("{other:?}"),
+					})
+			});
+			let x = if stacked {
+				list.x + 2.min(width)
+			} else {
+				list.x + width.saturating_sub(29)
+			};
+			let y = list.y + (field_position - self.top) as u16;
+			let remaining = list.x + width - x;
+			let field_width = remaining.saturating_sub(12).clamp(1, 16).min(remaining);
+			self.button(
+				frame,
+				Rect::new(x, y, field_width, 1),
+				&format!(
+					" {value}{}",
+					if self.theme_input.is_some() && *role_index == self.theme_row {
+						"▏"
+					} else {
+						""
+					}
+				),
+				Hit::ThemeRow(index),
+				focused,
+			);
+			let swatch_x = x + field_width + 1;
+			if swatch_x + 3 <= list.x + width {
+				text(
+					frame,
+					Rect::new(swatch_x, y, 3, 1),
+					"   ",
+					Style::default().bg(color),
+				);
+			}
+			let reset_x = swatch_x + 4;
+			if reset_x < list.x + width {
+				self.button(
+					frame,
+					Rect::new(reset_x, y, (list.x + width - reset_x).min(7), 1),
+					" Reset ",
+					Hit::ThemeReset(*role_index),
+					self.focus == Focus::Reset && self.theme_cursor == index,
+				);
+			}
+		}
+		if total > self.viewport {
+			let bar = Bar {
+				target: Target::Tools,
+				area: Rect::new(list.right() - 1, list.y, 1, list.height),
+				content: total,
+				viewport: self.viewport,
+				offset: self.top,
+			};
+			scrollbar::draw(frame, &mut Vec::new(), bar);
+			self.bar = Some(bar);
+		}
+	}
+
 	fn draw_timeout(&mut self, frame: &mut Frame, area: Rect) {
 		if area.is_empty() {
 			return;
@@ -596,13 +873,13 @@ impl Settings {
 		{
 			let row = Rect::new(area.x, area.y + (y - self.top) as u16, width, 1);
 			let style = if *index == Some(self.row) {
-				Style::default()
-					.bg(SELECTED)
-					.add_modifier(if self.focus == Focus::List {
+				Style::default().bg(theme::selected_color()).add_modifier(
+					if self.focus == Focus::List {
 						Modifier::BOLD
 					} else {
 						Modifier::empty()
-					})
+					},
+				)
 			} else {
 				Style::default()
 			};

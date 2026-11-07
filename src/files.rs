@@ -1,4 +1,5 @@
 //! File actions and modal state. Candidate documents are validated before replacement.
+use crate::theme;
 use crate::{
 	ansi_import::{self, Import, Mode},
 	app::App,
@@ -13,8 +14,8 @@ use crossterm::event::{Event, MouseButton, MouseEventKind};
 use ratatui::{
 	Frame,
 	layout::Rect,
-	style::{Color, Modifier, Style},
-	widgets::{Block, BorderType, Clear, Paragraph},
+	style::{Modifier, Style},
+	widgets::{BorderType, Clear, Paragraph},
 };
 use std::path::PathBuf;
 
@@ -588,7 +589,7 @@ fn draw_dirty(frame: &mut Frame, app: &mut App) {
 		height,
 	);
 	frame.render_widget(Clear, popup);
-	let block = Block::bordered().border_type(BorderType::Rounded);
+	let block = theme::block().border_type(BorderType::Rounded);
 	let inner = block.inner(popup);
 	frame.render_widget(block, popup);
 	app.files.buttons.clear();
@@ -625,12 +626,12 @@ fn draw_dirty(frame: &mut Frame, app: &mut App) {
 		frame.render_widget(
 			Paragraph::new(format!(" {label} ")).style(
 				Style::default()
-					.fg(Color::Cyan)
+					.fg(theme::accent_color())
 					.add_modifier(Modifier::BOLD)
 					.bg(if app.files.choice == i {
-						Color::Rgb(41, 54, 83)
+						theme::selected_color()
 					} else {
-						Color::Rgb(23, 28, 44)
+						theme::field_color()
 					}),
 			),
 			rect,
@@ -660,7 +661,7 @@ fn draw_menu(frame: &mut Frame, app: &mut App, index: usize) {
 		height,
 	);
 	frame.render_widget(Clear, popup);
-	let block = Block::bordered()
+	let block = theme::block()
 		.border_type(BorderType::Rounded)
 		.title(" File ");
 	let inner = block.inner(popup);
@@ -686,9 +687,9 @@ fn draw_menu(frame: &mut Frame, app: &mut App, index: usize) {
 		frame.render_widget(
 			Paragraph::new(format!("{} {label}", if i == index { ">" } else { " " })).style(
 				Style::default().bg(if i == index {
-					Color::Rgb(41, 54, 83)
+					theme::selected_color()
 				} else {
-					Color::Reset
+					theme::surface_color()
 				}),
 			),
 			rect,
@@ -753,7 +754,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		Dialog::Overwrite { .. } => " Overwrite existing file? ",
 		Dialog::Review(_) => " Import controls review ",
 	};
-	let block = Block::bordered()
+	let block = theme::block()
 		.border_type(BorderType::Rounded)
 		.title(caption);
 	let inner = block.inner(popup);
@@ -825,7 +826,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 		let text = &lines[row.line][row.start..row.end];
 		let style = if actions.iter().any(|(line, _)| *line == row.line) {
 			Style::default()
-				.fg(Color::Cyan)
+				.fg(theme::accent_color())
 				.add_modifier(Modifier::BOLD)
 		} else {
 			Style::default()

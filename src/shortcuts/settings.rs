@@ -15,6 +15,8 @@ mod view;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Focus {
 	Categories,
+	Preset,
+	ResetTheme,
 	List,
 	Binding(usize),
 	Reset,
@@ -32,6 +34,9 @@ enum Row {
 enum Hit {
 	Category(SettingsSection),
 	Selector,
+	Preset(usize),
+	PresetOpen,
+	ResetTheme,
 	Row(usize),
 	Binding(usize),
 	Reset,
@@ -42,6 +47,8 @@ enum Hit {
 	Discard,
 	Keep,
 	LeaderChoice(usize),
+	ThemeRow(usize),
+	ThemeReset(usize),
 }
 struct Capture {
 	action: ActionId,
@@ -50,7 +57,30 @@ struct Capture {
 	keys: Vec<ShortcutKey>,
 	received: Vec<String>,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ThemeRow {
+	Section(usize),
+	Color(usize),
+}
+const THEME_SECTIONS: &[(&str, &[usize])] = &[
+	("Interface", &[0, 2, 4, 1, 3]),
+	("Controls", &[5, 6, 7, 8, 9]),
+	("Editor & Feedback", &[11, 10]),
+	("Code Highlighting", &[13, 14, 15, 16, 17]),
+	("RGB Controls", &[18, 19, 20, 12]),
+];
 pub struct Settings {
+	preset_open: bool,
+	preset_cursor: usize,
+	preset_top: usize,
+	theme_cursor: usize,
+	theme_collapsed: BTreeSet<usize>,
+	pub theme_draft: crate::theme::Config,
+	theme_original: crate::theme::Config,
+	theme_row: usize,
+	theme_input: Option<String>,
+	theme_replace: bool,
+	closed_groups: BTreeSet<SettingsSection>,
 	leader_capture: bool,
 	leader_scroll: u16,
 	leader_choice: usize,
@@ -91,9 +121,140 @@ pub enum Outcome {
 	Save,
 }
 impl Settings {
+	fn cycle_preset(&mut self, back: bool) {
+		let presets = crate::theme::PRESETS;
+		let index = presets
+			.iter()
+			.position(|(id, _)| *id == self.theme_draft.preset)
+			.unwrap_or(0);
+		self.theme_draft.preset = presets
+			[(index + if back { presets.len() - 1 } else { 1 }) % presets.len()]
+		.0
+		.into();
+		self.validate();
+	}
+
+	fn theme_rows(&self) -> Vec<ThemeRow> {
+		let mut rows = Vec::new();
+		for (index, (_, colors)) in THEME_SECTIONS.iter().enumerate() {
+			rows.push(ThemeRow::Section(index));
+			if !self.theme_collapsed.contains(&index) {
+				rows.extend(colors.iter().copied().map(ThemeRow::Color));
+			}
+		}
+		rows
+	}
+	fn select_theme_row(&mut self, index: usize) {
+		self.theme_cursor = index.min(self.theme_rows().len().saturating_sub(1));
+		if let Some(ThemeRow::Color(role)) = self.theme_rows().get(self.theme_cursor) {
+			self.theme_row = *role;
+		}
+		self.follow = true;
+	}
+	fn reset_theme_role(&mut self) {
+		self.theme_draft
+			.colors
+			.remove(crate::theme::ROLES[self.theme_row].0);
+		self.validate();
+	}
+
+	fn save(&self, runtime: &mut super::Runtime) -> Result<(), String> {
+		self.draft.build()?;
+		self.theme_draft.resolve()?;
+		let path = runtime
+			.path
+			.as_ref()
+			.map_err(Clone::clone)?
+			.with_file_name("theme.json");
+		let changed = self.theme_draft != self.theme_original;
+		let previous = if changed {
+			match std::fs::read(&path) {
+				Ok(bytes) => Some(bytes),
+				Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+				Err(e) => return Err(e.to_string()),
+			}
+		} else {
+			None
+		};
+		if changed {
+			self.theme_draft.write(&path)?;
+		}
+		if let Err(error) = runtime.save(self.draft.clone()) {
+			if changed {
+				let restored = if let Some(bytes) = previous {
+					std::fs::write(&path, bytes)
+				} else {
+					std::fs::remove_file(&path)
+				};
+				if let Err(restore_error) = restored {
+					return Err(format!(
+						"{error}; could not restore theme file: {restore_error}"
+					));
+				}
+			}
+			return Err(error);
+		}
+		Ok(())
+	}
+
+	pub fn set_theme(&mut self, config: &crate::theme::Config) {
+		self.theme_draft = config.clone();
+		self.theme_original = config.clone();
+	}
+	pub fn preview(&self) -> crate::theme::Theme {
+		let mut draft = self.theme_draft.clone();
+		if self.preset_open {
+			draft.preset = crate::theme::PRESETS[self.preset_cursor].0.into();
+		}
+		if let Some(input) = &self.theme_input {
+			let role = crate::theme::ROLES[self.theme_row].0;
+			if input.is_empty() {
+				draft.colors.remove(role);
+			} else {
+				draft.colors.insert(role.into(), input.clone());
+			}
+		}
+		draft
+			.resolve()
+			.unwrap_or_else(|_| self.theme_draft.resolve().unwrap_or_default())
+	}
+	fn dirty(&self) -> bool {
+		self.draft != self.original || self.theme_draft != self.theme_original
+	}
+	fn categories(&self) -> Vec<SettingsSection> {
+		SettingsSection::ALL
+			.into_iter()
+			.filter(|category| match category {
+				SettingsSection::ThemeGroup | SettingsSection::ShortcutsGroup => true,
+				SettingsSection::Appearance => {
+					!self.closed_groups.contains(&SettingsSection::ThemeGroup)
+				}
+				_ => !self
+					.closed_groups
+					.contains(&SettingsSection::ShortcutsGroup),
+			})
+			.collect()
+	}
+	fn toggle_group(&mut self) {
+		if !self.closed_groups.remove(&self.category) {
+			self.closed_groups.insert(self.category);
+		}
+	}
+
 	pub fn new(config: &Config, category: SettingsSection) -> Self {
 		let mut state = Self {
 			draft: config.clone(),
+			preset_open: false,
+			preset_cursor: 0,
+			preset_top: 0,
+			theme_draft: crate::theme::Config::default(),
+			theme_original: crate::theme::Config::default(),
+			theme_row: 0,
+			theme_cursor: 1,
+			theme_collapsed: BTreeSet::new(),
+			theme_input: None,
+			theme_replace: true,
+			closed_groups: BTreeSet::new(),
 			leader_capture: false,
 			leader_scroll: 0,
 			leader_choice: 0,
@@ -167,6 +328,14 @@ impl Settings {
 		self.row = self.row.min(self.rows.len().saturating_sub(1));
 	}
 	fn switch_category(&mut self, category: SettingsSection) {
+		if category == SettingsSection::Appearance {
+			self.closed_groups.remove(&SettingsSection::ThemeGroup);
+		} else if !matches!(
+			category,
+			SettingsSection::ThemeGroup | SettingsSection::ShortcutsGroup
+		) {
+			self.closed_groups.remove(&SettingsSection::ShortcutsGroup);
+		}
 		self.category = category;
 		self.top = 0;
 		self.row = 0;
@@ -216,7 +385,7 @@ impl Settings {
 		self.follow = true;
 	}
 	fn close(&mut self) -> Outcome {
-		if self.draft == self.original {
+		if !self.dirty() {
 			Outcome::Close
 		} else {
 			self.discard = Some(false);
@@ -224,7 +393,11 @@ impl Settings {
 		}
 	}
 	fn validate(&mut self) {
-		self.error = self.draft.build().err();
+		self.error = self
+			.draft
+			.build()
+			.err()
+			.or_else(|| self.theme_draft.resolve().err());
 	}
 	fn capture(&mut self, count: usize) {
 		if let Some(action) = self.selected {
@@ -283,13 +456,59 @@ impl Settings {
 	}
 
 	fn activate(&mut self) -> Outcome {
+		if matches!(
+			self.category,
+			SettingsSection::ThemeGroup | SettingsSection::ShortcutsGroup
+		) && matches!(self.focus, Focus::Categories | Focus::List)
+		{
+			self.toggle_group();
+			return Outcome::Keep;
+		}
+		if self.category == SettingsSection::Appearance && self.focus == Focus::Reset {
+			self.reset_theme_role();
+			return Outcome::Keep;
+		}
+		if self.category == SettingsSection::Appearance && self.focus == Focus::List {
+			if let Some(ThemeRow::Section(section)) = self.theme_rows().get(self.theme_cursor) {
+				let section = *section;
+				if !self.theme_collapsed.remove(&section) {
+					self.theme_collapsed.insert(section);
+				}
+				return Outcome::Keep;
+			}
+			let role = crate::theme::ROLES[self.theme_row].0;
+			self.theme_input = Some(
+				self.theme_draft
+					.colors
+					.get(role)
+					.cloned()
+					.unwrap_or_default(),
+			);
+			self.theme_replace = true;
+			return Outcome::Keep;
+		}
 		match self.focus {
+			Focus::Preset => {
+				self.preset_cursor = crate::theme::PRESETS
+					.iter()
+					.position(|(id, _)| *id == self.theme_draft.preset)
+					.unwrap_or(0);
+				self.preset_top = 0;
+				self.preset_open = true;
+			}
+			Focus::ResetTheme => {
+				self.theme_draft.colors.clear();
+				self.validate();
+				self.message = Some("Theme customizations reset in draft".into());
+			}
 			Focus::Categories => {
 				if self.narrow && !self.selector_open {
 					self.selector_open = true;
 				} else {
 					self.selector_open = false;
-					self.focus = if self.category == SettingsSection::Timeout {
+					self.focus = if self.category == SettingsSection::Appearance {
+						Focus::Preset
+					} else if self.category == SettingsSection::Timeout {
 						Focus::Leader
 					} else {
 						Focus::List
@@ -316,6 +535,7 @@ impl Settings {
 			}
 			Focus::Footer(0) => {
 				self.draft = Config::default();
+				self.theme_draft = crate::theme::Config::default();
 				self.validate();
 				self.message = Some("Defaults restored in draft".into());
 			}
@@ -331,7 +551,17 @@ impl Settings {
 	}
 	fn cycle_focus(&mut self, back: bool) {
 		let mut fields = vec![Focus::Categories];
-		if self.category == SettingsSection::Timeout {
+		if self.category == SettingsSection::Appearance {
+			fields.push(Focus::Preset);
+			fields.push(Focus::ResetTheme);
+			fields.push(Focus::List);
+			if matches!(
+				self.theme_rows().get(self.theme_cursor),
+				Some(ThemeRow::Color(_))
+			) {
+				fields.push(Focus::Reset);
+			}
+		} else if self.category == SettingsSection::Timeout {
 			fields.push(Focus::Leader);
 			fields.push(Focus::Timeout);
 		} else {
@@ -360,27 +590,100 @@ impl Settings {
 		let left = matches!(code, KeyCode::Left | KeyCode::Char('h'));
 		let right = matches!(code, KeyCode::Right | KeyCode::Char('l'));
 		match self.focus {
+			Focus::Preset => {
+				if left || right {
+					self.cycle_preset(left);
+				}
+				if up {
+					self.focus = Focus::Categories;
+				}
+				if down {
+					self.focus = Focus::List;
+				}
+			}
+			Focus::ResetTheme => {
+				if up || left {
+					self.focus = Focus::Preset;
+				}
+				if down {
+					self.focus = Focus::List;
+				}
+			}
 			Focus::Categories => {
-				let at = SettingsSection::ALL
-					.iter()
-					.position(|s| *s == self.category)
-					.unwrap();
+				let categories = self.categories();
+				let at = categories.iter().position(|s| *s == self.category).unwrap();
 				let next = match code {
 					KeyCode::Home => 0,
-					KeyCode::End | KeyCode::Char('G') => 6,
-					KeyCode::Char('M') => 3,
+					KeyCode::End | KeyCode::Char('G') => categories.len() - 1,
+					KeyCode::Char('M') => categories.len() / 2,
 					_ if up => at.saturating_sub(1),
-					_ if down => (at + 1).min(6),
+					_ if down => (at + 1).min(categories.len() - 1),
 					_ => at,
 				};
-				self.switch_category(SettingsSection::ALL[next]);
+				self.switch_category(categories[next]);
+				if matches!(
+					self.category,
+					SettingsSection::ThemeGroup | SettingsSection::ShortcutsGroup
+				) {
+					if left {
+						self.closed_groups.insert(self.category);
+					}
+					if right {
+						self.closed_groups.remove(&self.category);
+					}
+					return;
+				}
 				if right {
 					self.selector_open = false;
-					self.focus = if self.category == SettingsSection::Timeout {
+					self.focus = if self.category == SettingsSection::Appearance {
+						Focus::Preset
+					} else if self.category == SettingsSection::Timeout {
 						Focus::Leader
 					} else {
 						Focus::List
 					};
+				}
+			}
+			Focus::List if self.category == SettingsSection::Appearance => {
+				if up && self.theme_cursor == 0 {
+					self.focus = Focus::Preset;
+					return;
+				}
+				let last = self.theme_rows().len().saturating_sub(1);
+				let next = match code {
+					KeyCode::Home => 0,
+					KeyCode::End | KeyCode::Char('G') => last,
+					KeyCode::PageUp => self.theme_cursor.saturating_sub(self.viewport.max(1) / 2),
+					KeyCode::PageDown => (self.theme_cursor + self.viewport.max(1) / 2).min(last),
+					KeyCode::Char('M') => last / 2,
+					_ if up => self.theme_cursor.saturating_sub(1),
+					_ if down => (self.theme_cursor + 1).min(last),
+					_ => self.theme_cursor,
+				};
+				self.select_theme_row(next);
+				if left || right {
+					if let Some(ThemeRow::Section(section)) =
+						self.theme_rows().get(self.theme_cursor)
+					{
+						if right {
+							self.theme_collapsed.remove(section);
+						} else {
+							self.theme_collapsed.insert(*section);
+						}
+					} else if right {
+						self.focus = Focus::Reset;
+					} else {
+						self.focus = Focus::Categories;
+					}
+				}
+			}
+			Focus::Reset if self.category == SettingsSection::Appearance => {
+				if left || up {
+					self.focus = Focus::List;
+				}
+				if down {
+					self.focus = Focus::List;
+					self.select_theme_row(self.theme_cursor + 1);
 				}
 			}
 			Focus::List => {
@@ -487,7 +790,9 @@ impl Settings {
 					self.focus = Focus::Footer((i + 1).min(2));
 				}
 				if up {
-					self.focus = if self.category == SettingsSection::Timeout {
+					self.focus = if self.category == SettingsSection::Appearance {
+						Focus::Preset
+					} else if self.category == SettingsSection::Timeout {
 						Focus::Leader
 					} else {
 						Focus::List
@@ -497,6 +802,67 @@ impl Settings {
 		}
 	}
 	pub fn event(&mut self, event: Event) -> Outcome {
+		if self.preset_open {
+			let last = crate::theme::PRESETS.len() - 1;
+			match event {
+				Event::Key(key) if key.kind != KeyEventKind::Release => match key.code {
+					KeyCode::Esc => self.preset_open = false,
+					KeyCode::Enter => {
+						self.theme_draft.preset =
+							crate::theme::PRESETS[self.preset_cursor].0.into();
+						self.preset_open = false;
+						self.validate();
+					}
+					KeyCode::Up | KeyCode::Char('k') => {
+						self.preset_cursor = self.preset_cursor.saturating_sub(1)
+					}
+					KeyCode::Down | KeyCode::Char('j') => {
+						self.preset_cursor = (self.preset_cursor + 1).min(last)
+					}
+					KeyCode::Home | KeyCode::Char('g') => self.preset_cursor = 0,
+					KeyCode::End | KeyCode::Char('G') => self.preset_cursor = last,
+					KeyCode::PageUp => self.preset_cursor = self.preset_cursor.saturating_sub(5),
+					KeyCode::PageDown => self.preset_cursor = (self.preset_cursor + 5).min(last),
+					_ => (),
+				},
+				Event::Mouse(mouse) => match mouse.kind {
+					MouseEventKind::ScrollUp => {
+						self.preset_cursor = self.preset_cursor.saturating_sub(1)
+					}
+					MouseEventKind::ScrollDown => {
+						self.preset_cursor = (self.preset_cursor + 1).min(last)
+					}
+					MouseEventKind::Down(MouseButton::Left) => {
+						if let Some((_, Hit::Preset(index))) = self
+							.hits
+							.iter()
+							.find(|(rect, _)| rect.contains((mouse.column, mouse.row).into()))
+						{
+							self.theme_draft.preset = crate::theme::PRESETS[*index].0.into();
+							self.preset_open = false;
+							self.validate();
+						}
+					}
+					_ => (),
+				},
+				_ => (),
+			}
+			return Outcome::Keep;
+		}
+
+		if let Event::Paste(text) = &event
+			&& let Some(input) = &mut self.theme_input
+		{
+			if text.len() <= 32 && text.chars().all(|ch| !ch.is_control()) {
+				*input = text.clone();
+				self.theme_replace = false;
+			}
+			return Outcome::Keep;
+		}
+		if !matches!(event, Event::Key(_)) && self.theme_input.is_some() {
+			return Outcome::Keep;
+		}
+
 		if self.leader_change.is_some()
 			&& let Event::Mouse(mouse) = event
 		{
@@ -521,6 +887,65 @@ impl Settings {
 				return Outcome::Keep;
 			}
 			let decoded = ShortcutKey::from(key);
+			if let Some(input) = &mut self.theme_input {
+				match decoded.code {
+					KeyCode::Esc => {
+						self.theme_input = None;
+						self.validate();
+					}
+					KeyCode::Enter => {
+						let role = crate::theme::ROLES[self.theme_row].0;
+						let mut draft = self.theme_draft.clone();
+						if input.is_empty() {
+							draft.colors.remove(role);
+						} else {
+							draft.colors.insert(role.into(), input.clone());
+						}
+						match draft.resolve() {
+							Ok(_) => {
+								self.theme_draft = draft;
+								self.theme_input = None;
+								self.validate();
+							}
+							Err(error) => self.error = Some(error),
+						}
+					}
+					KeyCode::Backspace => {
+						if self.theme_replace {
+							input.clear();
+						} else {
+							input.pop();
+						}
+						self.theme_replace = false;
+					}
+					KeyCode::Char('a') if decoded.modifiers == M::CONTROL => {
+						self.theme_replace = true
+					}
+					KeyCode::Char(ch) if decoded.modifiers.is_empty() && input.len() < 32 => {
+						if self.theme_replace {
+							input.clear();
+							self.theme_replace = false;
+						}
+						input.push(ch);
+					}
+					_ => (),
+				}
+				return Outcome::Keep;
+			}
+			if self.category == SettingsSection::Appearance
+				&& self.focus == Focus::List
+				&& decoded.code == KeyCode::Delete
+				&& matches!(
+					self.theme_rows().get(self.theme_cursor),
+					Some(ThemeRow::Color(_))
+				) {
+				self.theme_draft
+					.colors
+					.remove(crate::theme::ROLES[self.theme_row].0);
+				self.validate();
+				return Outcome::Keep;
+			}
+
 			if let Some(change) = self.leader_change.clone() {
 				let count = if change.is_some() { 2 } else { 3 };
 				match decoded.code {
@@ -743,8 +1168,18 @@ impl Settings {
 						match hit {
 							Hit::Category(cat) => {
 								self.switch_category(cat);
+								if matches!(
+									cat,
+									SettingsSection::ThemeGroup | SettingsSection::ShortcutsGroup
+								) {
+									self.toggle_group();
+									self.focus = Focus::Categories;
+									return Outcome::Keep;
+								}
 								self.selector_open = false;
-								self.focus = if cat == SettingsSection::Timeout {
+								self.focus = if cat == SettingsSection::Appearance {
+									Focus::Preset
+								} else if cat == SettingsSection::Timeout {
 									Focus::Leader
 								} else {
 									Focus::List
@@ -753,6 +1188,35 @@ impl Settings {
 							Hit::Selector => {
 								self.focus = Focus::Categories;
 								self.selector_open = !self.selector_open;
+							}
+							Hit::PresetOpen => {
+								self.focus = Focus::Preset;
+								return self.activate();
+							}
+							Hit::Preset(index) => {
+								self.theme_draft.preset = crate::theme::PRESETS[index].0.into();
+								self.focus = Focus::Preset;
+								self.validate();
+							}
+							Hit::ResetTheme => {
+								self.focus = Focus::ResetTheme;
+								return self.activate();
+							}
+							Hit::ThemeReset(role) => {
+								if let Some(index) = self
+									.theme_rows()
+									.iter()
+									.position(|row| *row == ThemeRow::Color(role))
+								{
+									self.select_theme_row(index);
+								}
+								self.focus = Focus::Reset;
+								self.reset_theme_role();
+							}
+							Hit::ThemeRow(i) => {
+								self.select_theme_row(i);
+								self.focus = Focus::List;
+								return self.activate();
 							}
 							Hit::Row(i) => {
 								self.select_row(i);
@@ -857,12 +1321,13 @@ impl crate::app::App {
 				self.settings = None;
 				self.shortcuts.cancel();
 			}
-			Outcome::Save => match self.shortcuts.save(settings.draft.clone()) {
+			Outcome::Save => match settings.save(&mut self.shortcuts) {
 				Ok(()) => {
+					self.theme = settings.theme_draft.clone();
 					self.settings = None;
-					self.notice = Some("Shortcuts saved".into());
+					self.notice = Some("Settings saved".into());
 				}
-				Err(error) => settings.error = Some(format!("Could not save shortcuts: {error}")),
+				Err(error) => settings.error = Some(format!("Could not save settings: {error}")),
 			},
 			Outcome::Keep => (),
 		}
@@ -885,6 +1350,129 @@ mod tests {
 		settings.slot = slot;
 		settings.focus = Focus::Binding(slot);
 	}
+	#[test]
+	fn preset_chooser_previews_without_changing_draft_until_confirmed() {
+		let mut settings = Settings::new(&Config::default(), SettingsSection::Appearance);
+		settings.focus = Focus::Preset;
+		settings.event(event("Enter"));
+		settings.event(event("G"));
+		assert_eq!(settings.theme_draft.preset, "midnight");
+		assert_eq!(
+			settings.preview(),
+			crate::theme::Theme::preset("catppuccin-mocha").unwrap()
+		);
+		settings.event(event("Esc"));
+		assert_eq!(settings.preview(), crate::theme::Theme::default());
+		settings.event(event("Enter"));
+		settings.event(event("G"));
+		settings.event(event("Enter"));
+		assert_eq!(settings.theme_draft.preset, "catppuccin-mocha");
+		assert!(settings.dirty());
+		settings.event(event("Enter"));
+		for (width, height) in [(140, 40), (80, 24), (40, 12), (20, 5), (1, 1)] {
+			let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+			terminal.draw(|frame| settings.draw(frame)).unwrap();
+			for (rect, _) in &settings.hits {
+				assert!(rect.right() <= width && rect.bottom() <= height);
+			}
+		}
+	}
+
+	#[test]
+	fn presets_preserve_overrides_and_theme_reset_leaves_shortcuts_alone() {
+		let mut settings = Settings::new(&Config::default(), SettingsSection::Appearance);
+		settings
+			.theme_draft
+			.colors
+			.insert("accent".into(), "#123456".into());
+		let shortcuts = settings.draft.clone();
+		settings.focus = Focus::Preset;
+		settings.event(event("Right"));
+		assert_eq!(settings.theme_draft.preset, "light");
+		assert_eq!(
+			settings.preview().accent,
+			ratatui::style::Color::Rgb(18, 52, 86)
+		);
+		settings.focus = Focus::ResetTheme;
+		settings.event(event("Enter"));
+		assert_eq!(settings.theme_draft.preset, "light");
+		assert!(settings.theme_draft.colors.is_empty());
+		assert_eq!(settings.draft, shortcuts);
+		assert_eq!(
+			settings.preview(),
+			crate::theme::Theme::preset("light").unwrap()
+		);
+		assert!(settings.dirty());
+	}
+
+	#[test]
+	fn appearance_sections_fields_reset_and_resizing() {
+		let mut settings = Settings::new(&Config::default(), SettingsSection::Appearance);
+		settings.focus = Focus::List;
+		assert!(settings.theme_collapsed.is_empty());
+		settings
+			.theme_draft
+			.colors
+			.insert("accent".into(), "#123456".into());
+		settings.event(event("Tab"));
+		assert_eq!(settings.focus, Focus::Reset);
+		settings.event(event("Enter"));
+		assert!(!settings.theme_draft.colors.contains_key("accent"));
+		settings.focus = Focus::List;
+		settings.event(event("Home"));
+		settings.event(event("Enter"));
+		assert!(settings.theme_collapsed.contains(&0));
+		assert!(settings.theme_input.is_none());
+		settings.event(event("Enter"));
+		assert!(!settings.theme_collapsed.contains(&0));
+		for (width, height) in [(140, 40), (80, 24), (40, 16), (24, 8), (1, 1)] {
+			let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+			settings.event(event("G"));
+			terminal.draw(|frame| settings.draw(frame)).unwrap();
+			for (rect, _) in &settings.hits {
+				assert!(rect.right() <= width && rect.bottom() <= height, "{rect:?}");
+			}
+		}
+	}
+
+	#[test]
+	fn theme_preview_groups_and_failed_save_preserve_active_configuration() {
+		let mut settings = Settings::new(&Config::default(), SettingsSection::Appearance);
+		settings.focus = Focus::List;
+		settings.event(event("Enter"));
+		settings.event(Event::Paste("#123456".into()));
+		assert_eq!(
+			settings.preview().accent,
+			ratatui::style::Color::Rgb(18, 52, 86)
+		);
+		assert_eq!(settings.theme_draft, crate::theme::Config::default());
+		settings.event(event("Enter"));
+		assert!(settings.dirty());
+		assert!(matches!(settings.close(), Outcome::Keep));
+		settings.discard = None;
+		settings.switch_category(SettingsSection::ShortcutsGroup);
+		settings.toggle_group();
+		assert!(!settings.categories().contains(&SettingsSection::Editor));
+		settings.switch_category(SettingsSection::Editor);
+		assert!(settings.categories().contains(&SettingsSection::Editor));
+		let dir = tempfile::tempdir().unwrap();
+		let shortcuts_path = dir.path().join("shortcuts.json");
+		std::fs::create_dir(&shortcuts_path).unwrap();
+		let mut runtime = super::super::Runtime {
+			path: Ok(shortcuts_path),
+			..Default::default()
+		};
+		let original = runtime.config.clone();
+		assert!(settings.save(&mut runtime).is_err());
+		assert_eq!(runtime.config, original);
+		assert!(!dir.path().join("theme.json").exists());
+		let theme_path = dir.path().join("theme.json");
+		crate::theme::Config::default().write(&theme_path).unwrap();
+		let original_bytes = std::fs::read(&theme_path).unwrap();
+		assert!(settings.save(&mut runtime).is_err());
+		assert_eq!(std::fs::read(&theme_path).unwrap(), original_bytes);
+	}
+
 	#[test]
 	fn general_navigation_and_unaffected_leader_need_no_confirmation() {
 		let mut settings = Settings::new(&Config::default(), SettingsSection::Timeout);
@@ -1075,6 +1663,9 @@ mod tests {
 		settings.focus = Focus::Categories;
 		settings.event(event("g"));
 		settings.event(event("g"));
+		for _ in 0..3 {
+			settings.event(event("j"));
+		}
 		assert_eq!(settings.category, SettingsSection::Timeout);
 		settings.event(event("j"));
 		assert_eq!(settings.category, SettingsSection::Workspace);
@@ -1153,6 +1744,9 @@ mod tests {
 		assert_eq!(
 			SettingsSection::ALL.map(SettingsSection::label),
 			[
+				"Theme",
+				"Appearance",
+				"Shortcuts",
 				"General",
 				"Workspace",
 				"Editor",
@@ -1217,6 +1811,9 @@ mod tests {
 				settings.event(event("Ctrl+l"));
 				settings.event(event("g"));
 				settings.event(event("g"));
+				for _ in 0..3 {
+					settings.event(event("j"));
+				}
 				terminal.draw(|frame| settings.draw(frame)).unwrap();
 				assert_eq!(settings.category, SettingsSection::Timeout);
 				settings.event(event("Enter"));

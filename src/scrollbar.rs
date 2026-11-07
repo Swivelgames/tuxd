@@ -1,9 +1,5 @@
-use ratatui::{
-	Frame,
-	layout::Rect,
-	style::{Color, Style},
-	widgets::Paragraph,
-};
+use crate::theme;
+use ratatui::{Frame, layout::Rect, style::Style, widgets::Paragraph};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
@@ -82,9 +78,9 @@ pub fn draw(frame: &mut Frame, bars: &mut Vec<Bar>, bar: Bar) {
 		};
 		frame.render_widget(
 			Paragraph::new(symbol).style(Style::default().fg(if active {
-				Color::Cyan
+				theme::accent_color()
 			} else {
-				Color::Rgb(62, 78, 106)
+				theme::border_color()
 			})),
 			rect,
 		);

@@ -22,6 +22,9 @@ pub enum InputScope {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SettingsSection {
+	ThemeGroup,
+	Appearance,
+	ShortcutsGroup,
 	Timeout,
 	Workspace,
 	Editor,
@@ -31,7 +34,10 @@ pub enum SettingsSection {
 	Explorer,
 }
 impl SettingsSection {
-	pub const ALL: [Self; 7] = [
+	pub const ALL: [Self; 10] = [
+		Self::ThemeGroup,
+		Self::Appearance,
+		Self::ShortcutsGroup,
 		Self::Timeout,
 		Self::Workspace,
 		Self::Editor,
@@ -42,6 +48,9 @@ impl SettingsSection {
 	];
 	pub fn label(self) -> &'static str {
 		match self {
+			Self::ThemeGroup => "Theme",
+			Self::Appearance => "Appearance",
+			Self::ShortcutsGroup => "Shortcuts",
 			Self::Timeout => "General",
 			Self::Workspace => "Workspace",
 			Self::Editor => "Editor",

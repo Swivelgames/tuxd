@@ -1,4 +1,5 @@
 //! Inert source preview and independently scrollable import diagnostics.
+use crate::theme;
 use crate::{
 	ansi_import::Import,
 	document::sanitize,
@@ -9,9 +10,9 @@ use crossterm::event::{Event, MouseButton, MouseEventKind};
 use ratatui::{
 	Frame,
 	layout::{Constraint, Rect},
-	style::{Color, Modifier, Style},
+	style::{Modifier, Style},
 	text::{Line, Span},
-	widgets::{Block, BorderType, Clear, Paragraph, Row, Table},
+	widgets::{BorderType, Clear, Paragraph, Row, Table},
 };
 use std::path::PathBuf;
 use unicode_segmentation::UnicodeSegmentation;
@@ -200,7 +201,7 @@ impl Review {
 			height,
 		);
 		frame.render_widget(Clear, popup);
-		let block = Block::bordered()
+		let block = theme::block()
 			.border_type(BorderType::Rounded)
 			.title(" Unsupported ANSI Sequences ");
 		let inner = block.inner(popup);
@@ -250,14 +251,16 @@ impl Review {
 			.as_deref()
 			.and_then(|cwd| self.path.strip_prefix(cwd).ok())
 			.unwrap_or(&self.path);
-		let block = Block::bordered()
+		let block = theme::block()
 			.border_type(BorderType::Rounded)
 			.title(format!(" {} ", sanitize(&display_path.to_string_lossy())));
 		let inside = block.inner(preview);
 		frame.render_widget(block, preview);
 		self.areas[0] = inside;
 		self.top[0] = self.top[0].min(layout.rows.len().saturating_sub(inside.height as usize));
-		let red = Style::default().fg(Color::Red).add_modifier(Modifier::BOLD);
+		let red = Style::default()
+			.fg(theme::error_color())
+			.add_modifier(Modifier::BOLD);
 		for (visual, row) in layout
 			.rows
 			.iter()
@@ -273,7 +276,7 @@ impl Review {
 				} else {
 					"      ".into()
 				})
-				.style(Style::default().bg(Color::Rgb(23, 28, 44))),
+				.style(Style::default().bg(theme::field_color())),
 				Rect::new(inside.x, y, gutter, 1),
 			);
 			let spans: Vec<_> = lines[row.line][row.start..row.end]
@@ -347,7 +350,7 @@ impl Review {
 						.style(Style::default().add_modifier(Modifier::BOLD))
 						.bottom_margin(1),
 				)
-				.style(Style::default().bg(Color::Rgb(23, 28, 44))),
+				.style(Style::default().bg(theme::field_color())),
 			table_area,
 		);
 		for (i, area, count, viewport) in [
@@ -408,13 +411,15 @@ impl Review {
 				1,
 			);
 			frame.render_widget(
-				Paragraph::new(format!(" {label} ")).style(Style::default().fg(Color::Cyan).bg(
-					if self.focus == i + 2 {
-						Color::Rgb(41, 54, 83)
-					} else {
-						Color::Reset
-					},
-				)),
+				Paragraph::new(format!(" {label} ")).style(
+					Style::default()
+						.fg(theme::accent_color())
+						.bg(if self.focus == i + 2 {
+							theme::selected_color()
+						} else {
+							theme::surface_color()
+						}),
+				),
 				rect,
 			);
 			self.buttons.push((rect, i));
@@ -444,7 +449,8 @@ mod tests {
 				.buffer()
 				.content
 				.iter()
-				.any(|cell| cell.fg == Color::Red && cell.modifier.contains(Modifier::BOLD))
+				.any(|cell| cell.fg == theme::error_color()
+					&& cell.modifier.contains(Modifier::BOLD))
 		);
 		review.focus = 0;
 		review.shortcut(crate::shortcuts::ActionId::FieldEnd);

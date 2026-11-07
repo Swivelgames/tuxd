@@ -45,7 +45,7 @@ The editor uses the alternate screen. The title shows the document filename and 
 | Enter in RGB fields | Apply the staged RGB color; typing replaces a newly focused field |
 | Arrows, Page Up/Down in code | Scroll generated output |
 | Mouse wheel | Scroll three lines; the next edit/navigation returns to the cursor |
-| F1 / Ctrl+/ / Ctrl+, | Open Shortcut Settings (fixed); Esc closes settings |
+| F1 / Ctrl+/ / Ctrl+, | Open Settings (fixed); Esc closes settings |
 | F4 | File menu: New, Open, Save, Save As, Import, Export, Quit |
 | Ctrl+N / Ctrl+O | New / open document |
 | Ctrl+S / Ctrl+Shift+S | Save / Save As |
@@ -114,9 +114,9 @@ Style controls use a compact row of B/I/U/D/S buttons, each previewing its attri
 
 Scrollbars appear when content exceeds its viewport: vertical bars for Editor, Code, the tool sidebar, and the indexed-color grid; horizontal bars for Editor and Code when wrapping is off. Click a track to jump, drag its thumb, or scroll the wheel over it. Thumb size reflects the visible portion. Scrolling changes only the viewport, preserving text, selection, and undo history.
 
-## Shortcut Settings
+## Settings
 
-F1, Ctrl+/, and Ctrl+, always open Shortcut Settings, including from file dialogs and prompts. Settings starts at the related context and preserves the underlying selection, document, and dialog. The shortcuts documented above are defaults; the File menu and workspace hints reflect saved bindings.
+F1, Ctrl+/, and Ctrl+, always open Settings, including from file dialogs and prompts. Settings starts at the related context and preserves the underlying selection, document, and dialog. The shortcuts documented above are defaults; the File menu and workspace hints reflect saved bindings.
 
 Sequence Timeout has its own first destination, followed by Workspace, Editor, Code, Tools, Dialogs, and File Explorer. Wide terminals show a category navigator beside the current category; narrower terminals use a category selector. Subsections start expanded in every category and can be collapsed independently. Workspace groups Files, Panes, Field Actions, Field Navigation, Text Fields, and Range Controls; Editor separates Tools, Movement, Selection, and Editing. Toggle Editor and Toggle Code live in their respective categories, with Toggle wrapping at the top level in both. Blank rows separate subsection headings and related action groups.
 
@@ -148,7 +148,7 @@ Each `.tuxd.json` file contains one editable document. Open, Save As, Import, an
 - In the list, arrows, Home/End, and Page Up/Down select entries. Vim-style `h/j/k/l` navigate parent/down/up/into-directory, and `gg` / `G` select the first / last entry. Shift+M selects the middle visible entry. These letter bindings apply only to the file list. Left/Backspace goes to the parent directory; Right enters a directory. Enter or double-click opens a directory/file; for Save As/Export, choosing an existing file fills the filename for review. Single-click selects; the wheel and scrollbar scroll the list.
 - Ctrl+H or Ctrl+. toggles hidden files. Ctrl+F toggles `.tuxd.json`/all-files filtering. Open/Save As default to documents; Import/Export default to all files.
 - Both text fields accept terminal paste and Ctrl+V (using `wl-paste` on Wayland or `xclip`/`xsel` on X11). Clipboard reads run in the background. Ctrl+A selects the field contents for replacement; Left/Right, Home/End, and Backspace/Delete edit the path.
-- F1, Ctrl+/, or Ctrl+, opens Shortcut Settings at the File Explorer section. Closing settings returns to the same picker and focus. Legacy Ctrl+/ is supported; Ctrl+? is not a settings alias. Ctrl+. and distinct Ctrl+I require terminal support for disambiguated keys; Ctrl+H and the Style tool remain alternatives.
+- F1, Ctrl+/, or Ctrl+, opens Settings at the File Explorer section. Closing settings returns to the same picker and focus. Legacy Ctrl+/ is supported; Ctrl+? is not a settings alias. Ctrl+. and distinct Ctrl+I require terminal support for disambiguated keys; Ctrl+H and the Style tool remain alternatives.
 - Import and Export have Raw ANSI / Escaped ANSI radios: click an option, or focus the group and use Left/Right. Enter/Space submits the selected format and filename.
 - Enter submits the filename; Esc cancels. Existing destinations still require overwrite confirmation. F4 provides alternatives for terminals that cannot distinguish Ctrl+Shift+S. Menu entries and confirmation choices can also be clicked.
 
@@ -186,7 +186,7 @@ The Code pane highlights ANSI sequence boundaries in cyan, parameters in yellow,
 
 Editor selection clipboard: Ctrl+C copies styled escaped ANSI, Ctrl+X cuts after successful clipboard forwarding, Ctrl+V pastes plain or styled text, and Ctrl+A selects all. Terminal paste uses the same ANSI detection. Unsupported controls open a Strip and paste / Abort review. Cut and paste are undoable. Clipboard failures or editor changes while an operation is pending preserve the current document.
 
-Bind **Paste without formatting** or **Paste literal text** under Workspace → Text Fields in Shortcut Settings (both start unbound). The former decodes ANSI but uses the current typing style; the latter preserves literal escape notation. Style-only paste is still deferred. Remote clipboard reads are not provided; use terminal-side paste over SSH.
+Bind **Paste without formatting** or **Paste literal text** under Workspace → Text Fields in Settings (both start unbound). The former decodes ANSI but uses the current typing style; the latter preserves literal escape notation. Style-only paste is still deferred. Remote clipboard reads are not provided; use terminal-side paste over SSH.
 
 ## CLI ANSI import
 
@@ -206,10 +206,42 @@ Run the CLI acceptance checks with `uv run scripts/stdin_import_smoke.py`.
 
 ## Shortcut leader
 
-Shortcut Settings begins with **General**, containing Leader and Sequence Timeout. Leader is unset by default. Focus Leader and press Enter to record a key; Delete unsets it.
+Settings begins with **General**, containing Leader and Sequence Timeout. Leader is unset by default. Focus Leader and press Enter to record a key; Delete unsets it.
 
 Setting or changing Leader previews affected bindings: standalone uses of that key are unset, sequences beginning with it become symbolic `<leader>` sequences, and existing symbolic bindings follow the new key. Confirm with `y`, or cancel with Esc. When unsetting Leader, `p` preserves affected sequences by substituting its literal key; `r` removes the affected bindings. These changes only take effect after saving Settings.
 
 During shortcut capture, a leader pressed first adds one input to the capture count. Enter captures `<leader>` plus one key; `2` captures `<leader>` plus two keys, up to nine following keys. Later occurrences are literal. Conflicts are checked using resolved physical sequences and the existing context rules. Settings controls remain fixed.
 
 Validation: `uv run scripts/leader_smoke.py` exercises General navigation, capture, confirmation, explicit saving and unsetting in a PTY.
+
+## Baseline appearance
+
+Application colors and rounded panel/dialog borders are defined in `src/theme.rs`. Midnight is the default appearance, using an explicit dark background and light text. Shared roles cover muted text, focus, selection, errors, gutters, scrollbars and Code syntax highlighting. Document formatting and swatch colors remain independent. Theme customization is available in Settings → Theme → Appearance; the [baseline inventory](.work/initiatives/themes/baseline.md) records the current roles and deliberate visual adjustments.
+
+## Theme configuration
+
+The active theme loads at startup from `$XDG_CONFIG_HOME/tuxd/theme.json`, or `~/.config/tuxd/theme.json`. Midnight is the default. Presets include Midnight, Light, One Dark, Dracula, Nord, Gruvbox Dark/Light, Solarized Dark/Light, Tokyo Night, and Catppuccin Latte/Frappé/Macchiato/Mocha. Missing files use Midnight; omitted color roles inherit the selected preset. Baseline is no longer supported. To override roles, create this file:
+
+```json
+{
+	"version": 1,
+	"preset": "midnight",
+	"colors": {
+		"accent": "#80c0ff",
+		"border": "ansi:60",
+		"surface": "default"
+	}
+}
+```
+
+Colors accept `default` (terminal default), `ansi:0` through `ansi:255`, or six-digit `#RRGGBB`. Supported roles are `accent`, `surface`, `text`, `border`, `muted`, `field`, `selected`, `selected_text`, `focus`, `inactive_indicator`, `error`, `selection_overlay`, `range_text`, `rgb_red`, `rgb_green`, `rgb_blue`, `syntax_sequence`, `syntax_parameter`, `syntax_escape`, `syntax_separator`, and `syntax_whitespace`.
+
+Restart to load external file edits. Invalid versions, presets, role names or colors report an error and use Midnight; loading never rewrites the file. The document canvas keeps its own terminal-default or explicit document colors. The Settings dialog provides preset selection, live preview, and Save/Cancel.
+
+## Unified Settings
+
+F1, Ctrl+/, or Ctrl+, opens **Settings**, preserving the shortcut-category jump for the current focus. The sidebar groups **Theme → Appearance** and **Shortcuts → General / Workspace / Editor / Code / Tools / Dialogs / File Explorer**. Enter or a click on a group heading expands/collapses it; Left collapses and Right expands. Context jumps expand their destination group.
+
+Appearance offers a compact preset chooser: Enter opens the scrollable list, arrows or j/k preview a theme, Enter accepts, and Esc cancels. Left/Right on the closed preset field cycles directly. See the [preset catalog and upstream palette sources](.work/initiatives/themes/presets.md). Custom color overrides are preserved. Reset theme clears only overrides for the selected preset and leaves shortcuts untouched; the change stays in the draft until Save. Color roles are organized into expanded, collapsible Interface, Controls, Editor & Feedback, Code Highlighting, and RGB Controls subsections. Each row separates its label, color field, preview swatch, and Reset button; narrow screens stack the fields beneath their labels. Select a color role with arrows or j/k and press Enter to edit. Valid colors preview immediately across the app; Enter accepts the field, Esc cancels the field edit, and Delete restores that role to the selected preset. Empty input also restores the preset value. Pasting a color value is supported. The role list scrolls with a scrollbar.
+
+Save (Ctrl+S) validates both drafts, writes changes, and activates them together in the running app. Cancel offers to discard unsaved changes, including theme edits; discarding restores the previous theme. Reset all restores both theme and shortcut defaults in the draft. A failed save keeps Settings open and retains both drafts; if saving shortcuts fails after the theme file is written, the previous theme file is restored. The two files are individually persisted, not a single crash-atomic transaction.

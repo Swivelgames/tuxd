@@ -1,7 +1,8 @@
 //! View-only tokens for our escaped ANSI representation, never export markup.
+use crate::theme;
 use std::ops::Range;
 
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
@@ -107,13 +108,13 @@ impl Highlight {
 			return Style::default();
 		};
 		match token.kind {
-			Kind::Sequence => Style::default().fg(Color::Cyan),
-			Kind::Parameter => Style::default().fg(Color::Yellow),
+			Kind::Sequence => Style::default().fg(theme::syntax_sequence_color()),
+			Kind::Parameter => Style::default().fg(theme::syntax_parameter_color()),
 			Kind::Reset => Style::default()
-				.fg(Color::Magenta)
+				.fg(theme::syntax_escape_color())
 				.add_modifier(Modifier::BOLD),
-			Kind::Separator => Style::default().fg(Color::DarkGray),
-			Kind::Whitespace => Style::default().fg(Color::Blue),
+			Kind::Separator => Style::default().fg(theme::syntax_separator_color()),
+			Kind::Whitespace => Style::default().fg(theme::syntax_whitespace_color()),
 		}
 	}
 }
@@ -140,16 +141,22 @@ mod tests {
 			highlight.0.iter().filter(|t| t.kind == Kind::Reset).count(),
 			1
 		);
-		assert_eq!(highlight.style_at(3).fg, Some(Color::Cyan));
+		assert_eq!(
+			highlight.style_at(3).fg,
+			Some(theme::syntax_sequence_color())
+		);
 		assert_eq!(
 			highlight.style_at(line.find(";0;").unwrap() + 1).fg,
-			Some(Color::Yellow)
+			Some(theme::syntax_parameter_color())
 		);
 		assert_eq!(
 			highlight.style_at(line.find("text").unwrap()),
 			Style::default()
 		);
-		assert_eq!(highlight.style_at(line.len() - 1).fg, Some(Color::Blue));
+		assert_eq!(
+			highlight.style_at(line.len() - 1).fg,
+			Some(theme::syntax_whitespace_color())
+		);
 		for token in &highlight.0 {
 			assert!(line.is_char_boundary(token.bytes.start));
 			assert!(line.is_char_boundary(token.bytes.end));

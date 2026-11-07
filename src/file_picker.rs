@@ -1,6 +1,7 @@
 //! Shared local file picker. Explorer owns directory discovery/filtering; our rows
 //! keep mouse hit targets and scrollbar offsets consistent with the other panels.
 use crate::shortcuts::{ActionId as A, InputScope};
+use crate::theme;
 use crate::{
 	document::sanitize,
 	files::Action,
@@ -10,9 +11,9 @@ use crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind};
 use ratatui::{
 	Frame,
 	layout::Rect,
-	style::{Color, Modifier, Style},
+	style::{Modifier, Style},
 	text::{Line, Span},
-	widgets::{Block, BorderType, Clear, Paragraph},
+	widgets::{BorderType, Clear, Paragraph},
 };
 use ratatui_explorer::FileExplorer;
 use std::{
@@ -23,7 +24,6 @@ use std::{
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-const SELECTED: Color = Color::Rgb(41, 54, 83);
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Focus {
 	Location,
@@ -133,9 +133,9 @@ impl Field {
 				.style(
 					Style::default()
 						.bg(if focused {
-							SELECTED
+							theme::selected_color()
 						} else {
-							Color::Rgb(23, 28, 44)
+							theme::field_color()
 						})
 						.add_modifier(if focused && self.selected {
 							Modifier::REVERSED
@@ -626,14 +626,13 @@ impl Picker {
 			height,
 		);
 		frame.render_widget(Clear, popup);
-		let block =
-			Block::bordered()
-				.border_type(BorderType::Rounded)
-				.title(if self.import_prompt {
-					" Import this file as ANSI? ".to_owned()
-				} else {
-					format!(" {title} ")
-				});
+		let block = theme::block()
+			.border_type(BorderType::Rounded)
+			.title(if self.import_prompt {
+				" Import this file as ANSI? ".to_owned()
+			} else {
+				format!(" {title} ")
+			});
 		let inner = block.inner(popup);
 		frame.render_widget(block, popup);
 		self.buttons.clear();
@@ -690,12 +689,12 @@ impl Picker {
 			inner.width,
 			inner.height.saturating_sub(list_start + 3),
 		);
-		let block = Block::bordered()
+		let block = theme::block()
 			.border_type(BorderType::Rounded)
 			.border_style(Style::default().fg(if self.focus == Focus::List {
-				Color::Cyan
+				theme::accent_color()
 			} else {
-				Color::Rgb(62, 78, 106)
+				theme::border_color()
 			}));
 		let list_inner = block.inner(list_box);
 		frame.render_widget(block, list_box);
@@ -726,11 +725,15 @@ impl Picker {
 				let selected = explorer.selected_idx() == index;
 				let style = Style::default()
 					.fg(if file.is_dir {
-						Color::Cyan
+						theme::accent_color()
 					} else {
-						Color::Reset
+						theme::text_color()
 					})
-					.bg(if selected { SELECTED } else { Color::Reset });
+					.bg(if selected {
+						theme::selected_color()
+					} else {
+						theme::surface_color()
+					});
 				frame.render_widget(
 					Paragraph::new(format!(
 						"{} {}",
@@ -798,12 +801,12 @@ impl Picker {
 			frame.render_widget(
 				Paragraph::new(format!(" {text} ")).style(
 					Style::default()
-						.fg(Color::Cyan)
+						.fg(theme::accent_color())
 						.add_modifier(Modifier::BOLD)
 						.bg(if self.focus == focus {
-							SELECTED
+							theme::selected_color()
 						} else {
-							Color::Rgb(23, 28, 44)
+							theme::field_color()
 						}),
 				),
 				rect,
@@ -813,7 +816,7 @@ impl Picker {
 		if let Some(message) = self.error.as_deref().or(error) {
 			frame.render_widget(
 				Paragraph::new(format!("Error: {}", sanitize(message)))
-					.style(Style::default().fg(Color::LightRed)),
+					.style(Style::default().fg(theme::error_color())),
 				row(y + 1),
 			);
 		} else if self.paste.is_some() {
@@ -832,14 +835,18 @@ impl Picker {
 				(label.len() as u16 + 3).min(row.width - offset),
 				row.height,
 			);
-			let bg = if selected { SELECTED } else { Color::Reset };
+			let bg = if selected {
+				theme::selected_color()
+			} else {
+				theme::surface_color()
+			};
 			let line = Line::from(vec![
 				Span::styled(
 					"● ",
 					Style::default().fg(if selected {
-						Color::Cyan
+						theme::accent_color()
 					} else {
-						Color::Rgb(48, 62, 83)
+						theme::inactive_indicator_color()
 					}),
 				),
 				Span::styled(

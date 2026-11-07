@@ -128,7 +128,7 @@ def shortcut_settings_checks(binary):
 		path = Path(directory) / "tuxd" / "shortcuts.json"
 		session = Session(binary, env=env)
 		def category(index):
-			session.send("\x0cgg" + "j" * index + "\r")
+			session.send("\x0cgg" + "j" * (index + 3) + "\r")
 		def click(label):
 			for _ in range(40):
 				for y, row in enumerate(session.rows()):
@@ -170,11 +170,11 @@ def shortcut_settings_checks(binary):
 			session.send("1\x17")
 			assert "conflicts" in "\n".join(session.rows())
 			session.send("\x13")
-			assert "Shortcut Settings" in "\n".join(session.rows())
+			assert "Settings" in "\n".join(session.rows())
 			category(1)
 			session.send("\r\x1b[3~")  # return to the selected binding and unset it
 			session.send("\x1b")
-			assert "Shortcut Settings" not in "\n".join(session.rows())
+			assert "Settings" not in "\n".join(session.rows())
 			# Every opener works inside the picker and returns to its list.
 			session.send("\x0f")
 			for opener in ["\x1bOP", "\x1f", "\x1b[44;5u"]:
@@ -202,9 +202,9 @@ def shortcut_settings_checks(binary):
 			click("New document")
 			session.send("\r\x1b[3~")
 			session.send("\x1b")
-			assert "Discard unsaved shortcut changes?" in "\n".join(session.rows())
+			assert "Discard unsaved settings changes?" in "\n".join(session.rows())
 			session.send("\r")  # Keep editing is the default.
-			assert "Shortcut Settings" in "\n".join(session.rows())
+			assert "Settings" in "\n".join(session.rows())
 			session.send("\x1b")
 			session.send("\x1b[D\r")
 			assert path.read_bytes() == before
@@ -315,9 +315,9 @@ def main():
 		session.send("\x1b[1;5H")
 		session.send("\x1b[3~")  # Delete the entire combining grapheme.
 		assert session.screen.cursor.x == 7
-		# Shortcut Settings blocks edits and is dismissible.
+		# Settings blocks edits and is dismissible.
 		session.send("\x1bOP")
-		assert "Shortcut Settings" in "\n".join(session.rows())
+		assert "Settings" in "\n".join(session.rows())
 		session.paste("ignored")
 		session.send("\x1b")
 		assert "ignored" not in "\n".join(session.rows())
@@ -566,9 +566,9 @@ def main():
 			session.send("\x1b[46;5u")  # Ctrl+. hidden alias
 			assert ".hidden.tuxd.json" in "\n".join(session.rows())
 			session.send("\x1b[46;5u\x1f")  # Hide files; legacy Ctrl+/ shortcuts
-			assert "Shortcut Settings" in "\n".join(session.rows())
+			assert "Settings" in "\n".join(session.rows())
 			session.send("\x1b")  # Close settings and return to the picker
-			assert "Shortcut Settings" not in "\n".join(session.rows())
+			assert "Settings" not in "\n".join(session.rows())
 			session.send("\x06")  # Ctrl+F includes non-project files.
 			assert "other.txt" in "\n".join(session.rows())
 			session.send("\x06jggMG\r")  # Project filter; Vim navigation selects the document.

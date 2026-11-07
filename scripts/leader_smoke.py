@@ -14,7 +14,7 @@ binary = str(Path(metadata["target_directory"]) / "debug" / "terminal-ux-designe
 with tempfile.TemporaryDirectory() as directory:
 	session = Session(binary, env={"XDG_CONFIG_HOME": directory})
 	def leader():
-		session.send("\x1bOP\x0cgg\r")
+		session.send("\x1bOP\x0cggjjj\r")
 		session.send("\r")  # General opens with Leader focused; Enter records
 
 	try:

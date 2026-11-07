@@ -19,6 +19,7 @@ mod scrollbar;
 mod shortcuts;
 mod styling;
 mod terminal;
+mod theme;
 mod ui;
 
 use std::io;
@@ -33,7 +34,7 @@ fn main() -> io::Result<()> {
 	match command {
 		cli::Command::Help => {
 			println!(
-				"Terminal UX Designer\n\nUsage: terminal-ux-designer [document.tuxd.json]\n       terminal-ux-designer --raw INPUT\n       terminal-ux-designer --escaped INPUT\n\nINPUT is a file path or - for piped/redirected stdin. Import requires UTF-8, at most 16 MiB.\nImported content opens unsaved. F4 files · Ctrl+S save · Ctrl+Q quit · F1 shortcuts"
+				"Terminal UX Designer\n\nUsage: terminal-ux-designer [document.tuxd.json]\n       terminal-ux-designer --raw INPUT\n       terminal-ux-designer --escaped INPUT\n\nINPUT is a file path or - for piped/redirected stdin. Import requires UTF-8, at most 16 MiB.\nImported content opens unsaved. F4 files · Ctrl+S save · Ctrl+Q quit · F1 settings"
 			);
 			return Ok(());
 		}
@@ -81,14 +82,36 @@ fn main() -> io::Result<()> {
 			crate::document::sanitize(&error)
 		));
 	}
+	app.theme = match theme::load() {
+		Ok(theme) => theme,
+		Err(error) => {
+			let notice = format!(
+				"Theme: {}; using Midnight",
+				crate::document::sanitize(&error)
+			);
+			app.notice = Some(
+				app.notice
+					.take()
+					.map_or(notice.clone(), |old| format!("{old}; {notice}")),
+			);
+			theme::Config::default()
+		}
+	};
 	loop {
 		app.poll_clipboard();
+		let active_theme = app
+			.settings
+			.as_ref()
+			.map(|settings| settings.preview())
+			.unwrap_or_else(|| app.theme.resolve().unwrap_or_default());
 		terminal.draw(|frame| {
-			ui::draw(frame, &mut app);
-			files::draw(frame, &mut app);
-			if let Some(settings) = &mut app.settings {
-				settings.draw(frame);
-			}
+			theme::with(&active_theme, || {
+				ui::draw(frame, &mut app);
+				files::draw(frame, &mut app);
+				if let Some(settings) = &mut app.settings {
+					settings.draw(frame);
+				}
+			})
 		})?;
 		if let Some(panic) = diagnostic {
 			if panic {
