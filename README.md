@@ -203,3 +203,13 @@ Input must be UTF-8 and at most 16 MiB. Stdin is read to EOF before the UI opens
 Imports open as unsaved documents. Unsupported/malformed controls use the existing review dialog with **Import anyway** (strip and continue) and **Abort**; unrecoverable parsing errors exit before opening the UI. File imports remember their source directory; stdin imports use the working directory. Original files are unaffected.
 
 Run the CLI acceptance checks with `uv run scripts/stdin_import_smoke.py`.
+
+## Shortcut leader
+
+Shortcut Settings begins with **General**, containing Leader and Sequence Timeout. Leader is unset by default. Focus Leader and press Enter to record a key; Delete unsets it.
+
+Setting or changing Leader previews affected bindings: standalone uses of that key are unset, sequences beginning with it become symbolic `<leader>` sequences, and existing symbolic bindings follow the new key. Confirm with `y`, or cancel with Esc. When unsetting Leader, `p` preserves affected sequences by substituting its literal key; `r` removes the affected bindings. These changes only take effect after saving Settings.
+
+During shortcut capture, a leader pressed first adds one input to the capture count. Enter captures `<leader>` plus one key; `2` captures `<leader>` plus two keys, up to nine following keys. Later occurrences are literal. Conflicts are checked using resolved physical sequences and the existing context rules. Settings controls remain fixed.
+
+Validation: `uv run scripts/leader_smoke.py` exercises General navigation, capture, confirmation, explicit saving and unsetting in a PTY.

@@ -128,9 +128,9 @@ Add project/workspace support as a collection of related document files, with a 
 
 Allow styled command output to be piped into the app, for example `some_command --colors=always | tuxd`. Treat stdin as import data while opening the controlling terminal for interactive input. Reuse the ANSI import parser and malformed/unsupported-control review flow, and open the result as an unsaved document. Scope CLI mode selection, end-of-input behavior, noninteractive/no-controlling-terminal errors, and input-size handling in that iteration. Implemented with explicit `--raw INPUT` / `--escaped INPUT`, using `-` for stdin; see the [stdin import initiative](initiatives/stdin-import/overview.md).
 
-## Future work: shortcut leader and General settings
+## Shortcut leader and General settings
 
-Add an optional `<leader>` shortcut, unbound by default. Replace the standalone Sequence Timeout destination with a first category named General, containing Leader and Sequence Timeout. This is a follow-up to Slice 4a; it is not implemented yet.
+Add an optional `<leader>` shortcut, unbound by default. Replace the standalone Sequence Timeout destination with a first category named General, containing Leader and Sequence Timeout. Implemented as a follow-up to Slice 4a on `feat/shortcut-leader`.
 
 When capturing a binding, recognize the configured leader as a `<leader>` prefix. The prefix adds one press to the requested capture length rather than consuming one of the requested action inputs:
 
@@ -141,7 +141,7 @@ When capturing a binding, recognize the configured leader as a `<leader>` prefix
 
 After receiving the leader, keep capture open until the requested number of following inputs has arrived. Without a configured leader, preserve the existing capture behavior. The extra press is for the leader prefix; it must not recursively extend capture if the same key appears later in the sequence.
 
-Before implementation, settle how symbolic leader references are persisted and resolved when the leader changes or is unset, and whether the current nine-press limit allows nine following inputs plus the leader. Validate conflicts against resolved sequences using the existing context and prefix rules. For example, Ctrl+Y currently defaults to Redo, so using it as a leader in the same context requires resolving that conflict rather than silently replacing Redo. Retain fixed settings controls, text-input protection, and explicit Save behavior.
+Leader references are symbolic. Changing Leader updates symbolic bindings and offers conversion of existing literal prefixes; standalone uses of the new key are unset after confirmation. Unsetting offers literal preservation or removal of affected bindings. Capture allows nine following inputs plus the leader, and preserved literal sequences retain that full length. Validate conflicts against resolved sequences using the existing context and prefix rules. For example, Ctrl+Y currently defaults to Redo, so using it as a leader in the same context requires resolving that conflict rather than silently replacing Redo. Retain fixed settings controls, text-input protection, and explicit Save behavior.
 
 ## Near-term follow-up: component-emoji rendering
 

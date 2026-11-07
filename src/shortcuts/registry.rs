@@ -42,7 +42,7 @@ impl SettingsSection {
 	];
 	pub fn label(self) -> &'static str {
 		match self {
-			Self::Timeout => "Sequence Timeout",
+			Self::Timeout => "General",
 			Self::Workspace => "Workspace",
 			Self::Editor => "Editor",
 			Self::Code => "Code",

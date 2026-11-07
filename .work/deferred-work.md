@@ -8,7 +8,6 @@ This is the consolidated current backlog. Older slice documents describe what wa
 
 | Area | Remaining work | Decisions or prerequisites |
 | --- | --- | --- |
-| Shortcut leader | Optional unbound `<leader>`; recognize it during capture and wait for the requested following inputs; General category containing Leader and Sequence Timeout | Symbolic persistence, changes/unsetting leader, capture limit and resolved prefix conflicts |
 | Shortcut defaults | Adopt the user's preferred defaults after their keymap walkthrough | User supplies reviewed bindings |
 | Component emoji | Render composed emoji/components reliably instead of display escapes | Shared terminal/multiplexer width strategy; ZWJ, modifiers, flags, selectors, keycaps; redraw/navigation regressions |
 | Character catalogs | More curated glyphs; search by glyph, name and code point | Catalog coverage, metadata and search UI |
@@ -40,6 +39,8 @@ Application-managed font selection/installation and guaranteed terminal capabili
 
 ## Completed work removed from the backlog
 
+- Optional shortcut leader and General settings, including staged conversion/unset prompts and resolved conflict validation.
+
 - Explicit raw/escaped CLI imports from files or stdin (`--raw -`, `--escaped -`), with control review and terminal handoff.
 
 - ANSI syntax highlighting, including wrapped/scrolled Code output.
@@ -51,4 +52,4 @@ Application-managed font selection/installation and guaranteed terminal capabili
 
 ## Suggested next selection
 
-The leader/General settings follow-up has the clearest existing behavior specification. Character discovery or themes would be self-contained product improvements. Component-emoji rendering and code generation each require more investigation before implementation scope can be estimated confidently. This is sequencing advice, not an approved order.
+Character discovery or themes would be self-contained product improvements. Component-emoji rendering and code generation each require more investigation before implementation scope can be estimated confidently. This is sequencing advice, not an approved order.

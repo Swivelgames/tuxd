@@ -10,6 +10,16 @@ pub struct ShortcutKey {
 	pub modifiers: M,
 }
 impl ShortcutKey {
+	pub fn leader() -> Self {
+		Self {
+			code: KeyCode::Null,
+			modifiers: M::empty(),
+		}
+	}
+	pub fn is_leader(&self) -> bool {
+		*self == Self::leader()
+	}
+
 	pub fn new(code: KeyCode, modifiers: M) -> Self {
 		Self { code, modifiers }.normalized()
 	}
@@ -56,6 +66,9 @@ impl ShortcutKey {
 		}
 	}
 	pub fn label(&self) -> String {
+		if self.is_leader() {
+			return "<leader>".into();
+		}
 		let mut parts = Vec::new();
 		for (modifier, name) in [
 			(M::CONTROL, "Ctrl"),

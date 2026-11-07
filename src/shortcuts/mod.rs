@@ -21,6 +21,8 @@ pub type Map = Keymap<ShortcutKey, InputScope, ActionId, SettingsSection>;
 pub struct Config {
 	pub version: u32,
 	pub timeout_ms: u64,
+	#[serde(default)]
+	pub leader: Option<ShortcutKey>,
 	pub bindings: BTreeMap<ActionId, Slots>,
 }
 impl Default for Config {
@@ -28,6 +30,7 @@ impl Default for Config {
 		Self {
 			version: 2,
 			timeout_ms: 1000,
+			leader: None,
 			bindings: ACTIONS
 				.iter()
 				.map(|s| (s.id, default_slots(s.id)))
@@ -51,6 +54,33 @@ pub fn sequence_label(keys: &[ShortcutKey]) -> String {
 		.join(" ")
 }
 impl Config {
+	pub fn change_leader(&mut self, leader: Option<ShortcutKey>, remove: bool) {
+		let old = self.leader.clone();
+		for slots in self.bindings.values_mut() {
+			for slot in slots {
+				let Some(keys) = slot else {
+					continue;
+				};
+				if let Some(new) = &leader {
+					if keys.first() == Some(new) {
+						if keys.len() == 1 {
+							*slot = None;
+						} else {
+							keys[0] = ShortcutKey::leader();
+						}
+					}
+				} else if keys.first().is_some_and(ShortcutKey::is_leader) {
+					if remove {
+						*slot = None;
+					} else if let Some(old) = &old {
+						keys[0] = old.clone();
+					}
+				}
+			}
+		}
+		self.leader = leader;
+	}
+
 	pub fn build(&self) -> Result<Map, String> {
 		if self.version != 2 {
 			return Err(format!(
@@ -60,6 +90,14 @@ impl Config {
 		}
 		if !(1..=60_000).contains(&self.timeout_ms) {
 			return Err("Sequence timeout must be 1–60000 milliseconds".into());
+		}
+		if let Some(leader) = &self.leader
+			&& (leader.is_leader()
+				|| leader.opener()
+				|| leader.code == crossterm::event::KeyCode::Esc
+				|| *leader != leader.clone().normalized())
+		{
+			return Err("This key cannot be used as Leader".into());
 		}
 		let mut entries = Vec::new();
 		for spec in ACTIONS {
@@ -71,14 +109,24 @@ impl Config {
 				let Some(keys) = keys else {
 					continue;
 				};
-				if keys.is_empty() || keys.len() > 9 {
+				let symbolic = keys.first().is_some_and(ShortcutKey::is_leader);
+				if keys.iter().skip(1).any(ShortcutKey::is_leader) || (symbolic && keys.len() < 2) {
+					return Err("Leader must prefix at least one key".into());
+				}
+				if keys.is_empty() || keys.len() > 10 {
 					return Err(format!(
-						"{} slot {}: use 1–9 keys or unset",
+						"{} slot {}: use 1–10 keys or unset",
 						spec.label,
 						slot + 1
 					));
 				}
-				for key in keys {
+				let mut keys = keys.clone();
+				if symbolic {
+					keys[0] = self.leader.clone().ok_or("Leader is unset")?;
+				} else if keys.first() == self.leader.as_ref() && self.leader.is_some() {
+					return Err("Use <leader> as the dedicated prefix".into());
+				}
+				for key in &keys {
 					if *key != key.clone().normalized() {
 						return Err(format!(
 							"{} slot {}: noncanonical key {}",
@@ -327,3 +375,69 @@ impl Runtime {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod leader_tests {
+	use super::*;
+	#[test]
+	fn resolved_leader_dispatches_without_delaying_standalone_actions() {
+		let mut runtime = Runtime::default();
+		let leader = key::defaults("Ctrl+y")[0].clone();
+		runtime.config.change_leader(Some(leader.clone()), false);
+		runtime
+			.config
+			.bindings
+			.get_mut(&ActionId::FocusTools)
+			.unwrap()[0] = Some(vec![
+			ShortcutKey::leader(),
+			key::defaults("Right")[0].clone(),
+		]);
+		runtime.map = runtime.config.build().unwrap();
+		let now = Instant::now();
+		assert!(matches!(
+			runtime.dispatch(leader, InputScope::Editor, now),
+			Dispatch::Pending
+		));
+		assert!(matches!(
+			runtime.dispatch(key::defaults("Right")[0].clone(), InputScope::Editor, now),
+			Dispatch::Action(ActionId::FocusTools)
+		));
+		assert!(matches!(
+			runtime.dispatch(key::defaults("Ctrl+z")[0].clone(), InputScope::Editor, now),
+			Dispatch::Action(ActionId::Undo)
+		));
+	}
+
+	#[test]
+	fn leader_conversion_and_literal_preservation() {
+		let mut config = Config::default();
+		let key = key::defaults("Ctrl+y")[0].clone();
+		config.change_leader(Some(key.clone()), false);
+		assert!(config.bindings[&ActionId::Redo][0].is_none());
+		config.build().unwrap();
+		config.bindings.get_mut(&ActionId::Redo).unwrap()[0] =
+			Some(vec![ShortcutKey::leader(), key::defaults("g")[0].clone()]);
+		config.build().unwrap();
+		let roundtrip: Config =
+			serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+		assert_eq!(config, roundtrip);
+		config.change_leader(None, false);
+		assert_eq!(
+			config.bindings[&ActionId::Redo][0].as_ref().unwrap()[0],
+			key
+		);
+		config.build().unwrap();
+	}
+	#[test]
+	fn resolved_conflicts_and_remove() {
+		let mut config = Config::default();
+		config.change_leader(Some(key::defaults("Ctrl+y")[0].clone()), false);
+		let sequence = vec![ShortcutKey::leader(), key::defaults("g")[0].clone()];
+		config.bindings.get_mut(&ActionId::Redo).unwrap()[0] = Some(sequence.clone());
+		config.bindings.get_mut(&ActionId::Undo).unwrap()[0] = Some(sequence);
+		assert!(config.build().unwrap_err().contains("conflicts"));
+		config.change_leader(None, true);
+		assert!(config.bindings[&ActionId::Redo][0].is_none());
+		config.build().unwrap();
+	}
+}

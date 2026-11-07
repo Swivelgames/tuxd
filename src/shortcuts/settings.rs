@@ -19,6 +19,7 @@ enum Focus {
 	Binding(usize),
 	Reset,
 	Unset,
+	Leader,
 	Timeout,
 	Footer(usize),
 }
@@ -35,10 +36,12 @@ enum Hit {
 	Binding(usize),
 	Reset,
 	Unset,
+	Leader,
 	Timeout,
 	Footer(usize),
 	Discard,
 	Keep,
+	LeaderChoice(usize),
 }
 struct Capture {
 	action: ActionId,
@@ -48,6 +51,10 @@ struct Capture {
 	received: Vec<String>,
 }
 pub struct Settings {
+	leader_capture: bool,
+	leader_scroll: u16,
+	leader_choice: usize,
+	leader_change: Option<Option<ShortcutKey>>,
 	pub draft: Config,
 	original: Config,
 	category: SettingsSection,
@@ -87,6 +94,10 @@ impl Settings {
 	pub fn new(config: &Config, category: SettingsSection) -> Self {
 		let mut state = Self {
 			draft: config.clone(),
+			leader_capture: false,
+			leader_scroll: 0,
+			leader_choice: 0,
+			leader_change: None,
 			original: config.clone(),
 			category,
 			collapsed: BTreeSet::new(),
@@ -238,6 +249,39 @@ impl Settings {
 			self.validate();
 		}
 	}
+	fn request_leader(&mut self, leader: Option<ShortcutKey>) {
+		if leader == self.draft.leader {
+			return;
+		}
+		let affected = self
+			.draft
+			.bindings
+			.values()
+			.flatten()
+			.flatten()
+			.any(|keys| {
+				keys.first().is_some_and(ShortcutKey::is_leader)
+					|| (leader.is_some() && keys.first() == leader.as_ref())
+			});
+		if affected {
+			self.leader_scroll = 0;
+			self.leader_choice = if leader.is_some() { 1 } else { 2 };
+			self.leader_change = Some(leader);
+		} else {
+			self.draft.change_leader(leader, false);
+			self.validate();
+		}
+	}
+	fn choose_leader(&mut self, choice: usize) {
+		if let Some(change) = self.leader_change.take() {
+			let cancel = if change.is_some() { 1 } else { 2 };
+			if choice < cancel {
+				self.draft.change_leader(change, choice == 1);
+				self.validate();
+			}
+		}
+	}
+
 	fn activate(&mut self) -> Outcome {
 		match self.focus {
 			Focus::Categories => {
@@ -246,7 +290,7 @@ impl Settings {
 				} else {
 					self.selector_open = false;
 					self.focus = if self.category == SettingsSection::Timeout {
-						Focus::Timeout
+						Focus::Leader
 					} else {
 						Focus::List
 					};
@@ -263,6 +307,9 @@ impl Settings {
 			}
 			Focus::Reset => self.reset(false),
 			Focus::Unset => self.reset(true),
+			Focus::Leader => {
+				self.leader_capture = true;
+			}
 			Focus::Timeout => {
 				self.timeout = Some(self.draft.timeout_ms.to_string());
 				self.replace_timeout = true;
@@ -285,6 +332,7 @@ impl Settings {
 	fn cycle_focus(&mut self, back: bool) {
 		let mut fields = vec![Focus::Categories];
 		if self.category == SettingsSection::Timeout {
+			fields.push(Focus::Leader);
 			fields.push(Focus::Timeout);
 		} else {
 			fields.push(Focus::List);
@@ -329,7 +377,7 @@ impl Settings {
 				if right {
 					self.selector_open = false;
 					self.focus = if self.category == SettingsSection::Timeout {
-						Focus::Timeout
+						Focus::Leader
 					} else {
 						Focus::List
 					};
@@ -412,9 +460,20 @@ impl Settings {
 					self.focus = Focus::Footer(1);
 				}
 			}
-			Focus::Timeout => {
+			Focus::Leader => {
 				if left || up {
 					self.focus = Focus::Categories;
+				}
+				if down {
+					self.focus = Focus::Timeout;
+				}
+			}
+			Focus::Timeout => {
+				if left {
+					self.focus = Focus::Categories;
+				}
+				if up {
+					self.focus = Focus::Leader;
 				}
 				if down {
 					self.focus = Focus::Footer(1);
@@ -429,7 +488,7 @@ impl Settings {
 				}
 				if up {
 					self.focus = if self.category == SettingsSection::Timeout {
-						Focus::Timeout
+						Focus::Leader
 					} else {
 						Focus::List
 					};
@@ -438,12 +497,87 @@ impl Settings {
 		}
 	}
 	pub fn event(&mut self, event: Event) -> Outcome {
+		if self.leader_change.is_some()
+			&& let Event::Mouse(mouse) = event
+		{
+			if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+				let hit = self
+					.hits
+					.iter()
+					.find(|(area, _)| area.contains((mouse.column, mouse.row).into()))
+					.map(|(_, hit)| *hit);
+				if let Some(Hit::LeaderChoice(choice)) = hit {
+					self.choose_leader(choice);
+				}
+			}
+			return Outcome::Keep;
+		}
+		if !matches!(event, Event::Key(_)) && (self.leader_capture || self.leader_change.is_some())
+		{
+			return Outcome::Keep;
+		}
 		if let Event::Key(key) = event {
 			if key.kind == KeyEventKind::Release {
 				return Outcome::Keep;
 			}
 			let decoded = ShortcutKey::from(key);
+			if let Some(change) = self.leader_change.clone() {
+				let count = if change.is_some() { 2 } else { 3 };
+				match decoded.code {
+					KeyCode::Left | KeyCode::BackTab | KeyCode::Char('h') => {
+						self.leader_choice = (self.leader_choice + count - 1) % count
+					}
+					KeyCode::Right | KeyCode::Tab | KeyCode::Char('l') => {
+						self.leader_choice = (self.leader_choice + 1) % count
+					}
+					KeyCode::Enter => self.choose_leader(self.leader_choice),
+					KeyCode::Down | KeyCode::Char('j') => {
+						self.leader_scroll = self.leader_scroll.saturating_add(1)
+					}
+					KeyCode::Up | KeyCode::Char('k') => {
+						self.leader_scroll = self.leader_scroll.saturating_sub(1)
+					}
+					KeyCode::Esc | KeyCode::Char('c') => self.leader_change = None,
+					KeyCode::Char('y') if change.is_some() => {
+						self.draft.change_leader(change, false);
+						self.leader_change = None;
+						self.validate();
+					}
+					KeyCode::Char('p' | 'r') if change.is_none() => {
+						self.draft
+							.change_leader(None, decoded.code == KeyCode::Char('r'));
+						self.leader_change = None;
+						self.validate();
+					}
+					_ => (),
+				}
+				return Outcome::Keep;
+			}
+			if self.leader_capture {
+				if key.kind != KeyEventKind::Press {
+					return Outcome::Keep;
+				}
+				self.leader_capture = false;
+				if decoded.code != KeyCode::Esc {
+					if decoded.opener() || decoded.is_leader() {
+						self.error = Some("This key is reserved".into());
+					} else {
+						self.request_leader(Some(decoded));
+					}
+				}
+				return Outcome::Keep;
+			}
+			if self.focus == Focus::Leader && decoded.code == KeyCode::Delete {
+				if self.draft.leader.is_some() {
+					self.request_leader(None);
+				}
+				return Outcome::Keep;
+			}
+
 			if let Some(capture) = &mut self.capture {
+				if decoded.is_leader() {
+					return Outcome::Keep;
+				}
 				if key.kind != KeyEventKind::Press {
 					return Outcome::Keep;
 				}
@@ -459,7 +593,12 @@ impl Settings {
 					}
 					.label(),
 				);
-				capture.keys.push(decoded);
+				if capture.keys.is_empty() && self.draft.leader.as_ref() == Some(&decoded) {
+					capture.keys.push(ShortcutKey::leader());
+					capture.count += 1;
+				} else {
+					capture.keys.push(decoded);
+				}
 				if capture.keys.len() == capture.count {
 					let capture = self.capture.take().unwrap();
 					let label = sequence_label(&capture.keys);
@@ -606,7 +745,7 @@ impl Settings {
 								self.switch_category(cat);
 								self.selector_open = false;
 								self.focus = if cat == SettingsSection::Timeout {
-									Focus::Timeout
+									Focus::Leader
 								} else {
 									Focus::List
 								};
@@ -634,6 +773,10 @@ impl Settings {
 							Hit::Unset => {
 								self.focus = Focus::Unset;
 								self.reset(true);
+							}
+							Hit::Leader => {
+								self.focus = Focus::Leader;
+								return self.activate();
 							}
 							Hit::Timeout => {
 								self.focus = Focus::Timeout;
@@ -742,6 +885,73 @@ mod tests {
 		settings.slot = slot;
 		settings.focus = Focus::Binding(slot);
 	}
+	#[test]
+	fn general_navigation_and_unaffected_leader_need_no_confirmation() {
+		let mut settings = Settings::new(&Config::default(), SettingsSection::Timeout);
+		settings.focus = Focus::Categories;
+		settings.event(event("Right"));
+		assert_eq!(settings.focus, Focus::Leader);
+		settings.event(event("Down"));
+		assert_eq!(settings.focus, Focus::Timeout);
+		settings.event(event("Up"));
+		assert_eq!(settings.focus, Focus::Leader);
+		settings.event(event("Enter"));
+		settings.event(event("F12"));
+		assert!(settings.leader_change.is_none());
+		assert_eq!(
+			settings.draft.leader,
+			Some(super::super::key::defaults("F12")[0].clone())
+		);
+		settings.event(event("Delete"));
+		assert!(settings.leader_change.is_none());
+		assert!(settings.draft.leader.is_none());
+		settings.event(event("Enter"));
+		settings.event(event("Ctrl+y"));
+		assert!(settings.leader_change.is_some());
+		settings.event(event("Enter")); // Cancel is the default.
+		assert!(settings.draft.leader.is_none());
+	}
+
+	#[test]
+	fn leader_capture_extends_count_and_changes_are_staged() {
+		let mut settings = Settings::new(&Config::default(), SettingsSection::Timeout);
+		settings.focus = Focus::Leader;
+		settings.event(event("Enter"));
+		settings.event(event("Ctrl+y"));
+		assert!(settings.draft.leader.is_none());
+		settings.event(event("y"));
+		assert!(settings.draft.leader.is_some());
+		assert!(settings.original.leader.is_none());
+		select(&mut settings, ActionId::FocusTools, 0);
+		settings.event(event("2"));
+		settings.event(event("Ctrl+y"));
+		settings.event(event("g"));
+		assert!(settings.capture.is_some());
+		settings.event(event("g"));
+		assert!(settings.capture.is_none());
+		assert_eq!(
+			sequence_label(
+				settings.draft.bindings[&ActionId::FocusTools][0]
+					.as_ref()
+					.unwrap()
+			),
+			"<leader> g g"
+		);
+		settings.focus = Focus::Leader;
+		settings.event(event("Delete"));
+		settings.event(event("p"));
+		assert!(settings.draft.leader.is_none());
+		assert_eq!(
+			sequence_label(
+				settings.draft.bindings[&ActionId::FocusTools][0]
+					.as_ref()
+					.unwrap()
+			),
+			"Ctrl+Y g g"
+		);
+		settings.draft.build().unwrap();
+	}
+
 	#[test]
 	fn capture_is_counted_ignores_repeat_release_and_can_cancel() {
 		let mut settings = Settings::new(&Config::default(), SettingsSection::Editor);
@@ -943,7 +1153,7 @@ mod tests {
 		assert_eq!(
 			SettingsSection::ALL.map(SettingsSection::label),
 			[
-				"Sequence Timeout",
+				"General",
 				"Workspace",
 				"Editor",
 				"Code",
@@ -1010,10 +1220,10 @@ mod tests {
 				terminal.draw(|frame| settings.draw(frame)).unwrap();
 				assert_eq!(settings.category, SettingsSection::Timeout);
 				settings.event(event("Enter"));
-				assert_eq!(settings.focus, Focus::Timeout);
+				assert_eq!(settings.focus, Focus::Leader);
 				settings.event(event("Enter"));
 				settings.event(event("Esc"));
-				assert!(settings.timeout.is_none());
+				assert!(!settings.leader_capture);
 				settings.switch_category(SettingsSection::Editor);
 				settings.focus = Focus::List;
 			}
