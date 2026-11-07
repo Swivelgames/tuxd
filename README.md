@@ -130,7 +130,7 @@ The action list shows compact binding summaries. Selecting an action opens its d
 
 The four shared-control subsections in Workspace configure activation/submission, field navigation, text-field editing/clipboard, and range adjustment once. Tab visits each radio group, tab strip, and grid as one field, remembering its highlighted item. Left/Right selects radios and tabs immediately; grid arrows move the highlight and Enter/Space applies the swatch or inserts the character. Home/End operate within the focused control. RGB range adjustments remain staged until Apply or Submit. Editor movement, selection, literal-tab Indent, and Code scrolling remain independent.
 
-Shared Copy copies all escaped ANSI from Code or selected text from a path/RGB field. Select all selects a field for copying or replacement; Paste reads the clipboard into the targeted path/RGB field. Editor selection clipboard operations remain a future feature; terminal bracketed paste continues to work.
+Shared Copy copies the editor selection as escaped ANSI, the full escaped output from Code, or selected text from a path/RGB field. Select all and Paste also apply to the Editor. Editor Cut, Paste without formatting, and Paste literal text are described below.
 
 Complete bindings execute immediately. Proper sequence prefixes wait for the next input. Esc, an unmatched continuation, timeout, focus/context changes, or opening/closing a dialog cancel a pending sequence; buffered keys never become document text. A short pending indicator appears only while waiting. Both exact conflicts and ambiguous prefixes are rejected in overlapping contexts. Bare printable bindings/prefixes are prohibited in editable text contexts, while explorer letter navigation remains configurable. The fixed settings openers cannot be assigned to other actions.
 
@@ -164,7 +164,7 @@ Malformed or unsupported controls open **Unsupported ANSI Sequences** with a num
 
 **Raw ANSI export** writes actual escape bytes, original newlines/tabs, and a final style reset. **Escaped ANSI export** writes exactly the Code clipboard payload, without display-only line breaks. Export leaves the document path and dirty state unchanged. It is also the fallback when desktop clipboard helpers are unavailable.
 
-Automatic styled clipboard paste, stdin import, workspaces/multiple open files, autosave/recovery, and character search remain future work.
+Stdin import, workspaces/multiple open files, autosave/recovery, and character search remain future work.
 
 The compact unsaved-changes prompt defaults to **Cancel**. Use Tab/Shift+Tab or arrows to select Save, Discard, or Cancel, then Enter; mouse clicks and the existing S/D/C shortcuts also work.
 
@@ -183,3 +183,7 @@ Run `python3 scripts/alacritty_smoke.py` for real Alacritty rendering/input chec
 Composed Unicode sequences with inconsistent terminal widths (including joined emoji and flags) currently use a display-only `\u{…}` fallback in Editor, Code, and import previews. Accents, CJK and ordinary single emoji continue to render normally. Editing still treats each original grapheme as one unit; save/export and Code copying preserve the original characters. A fallback too wide for a wrapped row is abbreviated with `…`. Component-emoji rendering is planned.
 
 The Code pane highlights ANSI sequence boundaries in cyan, parameters in yellow, resets in bold magenta, separators in dark gray, and newline/tab escapes in blue. Ordinary text stays in the default color; literal escape-like text is not treated as an ANSI command. These colors are display metadata and do not affect clipboard or exported content.
+
+Editor selection clipboard: Ctrl+C copies styled escaped ANSI, Ctrl+X cuts after successful clipboard forwarding, Ctrl+V pastes plain or styled text, and Ctrl+A selects all. Terminal paste uses the same ANSI detection. Unsupported controls open a Strip and paste / Abort review. Cut and paste are undoable. Clipboard failures or editor changes while an operation is pending preserve the current document.
+
+Bind **Paste without formatting** or **Paste literal text** under Workspace → Text Fields in Shortcut Settings (both start unbound). The former decodes ANSI but uses the current typing style; the latter preserves literal escape notation. Style-only paste is still deferred. Remote clipboard reads are not provided; use terminal-side paste over SSH.

@@ -1,6 +1,6 @@
 # Slice 6 — ANSI syntax highlighting
 
-Status: Implemented — verification passed; user review pending
+Status: Complete — verified, accepted and squash-merged
 
 Depends on: [Slice 5](slice-05-compatibility-and-hardening.md)
 

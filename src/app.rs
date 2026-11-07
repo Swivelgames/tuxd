@@ -5,12 +5,12 @@ use std::time::Instant;
 use crossterm::event::{Event, KeyEventKind, MouseButton, MouseEventKind};
 use ratatui::layout::Rect;
 
-use crate::{
-	document::sanitize,
-	editor::{EditKind, Editor, Movement},
-};
+use crate::editor::{EditKind, Editor, Movement};
 
 pub struct App {
+	pub cut_target: Option<crate::editor_clipboard::Target>,
+	pub editor_paste: Option<crate::editor_clipboard::PendingPaste>,
+	pub paste_review: Option<crate::editor_clipboard::PasteReview>,
 	pub editor_open: bool,
 	pub slim: bool,
 	pub slim_tab: usize,
@@ -25,7 +25,8 @@ pub struct App {
 	pub editor_wrap_toggle: Rect,
 	pub code_wrap_toggle: Rect,
 	pub notice: Option<String>,
-	clipboard_result: Option<std::sync::mpsc::Receiver<Result<crate::clipboard::Copied, String>>>,
+	pub(crate) clipboard_result:
+		Option<std::sync::mpsc::Receiver<Result<crate::clipboard::Copied, String>>>,
 	copy_ansi: bool,
 	rgb_paste: Option<(usize, std::sync::mpsc::Receiver<Result<String, String>>)>,
 	pub focus: usize,
@@ -51,6 +52,9 @@ impl Default for App {
 		let mut editor = Editor::default();
 		editor.wrap = true;
 		Self {
+			cut_target: None,
+			editor_paste: None,
+			paste_review: None,
 			editor_open: true,
 			slim: false,
 			slim_tab: 0,
@@ -99,20 +103,19 @@ impl App {
 		if let Some(receiver) = &self.clipboard_result {
 			match receiver.try_recv() {
 				Ok(result) => {
-					self.notice = Some(
-						result
-							.and_then(|copied| crate::clipboard::finish(copied, self.copy_ansi))
-							.unwrap_or_else(|error| error),
-					);
+					let result =
+						result.and_then(|copied| crate::clipboard::finish(copied, self.copy_ansi));
+					self.finish_editor_copy(result);
 					self.clipboard_result = None;
 				}
 				Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-					self.notice = Some("Clipboard copy failed".into());
+					self.finish_editor_copy(Err("Clipboard copy failed".into()));
 					self.clipboard_result = None;
 				}
 				Err(std::sync::mpsc::TryRecvError::Empty) => (),
 			}
 		}
+		let editor_pasted = self.poll_editor_paste();
 		let mut pasted = false;
 		if let Some((field, receiver)) = &self.rgb_paste {
 			let field = *field;
@@ -135,13 +138,13 @@ impl App {
 		if pasted {
 			self.rgb_paste = None;
 		}
-		pasted || path_updated || (was_pending && self.clipboard_result.is_none())
+		editor_pasted || pasted || path_updated || (was_pending && self.clipboard_result.is_none())
 	}
 
 	fn copy_code(&mut self) {
 		self.copy_text(crate::styling::clipboard_text(&self.editor.document), true);
 	}
-	fn copy_text(&mut self, text: String, ansi: bool) {
+	pub(crate) fn copy_text(&mut self, text: String, ansi: bool) {
 		if self.clipboard_result.is_some() {
 			return;
 		}
@@ -324,7 +327,27 @@ impl App {
 				}
 				self.editor.break_group();
 			}
+			A::Cut => self.copy_selection(true),
+			A::Paste | A::PastePlain | A::PasteLiteral
+				if self.focus == 0 && self.files.dialog.is_none() =>
+			{
+				use crate::editor_clipboard::PasteMode;
+				self.request_editor_paste(match action {
+					A::PastePlain => PasteMode::Plain,
+					A::PasteLiteral => PasteMode::Literal,
+					_ => PasteMode::Styled,
+				});
+			}
+			A::SelectAll if self.focus == 0 && self.files.dialog.is_none() => {
+				self.editor.navigate(Movement::Start, false);
+				self.editor.navigate(Movement::Finish, true);
+			}
 			A::Copy => {
+				if self.focus == 0 && self.files.dialog.is_none() {
+					self.copy_selection(false);
+					return;
+				}
+
 				if self.focus == 2 && self.files.dialog.is_none() {
 					self.copy_code();
 				} else if let Some(crate::files::Dialog::Path { picker, .. }) = &self.files.dialog {
@@ -849,8 +872,7 @@ impl App {
 						}
 					}
 					Event::Paste(text) if self.focus == 0 => {
-						self.editor
-							.insert(&sanitize(&text), EditKind::Atomic, Instant::now())
+						self.paste_editor_text(&text, crate::editor_clipboard::PasteMode::Styled)
 					}
 					Event::Mouse(mouse) => self.mouse(mouse),
 					Event::Resize(_, _) | Event::FocusLost => self.editor.break_group(),

@@ -328,9 +328,12 @@ catalogue! {
 	RangeMinimum, "Minimum", Workspace, Some(Subsection::RangeControls), 34, &[Channel], ["Home", "", ""];
 	RangeMaximum, "Maximum", Workspace, Some(Subsection::RangeControls), 35, &[Channel], ["End", "", ""];
 	FieldDeleteBefore, "Backspace", Workspace, Some(Subsection::TextFields), 50, TEXT_FIELDS, ["Backspace", "", ""];
-	Copy, "Copy", Workspace, Some(Subsection::TextFields), 60, &[Code, Location, Filename, Hex, Channel], ["Ctrl+c", "", ""];
-	Paste, "Paste", Workspace, Some(Subsection::TextFields), 61, &[Explorer, Location, Filename, Format, FileButtons, Hex, Channel], ["Ctrl+v", "", ""];
-	SelectAll, "Select all", Workspace, Some(Subsection::TextFields), 62, TEXT_FIELDS, ["Ctrl+a", "", ""];
+	Copy, "Copy", Workspace, Some(Subsection::TextFields), 60, &[Editor, Code, Location, Filename, Hex, Channel], ["Ctrl+c", "", ""];
+	Paste, "Paste", Workspace, Some(Subsection::TextFields), 61, &[Editor, Explorer, Location, Filename, Format, FileButtons, Hex, Channel], ["Ctrl+v", "", ""];
+	Cut, "Cut", Workspace, Some(Subsection::TextFields), 63, &[Editor], ["Ctrl+x", "", ""];
+	PastePlain, "Paste without formatting", Workspace, Some(Subsection::TextFields), 64, &[Editor], ["", "", ""];
+	PasteLiteral, "Paste literal text", Workspace, Some(Subsection::TextFields), 65, &[Editor], ["", "", ""];
+	SelectAll, "Select all", Workspace, Some(Subsection::TextFields), 62, &[Editor, Location, Filename, Hex, Channel], ["Ctrl+a", "", ""];
 }
 pub fn category_actions(section: SettingsSection) -> Vec<&'static ActionSpec> {
 	let mut specs: Vec<_> = ACTIONS.iter().filter(|s| s.section == section).collect();
@@ -392,8 +395,11 @@ impl ActionId {
 	pub fn description(self) -> String {
 		use ActionId::*;
 		match self {
-			Copy => "Copy selected field text, or the entire escaped ANSI output in Code. Editor selection copy is not yet available.".into(),
-			Paste => "Paste clipboard text into a path or RGB field. In the explorer list, paste fills File/path.".into(),
+			Cut => "Copy the Editor selection as escaped ANSI, then delete after successful forwarding. Undo restores the cut.".into(),
+			PastePlain => "Decode ANSI and paste its text using the current typing style.".into(),
+			PasteLiteral => "Paste clipboard text literally without decoding ANSI escape notation.".into(),
+			Copy => "Copy selected field text, or the entire escaped ANSI output in Code. Editor selections are copied as escaped ANSI.".into(),
+			Paste => "Paste plain or styled ANSI text into the Editor, or text into a path or RGB field. In the explorer list, paste fills File/path.".into(),
 			SelectAll => "Select the focused field's contents for copying or replacement.".into(),
 			NextField | PreviousField => "Move focus between fields. Radios, tabs, and grids are each one focus stop.".into(),
 			FieldLeft | FieldRight | FieldUp | FieldDown => "Navigate the focused control. Radios/tabs select immediately; grids move the highlight without applying it.".into(),

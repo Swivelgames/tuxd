@@ -29,7 +29,7 @@ text = "escaped \\x1b[31m 界 " + "long payload " * 800
 expected = ("\\x1b[0m" + text.replace("\\", "\\\\") + "\\x1b[0m").encode()
 
 def exercise(session):
-	session.paste(text)
+	session.paste(expected.decode())
 	session.send("\x1b[17~\x1b[17~")
 	before = len(session.output)
 	session.send("\x03")

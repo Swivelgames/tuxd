@@ -39,6 +39,7 @@ pub enum Movement {
 
 #[derive(Default)]
 pub struct Editor {
+	pub revision: u64,
 	pub wrap: bool,
 	pub anchor: Option<Position>,
 	pub pending: Option<crate::styling::TextStyle>,
@@ -181,6 +182,7 @@ impl Editor {
 	}
 
 	fn begin_edit(&mut self, kind: EditKind, now: Instant) {
+		self.revision = self.revision.wrapping_add(1);
 		let grouped = kind != EditKind::Atomic
 			&& self.group.is_some_and(|(previous, at)| {
 				previous == kind && now.saturating_duration_since(at) < GROUP_PAUSE
@@ -232,6 +234,49 @@ impl Editor {
 		self.ensure_visible();
 	}
 
+	pub fn selected_document(&self) -> Option<Document> {
+		let (start, end) = self.selection()?;
+		let a = self.document.offset(start);
+		let b = self.document.offset(end);
+		let text = self.document.lines.join("\n");
+		let mut result = Document {
+			lines: text[a..b].split('\n').map(str::to_owned).collect(),
+			styles: Default::default(),
+		};
+		for run in &self.document.styles.runs {
+			if run.start < b && run.end > a {
+				result
+					.styles
+					.push(run.start.max(a) - a, run.end.min(b) - a, run.style);
+			}
+		}
+		Some(result)
+	}
+
+	pub fn paste_document(&mut self, document: &Document, formatted: bool) {
+		let text = document.lines.join("\n");
+		if text.is_empty() {
+			return;
+		}
+		let typing = self.typing_style();
+		let start = self.selection().map_or(self.cursor, |(start, _)| start);
+		let offset = self.document.offset(start);
+		self.insert(&text, EditKind::Atomic, Instant::now());
+		if formatted {
+			for run in &document.styles.runs {
+				self.document
+					.styles
+					.apply(offset + run.start, offset + run.end, |_| run.style);
+			}
+		} else {
+			self.document
+				.styles
+				.apply(offset, offset + text.len(), |_| typing);
+		}
+		self.document.normalize_styles();
+		self.pending = Some(typing);
+	}
+
 	pub fn delete(&mut self, backwards: bool, now: Instant) {
 		let (start, end) = if let Some(range) = self.selection() {
 			range
@@ -268,6 +313,7 @@ impl Editor {
 			self.undo.pop()
 		};
 		if let Some(snapshot) = snapshot {
+			self.revision = self.revision.wrapping_add(1);
 			let current = self.snapshot();
 			if redo {
 				self.undo.push(current);

@@ -4,6 +4,7 @@ mod clipboard;
 mod code_highlight;
 mod document;
 mod editor;
+mod editor_clipboard;
 mod file_picker;
 mod files;
 #[cfg(test)]

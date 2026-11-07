@@ -1,6 +1,6 @@
 # MVP initiative
 
-Status: MVP implementation complete — Slices 1–5 accepted; Slice 6 is follow-on work
+Status: MVP implementation complete — Slices 1–6 accepted
 
 ## Outcome
 

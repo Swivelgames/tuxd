@@ -127,6 +127,9 @@ impl App {
 	}
 
 	pub fn load_document(&mut self, document: Document, path: Option<PathBuf>, imported: bool) {
+		self.cut_target = None;
+		self.editor_paste = None;
+		self.paste_review = None;
 		self.editor_open = true;
 		self.files.saved = if imported {
 			None
@@ -158,7 +161,7 @@ impl App {
 	pub fn open_file_menu(&mut self) {
 		self.file_dialog(Dialog::Menu { index: 0 });
 	}
-	fn file_dialog(&mut self, dialog: Dialog) {
+	pub(crate) fn file_dialog(&mut self, dialog: Dialog) {
 		self.shortcuts.cancel();
 		self.files.dialog = Some(dialog);
 		self.files.choice = if matches!(self.files.dialog, Some(Dialog::Dirty)) {
@@ -177,6 +180,7 @@ impl App {
 		self.editor.break_group();
 	}
 	fn cancel_file(&mut self) {
+		self.paste_review = None;
 		self.shortcuts.cancel();
 		self.files.dialog = None;
 		self.files.pending = None;
@@ -399,6 +403,9 @@ impl App {
 				}
 			}
 			Dialog::Review(import) => {
+				if self.finish_paste_review(&import.document, choice == 0) {
+					return;
+				}
 				if choice == 0 {
 					self.replace_or_prompt(Pending::Replace {
 						document: import.document,

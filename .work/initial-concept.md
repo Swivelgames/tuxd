@@ -57,7 +57,7 @@ This depicts the intended direction; controls appear as their slices become func
 
 The tools panel offers bold, italic, underline, strike-through, dim, and clear formatting; foreground/background selection; ANSI 8/16, indexed 256, and 24-bit RGB colors; and box, block, and Nerd glyph categories. RGB starts with hex and numeric component entry.
 
-The initial code drawer displays escaped ANSI as read-only text. Each document newline is shown as a visible `\n` followed by a real display line break; tabs are shown as `\t`. ANSI file export will write actual escape bytes. Ctrl+C in the code pane copies escaped ANSI without presentation-only newlines or gutters. Later work adds ANSI token highlighting, sequence explanations, and language-specific string generation, starting with Rust.
+The initial code drawer displays escaped ANSI as read-only text. Each document newline is shown as a visible `\n` followed by a real display line break; tabs are shown as `\t`. ANSI file export will write actual escape bytes. Ctrl+C in the code pane copies escaped ANSI without presentation-only newlines or gutters. ANSI token highlighting is implemented. Sequence explanations remain deferred; language/framework generation belongs to the separate code generation discovery initiative, with initial targets to be chosen.
 
 Each `.tuxd.json` document file preserves one document’s editable text and styles. Generated ANSI is an output, not the editable source of truth. Slice 4 includes explicit Raw/Escaped ANSI file import for supported styled text. Full terminal screen reconstruction and bidirectional code editing remain outside the MVP.
 
@@ -116,7 +116,7 @@ See the [MVP initiative](initiatives/mvp/overview.md) and [slice breakdown](init
 - Expand the curated character catalogs and add character search by glyph, name, and code point.
 - Copy/paste styles independently of text, applying them to a selection or the pending typing style with normal undo behavior.
 
-These are follow-up enhancements. Slice 4 remains focused on persistence and export; existing whole-Code clipboard copying remains available.
+Editor selection copy/cut and styled/literal/plain paste are implemented in the [clipboard editing initiative](initiatives/clipboard-editing/overview.md). Expanded/searchable characters and style-only copy/paste remain deferred.
 
 
 ## Future work: workspaces and multiple documents

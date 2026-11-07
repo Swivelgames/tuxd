@@ -305,7 +305,7 @@ def main():
 		assert session.row(2)[7:11] == "!Xab"
 		# Undo all edits back to an empty document, then test an atomic paste.
 		session.send("\x1a" * 8)
-		session.paste("e\u0301\t界👩‍💻\r\nsecond\rthird\x1b[31m")
+		session.paste("e\u0301\t界👩‍💻\r\nsecond\rthird\\u{1b}[31m")
 		assert session.row(3)[7:13] == "second"
 		assert "third\\u{1b}[31m" in session.row(4)
 		session.send("\x1a")

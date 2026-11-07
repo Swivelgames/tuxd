@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Review {
+	clipboard: bool,
 	path: PathBuf,
 	top: [usize; 2],
 	areas: [Rect; 2],
@@ -31,11 +32,17 @@ impl Default for Review {
 	}
 }
 impl Review {
+	pub fn clipboard() -> Self {
+		let mut review = Self::new(PathBuf::from("Clipboard"));
+		review.clipboard = true;
+		review
+	}
 	pub fn source_path(&self) -> &std::path::Path {
 		&self.path
 	}
 	pub fn new(path: PathBuf) -> Self {
 		Self {
+			clipboard: false,
 			path,
 			top: [0; 2],
 			areas: [Rect::default(); 2],
@@ -205,7 +212,11 @@ impl Review {
 			row(if screen.height < 18 { 0 } else { 1 }),
 		);
 		frame.render_widget(
-			Paragraph::new("The original file will be unaffected."),
+			Paragraph::new(if self.clipboard {
+				"The clipboard will be unaffected."
+			} else {
+				"The original file will be unaffected."
+			}),
 			row(3),
 		);
 		let preview = Rect::new(
@@ -363,7 +374,17 @@ impl Review {
 		}
 		let button_y = inner.bottom() - 1;
 		let mut x = inner.right().saturating_sub(26).max(inner.x);
-		for (i, label) in ["Import anyway", "Abort"].iter().enumerate() {
+		for (i, label) in [
+			if self.clipboard {
+				"Strip and paste"
+			} else {
+				"Import anyway"
+			},
+			"Abort",
+		]
+		.iter()
+		.enumerate()
+		{
 			let rect = Rect::new(
 				x,
 				button_y,
