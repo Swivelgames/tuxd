@@ -14,7 +14,6 @@ This is the consolidated current backlog. Older slice documents describe what wa
 | Character catalogs | More curated glyphs; search by glyph, name and code point | Catalog coverage, metadata and search UI |
 | Themes | User-selectable/customizable application appearance, including gutters, selections, borders and controls | Configuration, presets and persistence; independent from document styles |
 | Style-only clipboard | Copy/paste formatting without text, targeting selection or pending typing style, with undo | Representation, mixed selection behavior and clipboard compatibility |
-| Stdin import | `some_command --colors=always \| tuxd`; reuse supported ANSI import/review and open an unsaved document | Controlling-terminal input, CLI selection, EOF, size limits and noninteractive errors |
 | Workspaces | Related files, left explorer and multiple open document tabs | Per-document undo/dirty state, switching, save/close rules and workspace metadata |
 | Proper Vim mode | Modal editing, composable operators/motions, counts and coherent undo | Registers, visual selection, repeat/search and compatibility contract |
 | ANSI explanations | Readable descriptions of sequences and their styling effect | Interaction/accessibility without obscuring Code output |
@@ -40,6 +39,8 @@ These appear in limits or scope notes. They are not automatically approved imple
 Application-managed font selection/installation and guaranteed terminal capabilities are platform constraints, not scheduled features. Remote clipboard querying is not provided; SSH users currently paste through their terminal. No remote-read implementation has been committed to.
 
 ## Completed work removed from the backlog
+
+- Explicit raw/escaped CLI imports from files or stdin (`--raw -`, `--escaped -`), with control review and terminal handoff.
 
 - ANSI syntax highlighting, including wrapped/scrolled Code output.
 - Editor styled-selection copy/cut and automatic raw/escaped ANSI paste.

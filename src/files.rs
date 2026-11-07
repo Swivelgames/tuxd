@@ -409,7 +409,7 @@ impl App {
 				if choice == 0 {
 					self.replace_or_prompt(Pending::Replace {
 						document: import.document,
-						path: Some(self.files.review.source_path().to_path_buf()),
+						path: self.files.review.source_origin(),
 						imported: true,
 					});
 				} else {

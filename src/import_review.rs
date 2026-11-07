@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Review {
+	stdin: bool,
 	clipboard: bool,
 	path: PathBuf,
 	top: [usize; 2],
@@ -32,16 +33,27 @@ impl Default for Review {
 	}
 }
 impl Review {
+	pub fn stdin() -> Self {
+		let mut review = Self::new(PathBuf::from("Standard input"));
+		review.stdin = true;
+		review
+	}
+	pub fn source_origin(&self) -> Option<PathBuf> {
+		if self.stdin {
+			None
+		} else {
+			Some(self.path.clone())
+		}
+	}
+
 	pub fn clipboard() -> Self {
 		let mut review = Self::new(PathBuf::from("Clipboard"));
 		review.clipboard = true;
 		review
 	}
-	pub fn source_path(&self) -> &std::path::Path {
-		&self.path
-	}
 	pub fn new(path: PathBuf) -> Self {
 		Self {
+			stdin: false,
 			clipboard: false,
 			path,
 			top: [0; 2],
@@ -215,7 +227,11 @@ impl Review {
 			Paragraph::new(if self.clipboard {
 				"The clipboard will be unaffected."
 			} else {
-				"The original file will be unaffected."
+				if self.stdin {
+					"Imported content will open as an unsaved document."
+				} else {
+					"The original file will be unaffected."
+				}
 			}),
 			row(3),
 		);

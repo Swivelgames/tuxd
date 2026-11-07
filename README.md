@@ -187,3 +187,19 @@ The Code pane highlights ANSI sequence boundaries in cyan, parameters in yellow,
 Editor selection clipboard: Ctrl+C copies styled escaped ANSI, Ctrl+X cuts after successful clipboard forwarding, Ctrl+V pastes plain or styled text, and Ctrl+A selects all. Terminal paste uses the same ANSI detection. Unsupported controls open a Strip and paste / Abort review. Cut and paste are undoable. Clipboard failures or editor changes while an operation is pending preserve the current document.
 
 Bind **Paste without formatting** or **Paste literal text** under Workspace → Text Fields in Shortcut Settings (both start unbound). The former decodes ANSI but uses the current typing style; the latter preserves literal escape notation. Style-only paste is still deferred. Remote clipboard reads are not provided; use terminal-side paste over SSH.
+
+## CLI ANSI import
+
+Use `--raw INPUT` for actual ANSI escape bytes or `--escaped INPUT` for literal escape notation. `INPUT` accepts a file path or `-` for stdin:
+
+```sh
+printf '\033[31mRed\033[0m\n' | cargo run --locked -- --raw -
+printf '%s' '\x1b[31mRed\x1b[0m\n' | cargo run --locked -- --escaped -
+cargo run --locked -- --escaped examples/import-review.txt
+```
+
+Input must be UTF-8 and at most 16 MiB. Stdin is read to EOF before the UI opens; keyboard input then uses the controlling terminal. Interactive stdout and a controlling terminal are required. Bare `-` is rejected: choose the format explicitly. Empty input is valid.
+
+Imports open as unsaved documents. Unsupported/malformed controls use the existing review dialog with **Import anyway** (strip and continue) and **Abort**; unrecoverable parsing errors exit before opening the UI. File imports remember their source directory; stdin imports use the working directory. Original files are unaffected.
+
+Run the CLI acceptance checks with `uv run scripts/stdin_import_smoke.py`.

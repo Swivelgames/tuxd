@@ -124,9 +124,9 @@ Editor selection copy/cut and styled/literal/plain paste are implemented in the 
 Add project/workspace support as a collection of related document files, with a left-hand file explorer and multiple open files. Define navigation between open documents, per-document history and dirty state, workspace metadata, and save/close behavior in that iteration. The initial `.tuxd.json` format remains a single-document format.
 
 
-## Future work: stdin import
+## Stdin import
 
-Allow styled command output to be piped into the app, for example `some_command --colors=always | tuxd`. Treat stdin as import data while opening the controlling terminal for interactive input. Reuse the ANSI import parser and malformed/unsupported-control review flow, and open the result as an unsaved document. Scope CLI mode selection, end-of-input behavior, noninteractive/no-controlling-terminal errors, and input-size handling in that iteration. This is deferred beyond Slice 4 file import.
+Allow styled command output to be piped into the app, for example `some_command --colors=always | tuxd`. Treat stdin as import data while opening the controlling terminal for interactive input. Reuse the ANSI import parser and malformed/unsupported-control review flow, and open the result as an unsaved document. Scope CLI mode selection, end-of-input behavior, noninteractive/no-controlling-terminal errors, and input-size handling in that iteration. Implemented with explicit `--raw INPUT` / `--escaped INPUT`, using `-` for stdin; see the [stdin import initiative](initiatives/stdin-import/overview.md).
 
 ## Future work: shortcut leader and General settings
 

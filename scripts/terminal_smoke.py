@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Session:
-	def __init__(self, binary, *args, env=None):
+	def __init__(self, binary, *args, env=None, stdin_source=None):
 		self.config_directory = tempfile.TemporaryDirectory(prefix="tuxd-smoke-config-")
 		self.master, self.slave = pty.openpty()
 		self.original = termios.tcgetattr(self.slave)
@@ -42,7 +42,7 @@ class Session:
 			fcntl.ioctl(self.slave, termios.TIOCSCTTY, 0)
 
 		self.process = subprocess.Popen(
-			[binary, *args], stdin=self.slave, stdout=self.slave, stderr=self.slave,
+			[binary, *args], stdin=self.slave if stdin_source is None else stdin_source, stdout=self.slave, stderr=self.slave,
 			env={key: value for key, value in {**os.environ, "TERM": "xterm-256color", "XDG_CONFIG_HOME": self.config_directory.name, "TMUX": None, "TMUX_PANE": None, "SSH_CONNECTION": None, "SSH_TTY": None, **(env or {})}.items() if value is not None}, preexec_fn=controlling_terminal,
 		)
 		self.drain()
