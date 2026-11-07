@@ -337,6 +337,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 			.split('\n')
 			.map(str::to_owned)
 			.collect();
+		let highlights: Vec<_> = lines
+			.iter()
+			.map(|line| crate::code_highlight::Highlight::new(line))
+			.collect();
 		app.code_area = text_area(inner, lines.len());
 		let layout = Layout::new(&lines, app.code_area.width as usize, app.code_wrap, false);
 		app.code_top = app.code_top.min(
@@ -369,7 +373,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 				left: app.code_left,
 				active_line: app.editor.cursor.row,
 			},
-			|_| Style::default(),
+			|position| highlights[position.row].style_at(position.byte),
 		);
 		scrollbar::draw(
 			frame,
@@ -548,6 +552,41 @@ mod tests {
 	use crate::styling::Action;
 	use ratatui::{Terminal, backend::TestBackend};
 	use std::time::Instant;
+
+	#[test]
+	fn code_highlighting_is_view_only_and_tracks_horizontal_scroll() {
+		let mut app = App::default();
+		app.editor.insert(
+			&format!("abc {}", "literal \\x1b[31m 界 👩🏽‍💻 ".repeat(4)),
+			EditKind::Atomic,
+			Instant::now(),
+		);
+		let document = app.editor.document.clone();
+		let raw = crate::styling::ansi(&document);
+		let copied = crate::styling::clipboard_text(&document);
+		let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+		terminal.draw(|f| draw(f, &mut app)).unwrap();
+		let area = app.code_area;
+		let buffer = terminal.backend().buffer();
+		assert_eq!(buffer[(area.x, area.y)].fg, Color::Cyan);
+		assert_eq!(buffer[(area.x + 5, area.y)].fg, Color::Magenta);
+		assert!(
+			buffer[(area.x + 5, area.y)]
+				.modifier
+				.contains(Modifier::BOLD)
+		);
+		assert_eq!(buffer[(area.x + 7, area.y)].fg, Color::Reset);
+		app.code_wrap = false;
+		app.code_left = 5;
+		terminal.draw(|f| draw(f, &mut app)).unwrap();
+		assert_eq!(
+			terminal.backend().buffer()[(app.code_area.x, app.code_area.y)].fg,
+			Color::Magenta
+		);
+		assert_eq!(app.editor.document, document);
+		assert_eq!(crate::styling::ansi(&app.editor.document), raw);
+		assert_eq!(crate::styling::clipboard_text(&app.editor.document), copied);
+	}
 
 	#[test]
 	fn rgb_gauges_stage_drag_and_keyboard_changes_until_apply() {

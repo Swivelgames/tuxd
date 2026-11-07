@@ -181,3 +181,5 @@ Run `uv run scripts/clipboard_smoke.py` to verify direct SSH and tmux forwarding
 Run `python3 scripts/alacritty_smoke.py` for real Alacritty rendering/input checks on an isolated Xvfb display (requires Alacritty, Xvfb, xdotool and ImageMagick). It saves screenshots for inspection and leaves the desktop and clipboard untouched.
 
 Composed Unicode sequences with inconsistent terminal widths (including joined emoji and flags) currently use a display-only `\u{…}` fallback in Editor, Code, and import previews. Accents, CJK and ordinary single emoji continue to render normally. Editing still treats each original grapheme as one unit; save/export and Code copying preserve the original characters. A fallback too wide for a wrapped row is abbreviated with `…`. Component-emoji rendering is planned.
+
+The Code pane highlights ANSI sequence boundaries in cyan, parameters in yellow, resets in bold magenta, separators in dark gray, and newline/tab escapes in blue. Ordinary text stays in the default color; literal escape-like text is not treated as an ANSI command. These colors are display metadata and do not affect clipboard or exported content.

@@ -16,7 +16,7 @@ The [initial concept](../../initial-concept.md) records product direction. The [
 - Slice 4: a reusable workflow with document save/open, ANSI import, copy, and export.
 - Slice 4a: configurable contextual shortcuts and sequences, before compatibility hardening.
 - Slice 5: broader compatibility and integration confidence; the MVP release checkpoint.
-- Slice 6: follow-on code-output improvements, tracked here but not required for MVP release.
+- Slice 6: ANSI syntax highlighting in the existing Code pane, after MVP.
 
 ## Completion contract for every slice
 
@@ -39,7 +39,7 @@ Repeat core selection and tool operations using keyboard navigation. Verify resi
 
 Include one document, explicit newlines, horizontal/vertical scrolling, linear selection, per-pane soft wrapping and logical line numbers, Unicode-aware word editing, code clipboard copy, and deterministic ANSI generation. Small documents are the performance target; large-file optimization is deferred.
 
-Defer rectangular selections, multi-document tabs, arbitrary ANSI import, bidirectional code editing, and terminal cursor-control authoring. Language generation and syntax highlighting belong to slice 6.
+Defer rectangular selections, multi-document tabs, arbitrary ANSI import, bidirectional code editing, and terminal cursor-control authoring. Syntax highlighting belongs to Slice 6. Language/framework generation is deferred to the separate [code generation initiative](../code-generation/overview.md).
 
 ## Architecture decisions
 

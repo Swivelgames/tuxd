@@ -12,19 +12,19 @@ Each slice builds on the preceding checkpoint and includes its own stability wor
 | [4. Save and export workflow](slice-04-save-and-export.md) | Save/reopen documents, import/export ANSI, and copy output | 3–5 days | Slice 3 |
 | [4a. Contextual shortcuts and settings](slice-04a-shortcut-settings.md) | Configure contextual keys/sequences, save settings, and use them across the full UI | 4–6 days | Slice 4 + layout refinement |
 | [5. Compatibility and hardening](slice-05-compatibility-and-hardening.md) | Use the integrated workflow reliably across the declared support matrix | 3–5 days | Slice 4a |
-| [6. Code output](slice-06-code-output.md) | Inspect highlighted sequences and copy valid Rust snippets | 2–4 days | Slice 5; after MVP |
+| [6. ANSI syntax highlighting](slice-06-code-output.md) | Inspect highlighted ANSI in the existing Code pane | Focused follow-on | Slice 5; after MVP |
 
-The first complete styling loop is approximately 5–8 developer days. With the added shortcuts/settings slice, the MVP is approximately 17–27 days, with another 2–4 days for the initial code-output improvements. Additional language generators are separately estimated once their output contracts are chosen.
+The first complete styling loop is approximately 5–8 developer days. With the added shortcuts/settings slice, the MVP is approximately 17–27 days, with ANSI syntax highlighting as a focused follow-on. Language/framework code generation is deferred to a separate discovery initiative; estimates follow agreed output contracts.
 
 ## How to implement each slice
 
 Start with its smallest end-to-end workflow, make that runnable, and then complete the scope and acceptance criteria. Keep the app usable during development. Do not merge a nominally complete slice whose central workflow is still stubbed or unstable.
 
-The slice specifications distinguish deliverables, stability requirements, hands-on checks, and deferred work. Checks are planned until implementation evidence is recorded in the corresponding slice. Slices 1–5 now record their implementations and passing verification; Slice 6 remains planned.
+The slice specifications distinguish deliverables, stability requirements, hands-on checks, and deferred work. Checks are planned until implementation evidence is recorded in the corresponding slice. Slices 1–5 now record their implementations and passing verification; Slice 6 highlighting is implemented and verified, awaiting user review.
 
 ## Sequence rationale
 
-Slice 1 validates editing and terminal lifecycle. Slice 2 proves the hardest product assumption: text and formatting remain coherent through selection and edits, and output matches the document. Slice 3 expands the available operations on that foundation. Slice 4 makes work persistent and reusable outside the app. Slice 4a centralizes shortcut routing and delivers transactional user configuration. Slice 5 then broadens compatibility and stress coverage, including custom keymaps. Slice 6 improves how developers consume the generated code.
+Slice 1 validates editing and terminal lifecycle. Slice 2 proves the hardest product assumption: text and formatting remain coherent through selection and edits, and output matches the document. Slice 3 expands the available operations on that foundation. Slice 4 makes work persistent and reusable outside the app. Slice 4a centralizes shortcut routing and delivers transactional user configuration. Slice 5 then broadens compatibility and stress coverage, including custom keymaps. Slice 6 improves ANSI readability. The separate [code generation initiative](../code-generation/overview.md) will explore language and framework outputs.
 
 ## Checkpoint evidence
 

@@ -1,6 +1,7 @@
 mod ansi_import;
 mod app;
 mod clipboard;
+mod code_highlight;
 mod document;
 mod editor;
 mod file_picker;
