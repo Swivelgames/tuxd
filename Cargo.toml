@@ -3,10 +3,27 @@ name = "tuxd"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "Design styled terminal text with live ANSI output"
+description = "A visual terminal text editor with live ANSI preview, RGB colors, and raw/escaped ANSI import and export"
 license = "GPL-3.0-only"
-repository = "https://gitlab.com/swivel/tux-design"
+repository = "https://github.com/swivelgames/tuxd"
+documentation = "https://github.com/swivelgames/tuxd/tree/main/docs"
 readme = "README.md"
+keywords = ["ansi", "terminal", "tui", "editor", "ratatui"]
+categories = ["command-line-utilities", "text-editors"]
+publish = ["crates-io"]
+include = [
+	"/src/**",
+	"/tests/**",
+	"/examples/**",
+	"/docs/**",
+	"/licenses/**",
+	"/scripts/*.py",
+	"/Cargo.toml",
+	"/Cargo.lock",
+	"/LICENSE",
+	"/*.md",
+	"/rustfmt.toml",
+]
 
 [dependencies]
 base64 = "0.22.1"

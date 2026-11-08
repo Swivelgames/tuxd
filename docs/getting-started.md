@@ -9,10 +9,10 @@ Before you start:
 - **Linux** with a UTF-8 terminal.
 - **Rust and Cargo** installed. The declared minimum is Rust 1.88; a current stable toolchain is recommended.
 
+Install the published package:
+
 ```sh
-git clone https://gitlab.com/swivel/tux-design.git
-cd tux-design
-cargo install --path . --locked
+cargo install tuxd --locked
 ```
 
 Cargo normally installs the executable in `~/.cargo/bin`; add that directory to your `PATH` if necessary. A custom `CARGO_HOME` or install root changes the destination.
@@ -26,11 +26,21 @@ Desktop clipboard access needs a suitable helper: `wl-copy` and `wl-paste` on Wa
 
 ## Explore an example
 
-From the checkout:
+A registry install starts without a document:
 
 ```sh
-tuxd examples/welcome.tuxd.json
+tuxd
 ```
+
+To explore the included examples or build from source:
+
+```sh
+git clone https://github.com/swivelgames/tuxd.git
+cd tuxd
+cargo run --locked -- examples/showcase.tuxd.json
+```
+
+To install the checkout instead, run `cargo install --path . --locked`.
 
 | Area | What it does |
 | --- | --- |
@@ -89,7 +99,13 @@ F1 opens Settings. Choose Theme → Appearance for presets and color roles, or a
 
 ## Update or uninstall
 
-To update a checkout installation, pull your desired revision and rerun `cargo install --path . --locked`.
+To update a registry installation, rerun:
+
+```sh
+cargo install tuxd --locked
+```
+
+For a checkout installation, pull your desired revision and rerun `cargo install --path . --locked`.
 
 ```sh
 cargo uninstall tuxd

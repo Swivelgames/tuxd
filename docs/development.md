@@ -53,3 +53,23 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for the pull-request workflow, [SECURI
 ## Package and license
 
 The package, binary, and library crate are named `tuxd`. The version comes from Cargo metadata; `tuxd --version` must work without a terminal. The project is licensed under [GPL-3.0-only](../LICENSE). Keep distribution documentation aligned with the artifacts actually available; do not advertise unpublished registry packages or release downloads.
+
+## Prepare a crates.io publication
+
+1. Publish the source and documentation to the GitHub repository linked in `Cargo.toml`.
+2. Confirm the release version and tag include the final manifest and documentation.
+3. Validate the packaged source without uploading:
+
+```sh
+cargo publish --dry-run --locked
+```
+
+4. Publish only when authorized:
+
+```sh
+cargo publish --locked
+```
+
+5. After the registry makes the version available, verify `cargo install tuxd --locked` in a clean install root.
+
+The package includes source, tests, examples, user documentation, and license notices. Internal `.work/` records are excluded. README images and links use absolute GitHub URLs so the registry page can render them after source publication.
