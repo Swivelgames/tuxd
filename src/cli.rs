@@ -1,5 +1,5 @@
 //! Explicit startup sources; stdin is consumed before terminal event handling.
-use crate::ansi_import::Mode;
+use crate::libraries::ansi::Mode;
 use std::{
 	ffi::OsString,
 	io::{self, IsTerminal, Read},
@@ -71,13 +71,13 @@ pub fn read_stdin() -> io::Result<Vec<u8>> {
 }
 
 fn read_bounded(reader: impl Read) -> io::Result<Vec<u8>> {
-	const LIMIT: u64 = 16 * 1024 * 1024;
-	let mut bytes = Vec::new();
-	reader.take(LIMIT + 1).read_to_end(&mut bytes)?;
-	if bytes.len() as u64 > LIMIT {
-		return Err(io::Error::other("Stdin import exceeds 16 MiB"));
+	crate::libraries::storage::ReadPolicy {
+		limit: 16 * 1024 * 1024,
+		overflow: "Stdin import exceeds 16 MiB",
+		special_file: "",
+		error_kind: io::ErrorKind::Other,
 	}
-	Ok(bytes)
+	.read(reader)
 }
 
 #[cfg(test)]

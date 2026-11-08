@@ -1,26 +1,25 @@
-mod ansi_import;
+use terminal_ux_designer::libraries;
+mod adapters;
 mod app;
 mod cli;
-mod clipboard;
-mod code_highlight;
-mod document;
-mod editor;
-mod editor_clipboard;
-mod file_picker;
+
+mod components;
+mod configuration;
+mod features;
 mod files;
 #[cfg(test)]
 mod hardening;
-mod import_review;
-mod layout;
 mod panel;
-mod panel_ui;
 mod persistence;
-mod scrollbar;
+mod session;
+mod settings;
 mod shortcuts;
-mod styling;
 mod terminal;
+#[cfg(test)]
+mod test_clipboard;
 mod theme;
-mod ui;
+mod workflows;
+mod workspace;
 
 use std::io;
 
@@ -47,9 +46,7 @@ fn main() -> io::Result<()> {
 			} else {
 				persistence::read_file(&source)?
 			};
-			let text = String::from_utf8(bytes)
-				.map_err(|_| io::Error::other("Import requires UTF-8 text"))?;
-			let import = ansi_import::parse(&text, mode).map_err(io::Error::other)?;
+			let import = workflows::parse_bytes(bytes, mode).map_err(io::Error::other)?;
 			startup_import = Some((import, if stdin { None } else { Some(source) }));
 		}
 	}
@@ -64,55 +61,16 @@ fn main() -> io::Result<()> {
 	if let Some(document) = loaded {
 		app.load_document(document, document_path.clone(), false);
 	}
-	app.document_path = document_path;
 	if let Some((import, path)) = startup_import {
-		if import.issues.is_empty() {
-			app.load_document(import.document, path, true);
-		} else {
-			app.files.review = match path {
-				Some(path) => import_review::Review::new(path),
-				None => import_review::Review::stdin(),
-			};
-			app.file_dialog(files::Dialog::Review(import));
-		}
+		let source = path
+			.map(workflows::Source::File)
+			.unwrap_or(workflows::Source::Stdin);
+		app.import_document(import, source);
 	}
-	if let Err(error) = app.shortcuts.load() {
-		app.notice = Some(format!(
-			"Shortcuts: {}; using defaults",
-			crate::document::sanitize(&error)
-		));
-	}
-	app.theme = match theme::load() {
-		Ok(theme) => theme,
-		Err(error) => {
-			let notice = format!(
-				"Theme: {}; using Midnight",
-				crate::document::sanitize(&error)
-			);
-			app.notice = Some(
-				app.notice
-					.take()
-					.map_or(notice.clone(), |old| format!("{old}; {notice}")),
-			);
-			theme::Config::default()
-		}
-	};
+	app.load_configuration();
 	loop {
 		app.poll_clipboard();
-		let active_theme = app
-			.settings
-			.as_ref()
-			.map(|settings| settings.preview())
-			.unwrap_or_else(|| app.theme.resolve().unwrap_or_default());
-		terminal.draw(|frame| {
-			theme::with(&active_theme, || {
-				ui::draw(frame, &mut app);
-				files::draw(frame, &mut app);
-				if let Some(settings) = &mut app.settings {
-					settings.draw(frame);
-				}
-			})
-		})?;
+		terminal.draw(|frame| app.draw(frame))?;
 		if let Some(panic) = diagnostic {
 			if panic {
 				panic!("Intentional terminal cleanup diagnostic");
@@ -132,3 +90,6 @@ fn main() -> io::Result<()> {
 		}
 	}
 }
+
+#[cfg(test)]
+mod test_editor;

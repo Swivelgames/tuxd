@@ -1,0 +1,1923 @@
+[
+	{
+		"id": "new",
+		"label": "New document",
+		"category": "Workspace",
+		"subsection": "Files",
+		"order": 2,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+n",
+			"",
+			""
+		]
+	},
+	{
+		"id": "open",
+		"label": "Open document",
+		"category": "Workspace",
+		"subsection": "Files",
+		"order": 3,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+o",
+			"",
+			""
+		]
+	},
+	{
+		"id": "save",
+		"label": "Save",
+		"category": "Workspace",
+		"subsection": "Files",
+		"order": 4,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+s",
+			"",
+			""
+		]
+	},
+	{
+		"id": "save_as",
+		"label": "Save as",
+		"category": "Workspace",
+		"subsection": "Files",
+		"order": 5,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+Shift+s",
+			"",
+			""
+		]
+	},
+	{
+		"id": "import",
+		"label": "Import",
+		"category": "Workspace",
+		"subsection": "Files",
+		"order": 6,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"",
+			"",
+			""
+		]
+	},
+	{
+		"id": "export",
+		"label": "Export",
+		"category": "Workspace",
+		"subsection": "Files",
+		"order": 7,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+e",
+			"",
+			""
+		]
+	},
+	{
+		"id": "quit",
+		"label": "Quit",
+		"category": "Workspace",
+		"subsection": "None",
+		"order": 0,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+q",
+			"",
+			""
+		]
+	},
+	{
+		"id": "file_menu",
+		"label": "Files menu",
+		"category": "Workspace",
+		"subsection": "Files",
+		"order": 1,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"F4",
+			"",
+			""
+		]
+	},
+	{
+		"id": "toggle_code",
+		"label": "Toggle Code",
+		"category": "Code",
+		"subsection": "None",
+		"order": 0,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"F2",
+			"",
+			""
+		]
+	},
+	{
+		"id": "toggle_editor",
+		"label": "Toggle Editor",
+		"category": "Editor",
+		"subsection": "None",
+		"order": 0,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"F5",
+			"",
+			""
+		]
+	},
+	{
+		"id": "editor_wrap",
+		"label": "Toggle wrapping",
+		"category": "Editor",
+		"subsection": "None",
+		"order": 1,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"F3",
+			"",
+			""
+		]
+	},
+	{
+		"id": "bold",
+		"label": "Toggle bold",
+		"category": "Editor",
+		"subsection": "Tools",
+		"order": 0,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+b",
+			"",
+			""
+		]
+	},
+	{
+		"id": "italic",
+		"label": "Toggle italic",
+		"category": "Editor",
+		"subsection": "Tools",
+		"order": 1,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+i",
+			"",
+			""
+		]
+	},
+	{
+		"id": "underline",
+		"label": "Toggle underline",
+		"category": "Editor",
+		"subsection": "Tools",
+		"order": 2,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+u",
+			"",
+			""
+		]
+	},
+	{
+		"id": "undo",
+		"label": "Undo",
+		"category": "Editor",
+		"subsection": "Editing",
+		"order": 0,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+z",
+			"",
+			""
+		]
+	},
+	{
+		"id": "redo",
+		"label": "Redo",
+		"category": "Editor",
+		"subsection": "Editing",
+		"order": 1,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+y",
+			"Ctrl+Shift+z",
+			""
+		]
+	},
+	{
+		"id": "move_left",
+		"label": "Left",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 0,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Left",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_left",
+		"label": "Select left",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 0,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Left",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_right",
+		"label": "Right",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 1,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Right",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_right",
+		"label": "Select right",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 1,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Right",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_up",
+		"label": "Up",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 2,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Up",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_up",
+		"label": "Select up",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 2,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Up",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_down",
+		"label": "Down",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 3,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Down",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_down",
+		"label": "Select down",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 3,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Down",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_home",
+		"label": "Line beginning",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 4,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_home",
+		"label": "Select line beginning",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 4,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_end",
+		"label": "Line end",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 5,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_end",
+		"label": "Select line end",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 5,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_page_up",
+		"label": "Page up",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 10,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"PageUp",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_page_up",
+		"label": "Select page up",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 10,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+PageUp",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_page_down",
+		"label": "Page down",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 11,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"PageDown",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_page_down",
+		"label": "Select page down",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 11,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+PageDown",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_start",
+		"label": "Document beginning",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 6,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Ctrl+Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_start",
+		"label": "Select document beginning",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 6,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Ctrl+Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_finish",
+		"label": "Document end",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 7,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Ctrl+End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_finish",
+		"label": "Select document end",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 7,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Ctrl+End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "move_word_left",
+		"label": "Previous word",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 8,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Ctrl+Left",
+			"Alt+Left",
+			""
+		]
+	},
+	{
+		"id": "select_word_left",
+		"label": "Select previous word",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 8,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Ctrl+Left",
+			"Shift+Alt+Left",
+			""
+		]
+	},
+	{
+		"id": "move_word_right",
+		"label": "Next word",
+		"category": "Editor",
+		"subsection": "Movement",
+		"order": 9,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Ctrl+Right",
+			"Alt+Right",
+			""
+		]
+	},
+	{
+		"id": "select_word_right",
+		"label": "Select next word",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 9,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Shift+Ctrl+Right",
+			"Shift+Alt+Right",
+			""
+		]
+	},
+	{
+		"id": "delete_before",
+		"label": "Backspace",
+		"category": "Editor",
+		"subsection": "Editing",
+		"order": 4,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Backspace",
+			"",
+			""
+		]
+	},
+	{
+		"id": "delete_after",
+		"label": "Delete",
+		"category": "Editor",
+		"subsection": "Editing",
+		"order": 5,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Delete",
+			"",
+			""
+		]
+	},
+	{
+		"id": "delete_word",
+		"label": "Delete previous word",
+		"category": "Editor",
+		"subsection": "Editing",
+		"order": 6,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Ctrl+Backspace",
+			"Alt+Backspace",
+			""
+		]
+	},
+	{
+		"id": "insert_newline",
+		"label": "Newline",
+		"category": "Editor",
+		"subsection": "Editing",
+		"order": 2,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Enter",
+			"",
+			""
+		]
+	},
+	{
+		"id": "insert_tab",
+		"label": "Indent",
+		"category": "Editor",
+		"subsection": "Editing",
+		"order": 3,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Tab",
+			"",
+			""
+		]
+	},
+	{
+		"id": "clear_selection",
+		"label": "Clear selection",
+		"category": "Editor",
+		"subsection": "Selection",
+		"order": 99,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Esc",
+			"",
+			""
+		]
+	},
+	{
+		"id": "cycle_panes",
+		"label": "Cycle panes",
+		"category": "Workspace",
+		"subsection": "Panes",
+		"order": 0,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"F6",
+			"",
+			""
+		]
+	},
+	{
+		"id": "focus_editor",
+		"label": "Focus Editor",
+		"category": "Workspace",
+		"subsection": "Panes",
+		"order": 1,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"",
+			"",
+			""
+		]
+	},
+	{
+		"id": "focus_code",
+		"label": "Focus Code",
+		"category": "Workspace",
+		"subsection": "Panes",
+		"order": 2,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"",
+			"",
+			""
+		]
+	},
+	{
+		"id": "focus_tools",
+		"label": "Focus Tools",
+		"category": "Workspace",
+		"subsection": "Panes",
+		"order": 3,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"",
+			"",
+			""
+		]
+	},
+	{
+		"id": "previous_tab",
+		"label": "Previous slim tab",
+		"category": "Workspace",
+		"subsection": "Panes",
+		"order": 4,
+		"scopes": [
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Alt+Left",
+			"",
+			""
+		]
+	},
+	{
+		"id": "next_tab",
+		"label": "Next slim tab",
+		"category": "Workspace",
+		"subsection": "Panes",
+		"order": 5,
+		"scopes": [
+			"Code",
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Alt+Right",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_wrap",
+		"label": "Toggle wrapping",
+		"category": "Code",
+		"subsection": "None",
+		"order": 1,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"F3",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_up",
+		"label": "Up",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 2,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"Up",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_down",
+		"label": "Down",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 3,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"Down",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_left",
+		"label": "Left",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 0,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"Left",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_right",
+		"label": "Right",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 1,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"Right",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_page_up",
+		"label": "Page up",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 4,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"PageUp",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_page_down",
+		"label": "Page down",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 5,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"PageDown",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_home",
+		"label": "Line beginning",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 6,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_end",
+		"label": "Line end",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 7,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_start",
+		"label": "Document beginning",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 8,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"Ctrl+Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "code_finish",
+		"label": "Document end",
+		"category": "Code",
+		"subsection": "Movement",
+		"order": 9,
+		"scopes": [
+			"Code"
+		],
+		"defaults": [
+			"Ctrl+End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "rgb_apply",
+		"label": "Apply RGB",
+		"category": "Tools",
+		"subsection": "Rgb",
+		"order": 0,
+		"scopes": [
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"",
+			"",
+			""
+		]
+	},
+	{
+		"id": "picker_location",
+		"label": "Focus Location",
+		"category": "Explorer",
+		"subsection": "Locations",
+		"order": 0,
+		"scopes": [
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons"
+		],
+		"defaults": [
+			"Ctrl+l",
+			"",
+			""
+		]
+	},
+	{
+		"id": "picker_cwd",
+		"label": "Go to CWD",
+		"category": "Explorer",
+		"subsection": "Locations",
+		"order": 1,
+		"scopes": [
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons"
+		],
+		"defaults": [
+			"Ctrl+g",
+			"",
+			""
+		]
+	},
+	{
+		"id": "picker_hidden",
+		"label": "Toggle hidden files",
+		"category": "Explorer",
+		"subsection": "Display",
+		"order": 0,
+		"scopes": [
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons"
+		],
+		"defaults": [
+			"Ctrl+h",
+			"Ctrl+.",
+			""
+		]
+	},
+	{
+		"id": "picker_filter",
+		"label": "Toggle filter",
+		"category": "Explorer",
+		"subsection": "Display",
+		"order": 1,
+		"scopes": [
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons"
+		],
+		"defaults": [
+			"Ctrl+f",
+			"",
+			""
+		]
+	},
+	{
+		"id": "explorer_parent",
+		"label": "Parent directory",
+		"category": "Explorer",
+		"subsection": "Locations",
+		"order": 2,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"Left",
+			"Backspace",
+			"h"
+		]
+	},
+	{
+		"id": "explorer_enter",
+		"label": "Enter directory",
+		"category": "Explorer",
+		"subsection": "Locations",
+		"order": 3,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"Right",
+			"l",
+			""
+		]
+	},
+	{
+		"id": "explorer_up",
+		"label": "Previous entry",
+		"category": "Explorer",
+		"subsection": "Navigation",
+		"order": 0,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"Up",
+			"k",
+			""
+		]
+	},
+	{
+		"id": "explorer_down",
+		"label": "Next entry",
+		"category": "Explorer",
+		"subsection": "Navigation",
+		"order": 1,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"Down",
+			"j",
+			""
+		]
+	},
+	{
+		"id": "explorer_first",
+		"label": "First entry",
+		"category": "Explorer",
+		"subsection": "Navigation",
+		"order": 2,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"Home",
+			"g g",
+			""
+		]
+	},
+	{
+		"id": "explorer_last",
+		"label": "Last entry",
+		"category": "Explorer",
+		"subsection": "Navigation",
+		"order": 3,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"End",
+			"G",
+			""
+		]
+	},
+	{
+		"id": "explorer_middle",
+		"label": "Middle visible entry",
+		"category": "Explorer",
+		"subsection": "Navigation",
+		"order": 4,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"M",
+			"",
+			""
+		]
+	},
+	{
+		"id": "explorer_page_up",
+		"label": "Previous page",
+		"category": "Explorer",
+		"subsection": "Navigation",
+		"order": 5,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"PageUp",
+			"",
+			""
+		]
+	},
+	{
+		"id": "explorer_page_down",
+		"label": "Next page",
+		"category": "Explorer",
+		"subsection": "Navigation",
+		"order": 6,
+		"scopes": [
+			"Explorer"
+		],
+		"defaults": [
+			"PageDown",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_delete_after",
+		"label": "Delete",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 51,
+		"scopes": [
+			"Location",
+			"Filename"
+		],
+		"defaults": [
+			"Delete",
+			"",
+			""
+		]
+	},
+	{
+		"id": "positive",
+		"label": "Positive action",
+		"category": "Dialogs",
+		"subsection": "General",
+		"order": 0,
+		"scopes": [
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons",
+			"FileButtons"
+		],
+		"defaults": [
+			"s",
+			"y",
+			""
+		]
+	},
+	{
+		"id": "negative",
+		"label": "Negative action",
+		"category": "Dialogs",
+		"subsection": "General",
+		"order": 1,
+		"scopes": [
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons",
+			"FileButtons"
+		],
+		"defaults": [
+			"d",
+			"n",
+			""
+		]
+	},
+	{
+		"id": "abort",
+		"label": "Abort action",
+		"category": "Dialogs",
+		"subsection": "General",
+		"order": 2,
+		"scopes": [
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons",
+			"FileButtons"
+		],
+		"defaults": [
+			"a",
+			"c",
+			""
+		]
+	},
+	{
+		"id": "close",
+		"label": "Close / dismiss",
+		"category": "Dialogs",
+		"subsection": "General",
+		"order": 3,
+		"scopes": [
+			"Menu",
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons",
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons"
+		],
+		"defaults": [
+			"Esc",
+			"",
+			""
+		]
+	},
+	{
+		"id": "next_field",
+		"label": "Next field",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 0,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel",
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons",
+			"Menu",
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Tab",
+			"",
+			""
+		]
+	},
+	{
+		"id": "previous_field",
+		"label": "Previous field",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 1,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel",
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons",
+			"Menu",
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Shift+Tab",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_left",
+		"label": "Left",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 2,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons",
+			"Menu",
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Left",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_right",
+		"label": "Right",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 3,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons",
+			"Menu",
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Right",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_up",
+		"label": "Up",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 4,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel",
+			"Format",
+			"FileButtons",
+			"Menu",
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Up",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_down",
+		"label": "Down",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 5,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Channel",
+			"Format",
+			"FileButtons",
+			"Menu",
+			"Prompt",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Down",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_page_up",
+		"label": "Page up",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 6,
+		"scopes": [
+			"Tools",
+			"Grid",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"PageUp",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_page_down",
+		"label": "Page down",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 7,
+		"scopes": [
+			"Tools",
+			"Grid",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"PageDown",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_home",
+		"label": "Beginning",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 8,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Location",
+			"Filename",
+			"Menu",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_end",
+		"label": "End",
+		"category": "Workspace",
+		"subsection": "FieldNavigation",
+		"order": 9,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Hex",
+			"Location",
+			"Filename",
+			"Menu",
+			"ReviewContent",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "activate",
+		"label": "Activate",
+		"category": "Workspace",
+		"subsection": "FieldActions",
+		"order": 10,
+		"scopes": [
+			"Tools",
+			"Radio",
+			"ToolTabs",
+			"Grid",
+			"Explorer",
+			"Format",
+			"FileButtons",
+			"Menu",
+			"Prompt",
+			"ReviewButtons"
+		],
+		"defaults": [
+			"Enter",
+			"Space",
+			""
+		]
+	},
+	{
+		"id": "submit",
+		"label": "Submit",
+		"category": "Workspace",
+		"subsection": "FieldActions",
+		"order": 11,
+		"scopes": [
+			"Location",
+			"Filename",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Enter",
+			"",
+			""
+		]
+	},
+	{
+		"id": "range_decrease",
+		"label": "Decrease",
+		"category": "Workspace",
+		"subsection": "RangeControls",
+		"order": 30,
+		"scopes": [
+			"Channel"
+		],
+		"defaults": [
+			"Left",
+			"",
+			""
+		]
+	},
+	{
+		"id": "range_increase",
+		"label": "Increase",
+		"category": "Workspace",
+		"subsection": "RangeControls",
+		"order": 31,
+		"scopes": [
+			"Channel"
+		],
+		"defaults": [
+			"Right",
+			"",
+			""
+		]
+	},
+	{
+		"id": "range_decrease10",
+		"label": "Decrease by 10",
+		"category": "Workspace",
+		"subsection": "RangeControls",
+		"order": 32,
+		"scopes": [
+			"Channel"
+		],
+		"defaults": [
+			"Shift+Left",
+			"",
+			""
+		]
+	},
+	{
+		"id": "range_increase10",
+		"label": "Increase by 10",
+		"category": "Workspace",
+		"subsection": "RangeControls",
+		"order": 33,
+		"scopes": [
+			"Channel"
+		],
+		"defaults": [
+			"Shift+Right",
+			"",
+			""
+		]
+	},
+	{
+		"id": "range_minimum",
+		"label": "Minimum",
+		"category": "Workspace",
+		"subsection": "RangeControls",
+		"order": 34,
+		"scopes": [
+			"Channel"
+		],
+		"defaults": [
+			"Home",
+			"",
+			""
+		]
+	},
+	{
+		"id": "range_maximum",
+		"label": "Maximum",
+		"category": "Workspace",
+		"subsection": "RangeControls",
+		"order": 35,
+		"scopes": [
+			"Channel"
+		],
+		"defaults": [
+			"End",
+			"",
+			""
+		]
+	},
+	{
+		"id": "field_delete_before",
+		"label": "Backspace",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 50,
+		"scopes": [
+			"Location",
+			"Filename",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Backspace",
+			"",
+			""
+		]
+	},
+	{
+		"id": "copy",
+		"label": "Copy",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 60,
+		"scopes": [
+			"Editor",
+			"Code",
+			"Location",
+			"Filename",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+c",
+			"",
+			""
+		]
+	},
+	{
+		"id": "paste",
+		"label": "Paste",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 61,
+		"scopes": [
+			"Editor",
+			"Explorer",
+			"Location",
+			"Filename",
+			"Format",
+			"FileButtons",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+v",
+			"",
+			""
+		]
+	},
+	{
+		"id": "cut",
+		"label": "Cut",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 63,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"Ctrl+x",
+			"",
+			""
+		]
+	},
+	{
+		"id": "paste_plain",
+		"label": "Paste without formatting",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 64,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"",
+			"",
+			""
+		]
+	},
+	{
+		"id": "paste_literal",
+		"label": "Paste literal text",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 65,
+		"scopes": [
+			"Editor"
+		],
+		"defaults": [
+			"",
+			"",
+			""
+		]
+	},
+	{
+		"id": "select_all",
+		"label": "Select all",
+		"category": "Workspace",
+		"subsection": "TextFields",
+		"order": 62,
+		"scopes": [
+			"Editor",
+			"Location",
+			"Filename",
+			"Hex",
+			"Channel"
+		],
+		"defaults": [
+			"Ctrl+a",
+			"",
+			""
+		]
+	}
+]

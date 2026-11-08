@@ -178,3 +178,30 @@ pub fn defaults(text: &str) -> Vec<ShortcutKey> {
 		})
 		.collect()
 }
+
+impl crate::libraries::shortcuts::BindingKey for ShortcutKey {
+	fn leader() -> Self {
+		Self::leader()
+	}
+	fn is_leader(&self) -> bool {
+		self.is_leader()
+	}
+	fn normalized(self) -> Self {
+		self.normalized()
+	}
+	fn token(&self) -> String {
+		self.token()
+	}
+	fn label(&self) -> String {
+		self.label()
+	}
+	fn leader_allowed(&self) -> bool {
+		self.code != KeyCode::Esc
+	}
+	fn escape(&self) -> bool {
+		self.code == KeyCode::Esc && self.modifiers.is_empty()
+	}
+	fn is_printable(&self) -> bool {
+		self.printable().is_some()
+	}
+}

@@ -1,31 +1,37 @@
 use super::*;
+use crate::workspace::{Pane, TextPane};
 use crate::{
 	app::App,
-	editor::Movement,
 	files::{Action as FileAction, Dialog},
+	libraries::editing::Movement,
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers as M};
+use std::time::Duration;
 
 fn key(s: &str) -> ShortcutKey {
 	key::defaults(s).remove(0)
 }
+
 fn event(s: &str) -> Event {
 	let k = key(s);
 	Event::Key(KeyEvent::new(k.code, k.modifiers))
 }
+
 fn bind(config: &mut Config, action: ActionId, slot: usize, sequence: &str) {
 	config.bindings.get_mut(&action).unwrap()[slot] = Some(key::defaults(sequence));
 }
+
 fn install(runtime: &mut Runtime, config: Config) {
 	runtime.map = config.build().unwrap();
 	runtime.config = config;
 	runtime.cancel();
 }
+
 #[test]
 fn every_default_slot_routes_to_its_action_in_all_applicable_scopes() {
 	let config = Config::default();
 	let map = config.build().unwrap();
-	for spec in ACTIONS {
+	for spec in ACTIONS.iter() {
 		for keys in config.bindings[&spec.id].iter().flatten() {
 			for scope in spec.scopes {
 				assert!(
@@ -38,6 +44,7 @@ fn every_default_slot_routes_to_its_action_in_all_applicable_scopes() {
 		}
 	}
 }
+
 #[test]
 fn adapter_retains_modifiers_unicode_and_roundtrips_library_tokens() {
 	use ratatui_which_key::Key;
@@ -78,6 +85,7 @@ fn adapter_retains_modifiers_unicode_and_roundtrips_library_tokens() {
 		}
 	}
 }
+
 #[test]
 fn validation_rejects_overlap_prefixes_printable_prefixes_and_all_reserved_aliases() {
 	for (a, b) in [
@@ -113,6 +121,7 @@ fn validation_rejects_overlap_prefixes_printable_prefixes_and_all_reserved_alias
 	}
 	assert!(!key("Ctrl+?").opener());
 }
+
 #[test]
 fn context_reuse_and_shared_prefixes_work_without_prefix_ambiguity() {
 	let mut config = Config::default();
@@ -146,6 +155,7 @@ fn context_reuse_and_shared_prefixes_work_without_prefix_ambiguity() {
 		Dispatch::Action(ActionId::FocusTools)
 	));
 }
+
 #[test]
 fn timeout_mismatch_escape_and_scope_change_clear_pending_input() {
 	let mut runtime = Runtime::default();
@@ -175,6 +185,7 @@ fn timeout_mismatch_escape_and_scope_change_clear_pending_input() {
 	));
 	assert!(runtime.pending_label().is_none());
 }
+
 #[test]
 fn config_is_atomic_strict_and_preserves_explicit_unset_slots() {
 	let folder = tempfile::tempdir().unwrap();
@@ -210,6 +221,7 @@ fn config_is_atomic_strict_and_preserves_explicit_unset_slots() {
 		default_slots(ActionId::Bold)
 	);
 }
+
 #[test]
 fn failed_load_or_save_leaves_active_config_and_original_file_untouched() {
 	let folder = tempfile::tempdir().unwrap();
@@ -230,6 +242,7 @@ fn failed_load_or_save_leaves_active_config_and_original_file_untouched() {
 	assert!(runtime.save(draft).is_err());
 	assert_eq!(runtime.config, Config::default());
 }
+
 #[test]
 fn app_dispatch_obeys_unset_bindings_selection_independence_and_extra_modifiers() {
 	let mut app = App::default();
@@ -239,32 +252,35 @@ fn app_dispatch_obeys_unset_bindings_selection_independence_and_extra_modifiers(
 	install(&mut app.shortcuts, config);
 	app.handle(Event::Paste("abc".into()));
 	app.handle(event("Ctrl+b"));
-	assert!(!app.editor.typing_style().bold);
+	assert!(!app.workspace.session.editing.typing_style().bold);
 	app.handle(event("Ctrl+g"));
-	assert_eq!(app.editor.cursor.byte, 2);
+	assert_eq!(app.workspace.session.editing.cursor.byte, 2);
 	app.handle(event("Shift+Left"));
-	assert!(app.editor.selection().is_some());
-	app.editor.anchor = None;
-	let before = app.editor.cursor;
+	assert!(app.workspace.session.editing.selection().is_some());
+	app.workspace.session.editing.anchor = None;
+	let before = app.workspace.session.editing.cursor;
 	app.handle(event("Ctrl+Alt+Left"));
-	assert_eq!(app.editor.cursor, before);
+	assert_eq!(app.workspace.session.editing.cursor, before);
 	app.handle(event("h"));
-	assert!(app.editor.document.lines[0].contains('h'));
+	assert!(app.workspace.session.editing.document.lines()[0].contains('h'));
 }
+
 #[test]
 fn settings_openers_preserve_selection_and_underlying_dialog_context() {
 	let mut app = App::default();
 	app.handle(Event::Paste("keep".into()));
-	app.editor.navigate(Movement::Home, true);
-	let selection = app.editor.selection();
-	let document = app.editor.document.clone();
+	app.workspace
+		.editor
+		.navigate(&mut app.workspace.session.editing, Movement::Home, true);
+	let selection = app.workspace.session.editing.selection();
+	let document = app.workspace.session.editing.document.clone();
 	for opener in ["F1", "Ctrl+/", "Ctrl+,", "Ctrl+7"] {
 		app.handle(event(opener));
 		assert!(app.settings.is_some());
 		app.handle(Event::Paste("ignored".into()));
 		app.handle(event("Esc"));
-		assert_eq!(app.editor.selection(), selection);
-		assert_eq!(app.editor.document, document);
+		assert_eq!(app.workspace.session.editing.selection(), selection);
+		assert_eq!(app.workspace.session.editing.document, document);
 	}
 	app.file_action(FileAction::Open);
 	let scope = app.input_scope();
@@ -278,8 +294,9 @@ fn settings_openers_preserve_selection_and_underlying_dialog_context() {
 	app.handle(event("Esc"));
 	assert!(matches!(app.files.dialog, Some(Dialog::Dirty)));
 	app.handle(event("Esc"));
-	assert_eq!(app.editor.document, document);
+	assert_eq!(app.workspace.session.editing.document, document);
 }
+
 #[test]
 fn remapped_prompt_responses_and_two_choice_fallback_use_actions() {
 	let mut app = App::default();
@@ -291,7 +308,7 @@ fn remapped_prompt_responses_and_two_choice_fallback_use_actions() {
 	app.handle(event("d"));
 	assert!(matches!(app.files.dialog, Some(Dialog::Dirty)));
 	app.handle(event("x"));
-	assert!(app.editor.document.is_empty());
+	assert!(app.workspace.session.editing.document.is_empty());
 	let folder = tempfile::tempdir().unwrap();
 	let path = folder.path().join("existing.txt");
 	std::fs::write(&path, "keep").unwrap();
@@ -305,6 +322,7 @@ fn remapped_prompt_responses_and_two_choice_fallback_use_actions() {
 		assert_eq!(std::fs::read_to_string(&path).unwrap(), "keep");
 	}
 }
+
 #[test]
 fn pending_sequences_never_leak_into_text_and_cancel_on_nonkey_events() {
 	let mut app = App::default();
@@ -313,7 +331,7 @@ fn pending_sequences_never_leak_into_text_and_cancel_on_nonkey_events() {
 	install(&mut app.shortcuts, config);
 	app.handle(event("Ctrl+w"));
 	app.handle(event("x"));
-	assert!(app.editor.document.is_empty());
+	assert!(app.workspace.session.editing.document.is_empty());
 	for interrupt in [
 		Event::FocusLost,
 		Event::Resize(80, 24),
@@ -330,13 +348,14 @@ fn pending_sequences_never_leak_into_text_and_cancel_on_nonkey_events() {
 
 #[test]
 fn one_shared_field_binding_operates_tools_picker_review_and_prompts() {
-	use crate::{import_review::Review, panel::Control};
+	use crate::panel::Control;
 	let mut app = App::default();
 	let mut config = Config::default();
 	bind(&mut config, ActionId::NextField, 0, "F8");
 	install(&mut app.shortcuts, config);
-	app.focus = 1;
-	app.tool_index = app
+	app.workspace.focus = Pane::Tools;
+	app.workspace.panel.selected = app
+		.workspace
 		.panel
 		.items()
 		.iter()
@@ -344,7 +363,7 @@ fn one_shared_field_binding_operates_tools_picker_review_and_prompts() {
 		.unwrap();
 	app.handle(event("F8"));
 	assert!(matches!(
-		app.panel.items()[app.tool_index].control,
+		app.workspace.panel.items()[app.workspace.panel.selected].control,
 		Control::Palette(_)
 	));
 	app.handle(event("Esc"));
@@ -353,14 +372,15 @@ fn one_shared_field_binding_operates_tools_picker_review_and_prompts() {
 	app.handle(event("F8"));
 	assert_eq!(app.input_scope(), InputScope::Filename);
 	app.handle(event("Esc"));
-	app.files.review = Review::default();
-	let report = crate::ansi_import::parse("\x1b[2J", crate::ansi_import::Mode::Raw).unwrap();
-	app.files.dialog = Some(Dialog::Review(report));
+
+	let report =
+		crate::libraries::ansi::parse("\x1b[2J", crate::libraries::ansi::Mode::Raw).unwrap();
+	app.import_document(report, crate::workflows::Source::Stdin);
 	assert_eq!(app.input_scope(), InputScope::ReviewButtons);
 	app.handle(event("F8"));
 	assert_eq!(app.input_scope(), InputScope::ReviewContent);
 	app.handle(event("Esc"));
-	app.focus = 0;
+	app.workspace.focus = Pane::Editor;
 	app.handle(Event::Paste("keep".into()));
 	app.file_action(FileAction::New);
 	// Cancel is initially focused. Next wraps to Save, previous returns to Cancel.
@@ -368,16 +388,16 @@ fn one_shared_field_binding_operates_tools_picker_review_and_prompts() {
 	app.handle(event("Shift+Tab"));
 	app.handle(event("Enter"));
 	assert!(app.files.dialog.is_none());
-	assert_eq!(app.editor.document.lines[0], "keep");
+	assert_eq!(app.workspace.session.editing.document.lines()[0], "keep");
 	app.handle(event("Tab"));
-	assert!(app.editor.document.lines[0].ends_with('\t'));
+	assert!(app.workspace.session.editing.document.lines()[0].ends_with('\t'));
 }
 
 #[test]
 fn shared_directions_ranges_and_selection_keep_control_specific_semantics() {
 	use crate::{
+		libraries::ansi::{Action, Ink},
 		panel::Control,
-		styling::{Action, Ink},
 	};
 	let mut app = App::default();
 	let mut config = Config::default();
@@ -385,9 +405,10 @@ fn shared_directions_ranges_and_selection_keep_control_specific_semantics() {
 	bind(&mut config, ActionId::RangeIncrease10, 0, "F9");
 	bind(&mut config, ActionId::SelectAll, 0, "F10");
 	install(&mut app.shortcuts, config);
-	app.focus = 1;
+	app.workspace.focus = Pane::Tools;
 	let choose = |app: &mut App, control| {
-		app.tool_index = app
+		app.workspace.panel.selected = app
+			.workspace
 			.panel
 			.items()
 			.iter()
@@ -396,43 +417,122 @@ fn shared_directions_ranges_and_selection_keep_control_specific_semantics() {
 	};
 	choose(&mut app, Control::Target(false));
 	app.handle(event("F8"));
-	assert!(app.panel.background);
+	assert!(app.workspace.panel.color.background);
 	choose(&mut app, Control::Palette(0));
 	app.handle(event("F8"));
-	assert_eq!(app.panel.palette, 1);
+	assert_eq!(app.workspace.panel.color.palette, 1);
 	choose(
 		&mut app,
 		Control::Style(Action::Background(Ink::Indexed(0))),
 	);
-	let before = app.editor.typing_style();
+	let before = app.workspace.session.editing.typing_style();
 	app.handle(event("F8"));
-	assert_eq!(app.editor.typing_style(), before);
+	assert_eq!(app.workspace.session.editing.typing_style(), before);
 	app.handle(event("Enter"));
-	assert_eq!(app.editor.typing_style().background, Ink::Indexed(1));
+	assert_eq!(
+		app.workspace.session.editing.typing_style().background,
+		Ink::Indexed(1)
+	);
 	choose(&mut app, Control::Glyph('─'));
 	app.handle(event("F8"));
-	assert!(app.editor.document.is_empty());
+	assert!(app.workspace.session.editing.document.is_empty());
 	app.handle(event("Enter"));
-	assert_eq!(app.editor.document.lines[0], "│");
+	assert_eq!(app.workspace.session.editing.document.lines()[0], "│");
 	app.handle(event("Tab"));
 	app.handle(event("Shift+Tab"));
 	assert_eq!(
-		app.panel.items()[app.tool_index].control,
+		app.workspace.panel.items()[app.workspace.panel.selected].control,
 		Control::Glyph('│')
 	);
-	app.panel.palette = 2;
+	app.workspace.panel.color.palette = 2;
 	for field in 1..4 {
 		choose(&mut app, Control::Field(field));
-		app.panel.set_component(field, 100);
+		app.workspace.panel.color.rgb.set_component(field, 100);
 		app.handle(event("F9"));
-		assert_eq!(app.panel.fields[field], "110");
+		assert_eq!(app.workspace.panel.color.rgb.fields[field].text(), "110");
 	}
 	choose(&mut app, Control::Field(0));
 	app.handle(event("F10"));
 	app.handle(Event::Paste("#aabbcc".into()));
-	assert_eq!(app.panel.fields[0], "#aabbcc");
+	assert_eq!(app.workspace.panel.color.rgb.fields[0].text(), "#aabbcc");
 	app.handle(event("Home"));
 	app.handle(event("F8"));
 	app.handle(event("Backspace"));
-	assert_eq!(app.panel.fields[0], "aabbcc");
+	assert_eq!(app.workspace.panel.color.rgb.fields[0].text(), "aabbcc");
+}
+
+#[test]
+fn composed_catalog_preserves_every_persisted_definition() {
+	let expected: Vec<serde_json::Value> =
+		serde_json::from_str(include_str!("fixtures/catalog-v2.json")).unwrap();
+	assert_eq!(ACTIONS.len(), expected.len());
+	for row in expected {
+		let id: ActionId = serde_json::from_value(row["id"].clone()).unwrap();
+		let spec = id.spec();
+		assert_eq!(
+			serde_json::json!({
+				"id": id, "label": spec.label, "category": format!("{:?}", spec.section),
+				"subsection": spec.subsection.map_or("None".into(), |s| format!("{s:?}")),
+				"order": spec.order, "scopes": spec.scopes.iter().map(|s| format!("{s:?}")).collect::<Vec<_>>(),
+				"defaults": spec.defaults,
+			}),
+			row
+		);
+	}
+}
+
+#[test]
+fn hidden_panels_and_repeated_construction_never_register_or_reset_bindings() {
+	let mut app = App::default();
+	let mut config = Config::default();
+	bind(&mut config, ActionId::CodeWrap, 0, "F8");
+	install(&mut app.shortcuts, config.clone());
+	let count = registry::catalog().actions().len();
+	for _ in 0..3 {
+		app.workspace.toggle_pane(TextPane::Code);
+		app.workspace.select_slim_tab(3);
+		let _another = App::default();
+		assert_eq!(registry::catalog().actions().len(), count);
+		assert_eq!(app.shortcuts.config, config);
+		assert_eq!(app.shortcuts.config.hint(ActionId::CodeWrap), "F8");
+	}
+}
+
+#[test]
+fn modal_scopes_mask_workspace_actions_and_restore_underlying_focus() {
+	let mut app = App::default();
+	app.workspace.focus = Pane::Code;
+	app.open_file_menu();
+	assert_eq!(app.input_scope(), InputScope::Menu);
+	for key in ["Ctrl+b", "Ctrl+z", "F2", "F6", "Ctrl+q"] {
+		app.handle(event(key));
+	}
+	assert!(app.files.dialog.is_some());
+	assert!(app.workspace.code_open);
+	assert!(!app.workspace.session.editing.typing_style().bold);
+	assert_eq!(app.workspace.focus, Pane::Code);
+	app.handle(event("Esc"));
+	assert_eq!(app.input_scope(), InputScope::Code);
+
+	app.import_document(
+		crate::libraries::ansi::parse("\x1b[2J", crate::libraries::ansi::Mode::Raw).unwrap(),
+		crate::workflows::Source::Stdin,
+	);
+	assert_eq!(app.input_scope(), InputScope::ReviewButtons);
+	app.handle(event("Esc"));
+	assert_eq!(app.input_scope(), InputScope::Code);
+}
+
+#[test]
+fn modified_escape_remains_disallowed_as_a_leader() {
+	let config = Config(engine::Configuration {
+		leader: Some(ShortcutKey::new(KeyCode::Esc, M::CONTROL)),
+		..registry::catalog().defaults()
+	});
+	assert!(
+		config
+			.build()
+			.unwrap_err()
+			.contains("cannot be used as Leader")
+	);
 }

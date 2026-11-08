@@ -1,19 +1,22 @@
 //! Cross-module acceptance and repeatable performance checks.
+use crate::test_editor::Harness as Editor;
+use crate::workspace::TextPane;
 use crate::{
 	app::App,
-	editor::{EditKind, Editor, Movement},
-	persistence,
-	styling::{self, Action, Ink},
-	ui,
+	libraries::ansi::{self as styling, Action, Ink},
+	libraries::editing::{EditKind, Movement},
 };
 use std::time::Instant;
 use unicode_segmentation::UnicodeSegmentation;
 
-fn verify(editor: &Editor) {
-	let bytes = persistence::encode(&editor.document).unwrap();
-	assert_eq!(persistence::decode(&bytes).unwrap(), editor.document);
+fn verify(editor: &crate::libraries::editing::Editing) {
+	let bytes = crate::adapters::native_document::encode(&editor.document).unwrap();
+	assert_eq!(
+		crate::adapters::native_document::decode(&bytes).unwrap(),
+		editor.document
+	);
 	for position in [Some(editor.cursor), editor.anchor].into_iter().flatten() {
-		let line = &editor.document.lines[position.row];
+		let line = &editor.document.lines()[position.row];
 		assert!(
 			line.grapheme_indices(true)
 				.map(|(i, _)| i)
@@ -21,10 +24,10 @@ fn verify(editor: &Editor) {
 				.any(|i| i == position.byte)
 		);
 	}
-	let ansi = styling::ansi(&editor.document);
-	let imported = crate::ansi_import::parse(&ansi, crate::ansi_import::Mode::Raw).unwrap();
+	let ansi = editor.document.to_raw_ansi();
+	let imported = crate::libraries::ansi::parse(&ansi, crate::libraries::ansi::Mode::Raw).unwrap();
 	assert_eq!(imported.document, editor.document);
-	assert_eq!(ansi, styling::ansi(&editor.document));
+	assert_eq!(ansi, editor.document.to_raw_ansi());
 }
 
 #[test]
@@ -89,9 +92,9 @@ fn mixed_unicode_styles_history_and_storage() {
 	}
 }
 
-fn fixture() -> crate::document::Document {
-	let mut doc = crate::document::Document::default();
-	doc.lines.clear();
+fn fixture() -> crate::libraries::ansi::Document {
+	let mut text = String::new();
+	let mut runs = Vec::new();
 	let mut offset = 0;
 	for i in 0..1000 {
 		let line = format!(
@@ -103,43 +106,60 @@ fn fixture() -> crate::document::Document {
 			foreground: Ink::Indexed((i % 256) as u8),
 			..Default::default()
 		};
-		doc.styles.push(offset, end, style);
+		runs.push(crate::libraries::ansi::Run {
+			start: offset,
+			end,
+			style,
+		});
 		offset = end;
-		doc.lines.push(line);
+		text.push_str(&line);
+		if i < 999 {
+			text.push('\n');
+		}
 	}
-	doc
+	crate::libraries::ansi::Document::try_from(crate::libraries::ansi::DocumentData {
+		text,
+		styles: crate::libraries::ansi::Styles { runs },
+	})
+	.unwrap()
 }
 
 #[test]
 fn representative_document_survives_resize_and_pane_changes() {
 	let mut app = App::default();
-	app.editor.document = fixture();
-	let original = app.editor.document.clone();
+	app.workspace.session.editing.document = fixture();
+	let original = app.workspace.session.editing.document.clone();
 	for (w, h) in [(120, 40), (64, 24), (40, 12), (1, 1), (80, 24)] {
 		let mut terminal =
 			ratatui::Terminal::new(ratatui::backend::TestBackend::new(w, h)).unwrap();
-		for code in [true, false, true] {
-			app.toggle_pane(code);
-			terminal.draw(|frame| ui::draw(frame, &mut app)).unwrap();
-			assert_eq!(app.editor.document, original);
+		for pane in [TextPane::Code, TextPane::Editor, TextPane::Code] {
+			app.workspace.toggle_pane(pane);
+			terminal.draw(|frame| app.draw(frame)).unwrap();
+			assert_eq!(app.workspace.session.editing.document, original);
 		}
 	}
-	verify(&app.editor);
+	verify(&app.workspace.session.editing);
 }
 
 #[test]
 #[ignore = "run in release mode with --nocapture to measure the documented fixture"]
 fn modest_document_performance() {
 	let mut app = App::default();
-	app.editor.document = fixture();
+	app.workspace.session.editing.document = fixture();
 	if let Ok(path) = std::env::var("TUXD_PERF_FIXTURE") {
-		std::fs::write(path, persistence::encode(&app.editor.document).unwrap()).unwrap();
+		std::fs::write(
+			path,
+			crate::adapters::native_document::encode(&app.workspace.session.editing.document)
+				.unwrap(),
+		)
+		.unwrap();
 	}
 	let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 40)).unwrap();
 	let mut samples = Vec::new();
 	for i in 0..40 {
 		let start = Instant::now();
-		app.editor.navigate(
+		app.workspace.editor.navigate(
+			&mut app.workspace.session.editing,
 			if i % 2 == 0 {
 				Movement::Finish
 			} else {
@@ -147,21 +167,34 @@ fn modest_document_performance() {
 			},
 			false,
 		);
-		app.editor.insert("x", EditKind::Atomic, Instant::now());
-		terminal.draw(|frame| ui::draw(frame, &mut app)).unwrap();
-		app.editor.undo(false);
+		app.workspace.editor.insert(
+			&mut app.workspace.session.editing,
+			"x",
+			EditKind::Atomic,
+			Instant::now(),
+		);
+		terminal.draw(|frame| app.draw(frame)).unwrap();
+		app.workspace
+			.editor
+			.undo(&mut app.workspace.session.editing, false);
 		samples.push(start.elapsed().as_secs_f64() * 1000.0);
 	}
 	samples.sort_by(f64::total_cmp);
 	println!(
 		"1000 lines, {} text bytes, 1000 style runs; edit + frame + undo: median {:.2} ms, p95 {:.2} ms, max {:.2} ms",
-		app.editor.document.lines.join("\n").len(),
+		app.workspace
+			.session
+			.editing
+			.document
+			.lines()
+			.join("\n")
+			.len(),
 		samples[20],
 		samples[37],
 		samples[39]
 	);
 	let start = Instant::now();
-	verify(&app.editor);
+	verify(&app.workspace.session.editing);
 	println!(
 		"validate + project roundtrip + ANSI roundtrip: {:.2} ms",
 		start.elapsed().as_secs_f64() * 1000.0
@@ -173,7 +206,7 @@ fn fallback_layout_preserves_grapheme_hits_and_roundtrips() {
 	let text = "café é 界 👩🏽‍💻 🇺🇳";
 	let mut editor = Editor::default();
 	editor.insert(text, EditKind::Atomic, Instant::now());
-	let layout = crate::layout::Layout::new(&editor.document.lines, 120, true, true);
+	let layout = crate::libraries::text::Layout::new(editor.document.lines(), 120, true, true);
 	for (y, row) in layout.rows.iter().enumerate() {
 		for cell in &row.cells {
 			for x in cell.x..cell.x + cell.width {
@@ -182,29 +215,42 @@ fn fallback_layout_preserves_grapheme_hits_and_roundtrips() {
 		}
 	}
 	verify(&editor);
-	assert!(styling::ansi(&editor.document).contains(text));
+	assert!(editor.document.to_raw_ansi().contains(text));
 	editor.navigate(Movement::Home, true);
 	editor.apply_tool(Action::Bold);
-	assert_eq!(editor.document.lines[0], text);
+	assert_eq!(editor.document.lines()[0], text);
 	verify(&editor);
 }
 
 #[test]
 fn composed_emoji_newline_redraw_clears_previous_rows() {
 	let mut app = App::default();
-	app.editor
-		.insert("café é 界 👩🏽‍💻 🇺🇳", EditKind::Atomic, Instant::now());
-	app.editor.navigate(Movement::Home, false);
+	app.workspace.editor.insert(
+		&mut app.workspace.session.editing,
+		"café é 界 👩🏽‍💻 🇺🇳",
+		EditKind::Atomic,
+		Instant::now(),
+	);
+	app.workspace
+		.editor
+		.navigate(&mut app.workspace.session.editing, Movement::Home, false);
 	let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(110, 36)).unwrap();
-	terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+	terminal.draw(|f| app.draw(f)).unwrap();
 	let initial = terminal.backend().buffer().clone();
 	for _ in 0..10 {
-		app.editor.insert("\n", EditKind::Atomic, Instant::now());
-		terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+		app.workspace.editor.insert(
+			&mut app.workspace.session.editing,
+			"\n",
+			EditKind::Atomic,
+			Instant::now(),
+		);
+		terminal.draw(|f| app.draw(f)).unwrap();
 	}
 	for _ in 0..10 {
-		app.editor.delete(true, Instant::now());
-		terminal.draw(|f| ui::draw(f, &mut app)).unwrap();
+		app.workspace
+			.editor
+			.delete(&mut app.workspace.session.editing, true, Instant::now());
+		terminal.draw(|f| app.draw(f)).unwrap();
 	}
 	// A wide glyph's continuation is not independently drawn by the terminal.
 	// TestBackend may retain its prior style when the glyph moves back over it.
@@ -220,5 +266,5 @@ fn composed_emoji_newline_redraw_clears_previous_rows() {
 			x += unicode_width::UnicodeWidthStr::width(expected.symbol()).max(1) as u16;
 		}
 	}
-	verify(&app.editor);
+	verify(&app.workspace.session.editing);
 }

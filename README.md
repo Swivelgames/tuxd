@@ -62,6 +62,13 @@ Both panes have independent soft-wrap toggles, initially on, and always-visible 
 
 ## Development and validation
 
+Read the [working agreements](AGENTS.md) and
+[code organization guidance](docs/code-organization-and-readability.md) before
+meaningful changes. The [target architecture](docs/architecture.md) and
+[composable architecture initiative](.work/initiatives/composable-architecture/overview.md)
+describe the planned refactor, its capability contracts, and validation stages;
+they do not describe a completed source migration.
+
 ```sh
 cargo fmt --check
 cargo test --locked
@@ -216,7 +223,7 @@ Validation: `uv run scripts/leader_smoke.py` exercises General navigation, captu
 
 ## Baseline appearance
 
-Application colors and rounded panel/dialog borders are defined in `src/theme.rs`. Midnight is the default appearance, using an explicit dark background and light text. Shared roles cover muted text, focus, selection, errors, gutters, scrollbars and Code syntax highlighting. Document formatting and swatch colors remain independent. Theme customization is available in Settings → Theme → Appearance; the [baseline inventory](.work/initiatives/themes/baseline.md) records the current roles and deliberate visual adjustments.
+Application colors and rounded panel/dialog borders are defined in `src/libraries/themes/` and `src/theme/`. Midnight is the default appearance, using an explicit dark background and light text. Shared roles cover muted text, focus, selection, errors, gutters, scrollbars and Code syntax highlighting. Document formatting and swatch colors remain independent. Theme customization is available in Settings → Theme → Appearance; the [baseline inventory](.work/initiatives/themes/baseline.md) records the current roles and deliberate visual adjustments.
 
 ## Theme configuration
 
@@ -245,3 +252,13 @@ F1, Ctrl+/, or Ctrl+, opens **Settings**, preserving the shortcut-category jump 
 Appearance offers a compact preset chooser: Enter opens the scrollable list, arrows or j/k preview a theme, Enter accepts, and Esc cancels. Left/Right on the closed preset field cycles directly. See the [preset catalog and upstream palette sources](.work/initiatives/themes/presets.md). Custom color overrides are preserved. Reset theme clears only overrides for the selected preset and leaves shortcuts untouched; the change stays in the draft until Save. Color roles are organized into expanded, collapsible Interface, Controls, Editor & Feedback, Code Highlighting, and RGB Controls subsections. Each row separates its label, color field, preview swatch, and Reset button; narrow screens stack the fields beneath their labels. Select a color role with arrows or j/k and press Enter to edit. Valid colors preview immediately across the app; Enter accepts the field, Esc cancels the field edit, and Delete restores that role to the selected preset. Empty input also restores the preset value. Pasting a color value is supported. The role list scrolls with a scrollbar.
 
 Save (Ctrl+S) validates both drafts, writes changes, and activates them together in the running app. Cancel offers to discard unsaved changes, including theme edits; discarding restores the previous theme. Reset all restores both theme and shortcut defaults in the draft. A failed save keeps Settings open and retains both drafts; if saving shortcuts fails after the theme file is written, the previous theme file is restored. The two files are individually persisted, not a single crash-atomic transaction.
+
+## Code ownership
+
+The [architecture guide](docs/architecture.md) maps the implemented boundaries.
+Independent ANSI, editing, shortcut, theme, clipboard, text/control and storage
+capabilities live in `src/libraries/`. `workspace/` composes the session and panes;
+`app/` coordinates services, modal decisions and cross-feature workflows. Features
+receive focused inputs rather than the entire application. The completed
+[refactor record](.work/initiatives/composable-architecture/stage-08-composition.md)
+includes validation and preserved limitations.

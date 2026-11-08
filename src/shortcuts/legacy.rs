@@ -671,10 +671,10 @@ pub fn upgrade(bytes: &[u8]) -> Result<Config, String> {
 	if old.version != 1 {
 		return Err("Expected shortcuts version 1".into());
 	}
-	let mut config = Config {
+	let mut config = Config(super::engine::Configuration {
 		timeout_ms: old.timeout_ms,
-		..Config::default()
-	};
+		..super::registry::catalog().defaults()
+	});
 	let mut changes: BTreeMap<A, Vec<(String, Slots)>> = BTreeMap::new();
 	for (id, slots) in old.bindings {
 		let spec = LEGACY
