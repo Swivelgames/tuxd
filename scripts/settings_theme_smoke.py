@@ -9,7 +9,7 @@ from pathlib import Path
 from terminal_smoke import ROOT, Session
 subprocess.run(["cargo", "build", "--locked"], cwd=ROOT, check=True)
 metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--no-deps", "--format-version=1"], cwd=ROOT))
-binary = str(Path(metadata["target_directory"]) / "debug" / "terminal-ux-designer")
+binary = str(Path(metadata["target_directory"]) / "debug" / "tuxd")
 with tempfile.TemporaryDirectory() as directory:
 	path = Path(directory) / "tuxd" / "theme.json"
 	session = Session(binary, env={"XDG_CONFIG_HOME": directory})

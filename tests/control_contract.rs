@@ -1,4 +1,4 @@
-use terminal_ux_designer::libraries::controls::{self, Direction, Field, FieldAction as A, Range};
+use tuxd::libraries::controls::{self, Direction, Field, FieldAction as A, Range};
 
 #[test]
 fn field_edits_use_graphemes_and_preserve_boundaries_when_text_joins() {

@@ -1,6 +1,6 @@
 //! The editing contract is usable without application objects or terminal widgets.
 use std::time::Instant;
-use terminal_ux_designer::libraries::{
+use tuxd::libraries::{
 	ansi::{Action, Position},
 	editing::{EditKind, Editing, Movement, Navigation},
 	text::Layout,

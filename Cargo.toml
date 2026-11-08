@@ -1,9 +1,12 @@
 [package]
-name = "terminal-ux-designer"
+name = "tuxd"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "A small terminal editor for designing styled text"
+description = "Design styled terminal text with live ANSI output"
+license = "GPL-3.0-only"
+repository = "https://gitlab.com/swivel/tux-design"
+readme = "README.md"
 
 [dependencies]
 base64 = "0.22.1"

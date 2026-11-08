@@ -1,0 +1,45 @@
+[
+	{
+		"theme": "one-dark",
+		"repository": "https://github.com/atom/one-dark-syntax",
+		"revision": "9c96f4454362267ac45322063e193ccf9d2debb1",
+		"license_source": "https://github.com/atom/one-dark-syntax/blob/9c96f4454362267ac45322063e193ccf9d2debb1/LICENSE.md"
+	},
+	{
+		"theme": "dracula",
+		"repository": "https://github.com/dracula/dracula-theme",
+		"revision": "8d33e5492b56740c4857c5ebe7c5d5ab4040caf1",
+		"license_source": "https://github.com/dracula/dracula-theme/blob/8d33e5492b56740c4857c5ebe7c5d5ab4040caf1/LICENSE"
+	},
+	{
+		"theme": "nord",
+		"repository": "https://github.com/nordtheme/nord",
+		"revision": "1cef71605416a222e57225b544540ce0fcec18d4",
+		"license_source": "https://github.com/nordtheme/nord/blob/1cef71605416a222e57225b544540ce0fcec18d4/license"
+	},
+	{
+		"theme": "solarized",
+		"repository": "https://github.com/altercation/solarized",
+		"revision": "62f656a02f93c5190a8753159e34b385588d5ff3",
+		"license_source": "https://github.com/altercation/solarized/blob/62f656a02f93c5190a8753159e34b385588d5ff3/LICENSE"
+	},
+	{
+		"theme": "tokyo-night",
+		"repository": "https://github.com/folke/tokyonight.nvim",
+		"revision": "cdc07ac78467a233fd62c493de29a17e0cf2b2b6",
+		"license_source": "https://github.com/folke/tokyonight.nvim/blob/cdc07ac78467a233fd62c493de29a17e0cf2b2b6/LICENSE"
+	},
+	{
+		"theme": "catppuccin",
+		"repository": "https://github.com/catppuccin/palette",
+		"revision": "07d02aa110ef9eb7e7427afca5c73ba9cf7f8ebd",
+		"license_source": "https://github.com/catppuccin/palette/blob/07d02aa110ef9eb7e7427afca5c73ba9cf7f8ebd/LICENSE"
+	},
+	{
+		"theme": "gruvbox",
+		"repository": "https://github.com/morhetz/gruvbox",
+		"revision": "ef8864bb42bf244f0295d1c5a403b27e3d139695",
+		"license_source": "https://github.com/morhetz/gruvbox/blob/ef8864bb42bf244f0295d1c5a403b27e3d139695/README.md",
+		"author_source": "https://github.com/morhetz/gruvbox/blob/ef8864bb42bf244f0295d1c5a403b27e3d139695/package.json"
+	}
+]

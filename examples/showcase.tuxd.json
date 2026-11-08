@@ -1,0 +1,269 @@
+{
+	"version": 1,
+	"text": "tuxd  /  design styled terminal text\n\n  BUILD SOMETHING BRIGHT\n  A CLI banner. A status message. Your next terminal tool.\n\n  \u2713 Build passed     \u25cf Ready to ship\n  \u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n  \u2502      Select text. Add color. Copy the ANSI.      \u2502\n  \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n\n  Bold  \u00b7  Italic  \u00b7  Underline  \u00b7  RGB color\n\n  Save your design. Export raw or escaped ANSI.\n",
+	"styles": {
+		"runs": [
+			{
+				"start": 0,
+				"end": 4,
+				"style": {
+					"bold": true,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Rgb": [
+							45,
+							230,
+							220
+						]
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 4,
+				"end": 38,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 38,
+				"end": 63,
+				"style": {
+					"bold": true,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Rgb": [
+							128,
+							192,
+							255
+						]
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 63,
+				"end": 123,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 123,
+				"end": 141,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Rgb": [
+							130,
+							220,
+							150
+						]
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 141,
+				"end": 164,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Rgb": [
+							255,
+							205,
+							110
+						]
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 164,
+				"end": 323,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Indexed": 60
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 323,
+				"end": 382,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Rgb": [
+							190,
+							170,
+							255
+						]
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 382,
+				"end": 542,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Indexed": 60
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 542,
+				"end": 548,
+				"style": {
+					"bold": true,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 548,
+				"end": 554,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 554,
+				"end": 560,
+				"style": {
+					"bold": false,
+					"italic": true,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 560,
+				"end": 566,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 566,
+				"end": 575,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": true,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 575,
+				"end": 581,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			},
+			{
+				"start": 581,
+				"end": 591,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": {
+						"Rgb": [
+							255,
+							145,
+							110
+						]
+					},
+					"background": "Default"
+				}
+			},
+			{
+				"start": 591,
+				"end": 640,
+				"style": {
+					"bold": false,
+					"italic": false,
+					"underline": false,
+					"dim": false,
+					"strike": false,
+					"foreground": "Default",
+					"background": "Default"
+				}
+			}
+		]
+	}
+}

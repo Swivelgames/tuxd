@@ -20,7 +20,7 @@ are not. Ask what is unique, what can be isolated, and what must be orchestrated
 | Document | Purpose |
 | --- | --- |
 | [Architecture](../../../docs/architecture.md) | Implemented composition, dependency rules, ownership, organization |
-| [Readability](../../../docs/code-organization-and-readability.md) | Engineering guidance ported from agnostic |
+| [Readability](../../../docs/code-organization-and-readability.md) | Code organization and review practices |
 | [Simplification inventory](simplification-inventory.md) | Current evidence and complexity to eliminate |
 | [Capability contracts](capability-contracts.md) | Library/component interfaces, lifecycle, workflows |
 | [Implementation plan](implementation-plan.md) | Stages, prerequisites, deliverables, completion gates |
@@ -90,9 +90,8 @@ reads, new platforms, large-file engineering, and new themes/defaults. See the
 	mechanics. It was committed and pushed as `f1dc426`.
 - Stage 8 completes Workspace composition, local clipboard transactions, typed
 	file effects and migration cleanup. It is committed and pushed as `3aa3b44`.
-- The subsequent [readability pass](readability-pass.md) applies the shared
-	Workyard/agnostic guidance to the completed structure.
-- The agnostic reference repository was not modified.
+- The subsequent [readability pass](readability-pass.md) applies
+	the readability guidance to the completed structure.
 
 Keep stage-local changes reviewable. A stage record identifies completed contracts,
 remaining bridges, and validation; a passing stage does not complete the initiative.

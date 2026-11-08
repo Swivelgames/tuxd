@@ -1,5 +1,7 @@
 # Theme presets
 
+Public attribution and retained license texts are maintained in [THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md).
+
 Midnight is the default and fallback. Baseline is removed with no migration or compatibility alias. Explicit color overrides remain independent of preset selection. The compact preset chooser previews highlighted entries; Enter/click accepts, Esc cancels. It supports arrows, j/k, Home/End, PageUp/PageDown and mouse-wheel navigation, with a scrollbar when needed.
 
 | Presets | Published palette source |

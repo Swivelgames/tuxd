@@ -1,4 +1,4 @@
-use terminal_ux_designer::libraries::ansi::*;
+use tuxd::libraries::ansi::*;
 
 fn position(byte: usize) -> Position {
 	Position { row: 0, byte }

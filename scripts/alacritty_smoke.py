@@ -12,7 +12,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 subprocess.run(["cargo", "build", "--release", "--locked"], cwd=ROOT, check=True)
 metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--no-deps", "--format-version=1"], cwd=ROOT))
-binary = str(Path(metadata["target_directory"]) / "release" / "terminal-ux-designer")
+binary = str(Path(metadata["target_directory"]) / "release" / "tuxd")
 artifacts = Path(tempfile.mkdtemp(prefix="tuxd-alacritty-evidence-"))
 with tempfile.TemporaryDirectory(prefix="tuxd-alacritty-config-") as directory:
 	folder = Path(directory)

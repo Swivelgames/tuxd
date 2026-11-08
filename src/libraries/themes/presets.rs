@@ -32,7 +32,9 @@ fn rgb(hex: u32) -> Color {
 	Color::Rgb((hex >> 16) as u8, (hex >> 8) as u8, hex as u8)
 }
 
-// Upstream palette sources and role adaptations: .work/initiatives/themes/presets.md.
+// Palette adaptations change role mappings for tuxd. Tokyo Night derives from
+// folke/tokyonight.nvim (Apache-2.0); other third-party palettes retain MIT notices.
+// Sources and retained licenses: THIRD_PARTY_NOTICES.md and licenses/themes/.
 struct Palette {
 	surface: u32,
 	field: u32,

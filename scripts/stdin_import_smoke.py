@@ -13,7 +13,7 @@ from terminal_smoke import ROOT, Session
 
 subprocess.run(["cargo", "build", "--locked"], cwd=ROOT, check=True)
 metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--no-deps", "--format-version=1"], cwd=ROOT))
-binary = str(Path(metadata["target_directory"]) / "debug" / "terminal-ux-designer")
+binary = str(Path(metadata["target_directory"]) / "debug" / "tuxd")
 with tempfile.TemporaryDirectory(prefix="tuxd-stdin-") as directory:
 	folder = Path(directory)
 	for index, (mode, data, review, accept, file_source) in enumerate([

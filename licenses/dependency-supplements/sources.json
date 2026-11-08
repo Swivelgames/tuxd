@@ -1,0 +1,37 @@
+[
+	{
+		"package": "ratatui-termina",
+		"version": "0.1.0",
+		"file": "ratatui-termina-0.1.0.txt",
+		"source": "https://github.com/ratatui/ratatui/blob/e665c36cb14752a61cd777fbd06dbef8474f2add/LICENSE",
+		"revision_from_crate": true
+	},
+	{
+		"package": "vtparse",
+		"version": "0.6.2",
+		"file": "vtparse-0.6.2.txt",
+		"source": "https://github.com/wez/wezterm/blob/edeae72b5fc55c7fa4aa1d08bbefd08c5493f757/LICENSE.md",
+		"revision_from_crate": true
+	},
+	{
+		"package": "wezterm-input-types",
+		"version": "0.1.0",
+		"file": "wezterm-input-types-0.1.0.txt",
+		"source": "https://github.com/wez/wezterm/blob/d5ca5509b95edc31291ba29bd1fcbf3f0b12c92d/LICENSE.md",
+		"revision_from_crate": true
+	},
+	{
+		"package": "winapi-i686-pc-windows-gnu",
+		"version": "0.4.0",
+		"file": "winapi-i686-pc-windows-gnu-0.4.0.txt",
+		"source": "https://github.com/retep998/winapi-rs/blob/5b1829956ef645f3c2f8236ba18bb198ca4c2468/LICENSE-MIT",
+		"revision_from_crate": false
+	},
+	{
+		"package": "winapi-x86_64-pc-windows-gnu",
+		"version": "0.4.0",
+		"file": "winapi-x86_64-pc-windows-gnu-0.4.0.txt",
+		"source": "https://github.com/retep998/winapi-rs/blob/5b1829956ef645f3c2f8236ba18bb198ca4c2468/LICENSE-MIT",
+		"revision_from_crate": false
+	}
+]

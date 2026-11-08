@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use terminal_ux_designer::libraries::themes::{Color, Config, Group, PRESETS, Role, Theme};
+use tuxd::libraries::themes::{Color, Config, Group, PRESETS, Role, Theme};
 
 #[test]
 fn every_preset_and_role_matches_the_pre_refactor_palette() {

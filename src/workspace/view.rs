@@ -81,7 +81,7 @@ impl super::Workspace {
 		}
 		frame.render_widget(
 			Paragraph::new(format!(
-				" Terminal UX Designer{}{}{}{}",
+				" tuxd{}{}{}{}",
 				shortcut_hint(&chrome, crate::shortcuts::ActionId::ToggleCode, "code"),
 				shortcut_hint(
 					&chrome,

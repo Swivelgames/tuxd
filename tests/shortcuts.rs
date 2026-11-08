@@ -2,7 +2,7 @@
 use ratatui_which_key::Key;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use terminal_ux_designer::libraries::shortcuts::{
+use tuxd::libraries::shortcuts::{
 	BindingKey, Catalog, Configuration, Context, Descriptor, Dispatch, Resolver,
 };
 

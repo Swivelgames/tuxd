@@ -8,6 +8,7 @@ This is the consolidated current backlog. Older slice documents describe what wa
 
 | Area | Remaining work | Decisions or prerequisites |
 | --- | --- | --- |
+| Named custom themes | Store themes under `$XDG_CONFIG_HOME/tuxd/themes/` (fallback `~/.config/tuxd/themes/`); create and name themes in Settings | Theme file schema, naming/collision behavior, discovery and selection |
 | Shortcut defaults | Adopt the user's preferred defaults after their keymap walkthrough | User supplies reviewed bindings |
 | Component emoji | Render composed emoji/components reliably instead of display escapes | Shared terminal/multiplexer width strategy; ZWJ, modifiers, flags, selectors, keycaps; redraw/navigation regressions |
 | Character catalogs | More curated glyphs; search by glyph, name and code point | Catalog coverage, metadata and search UI |

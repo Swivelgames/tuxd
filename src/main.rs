@@ -1,4 +1,4 @@
-use terminal_ux_designer::libraries;
+use tuxd::libraries;
 mod adapters;
 mod app;
 mod cli;
@@ -31,10 +31,12 @@ fn main() -> io::Result<()> {
 	let mut startup_import = None;
 	let mut diagnostic = None;
 	match command {
+		cli::Command::Version => {
+			println!("tuxd {}", env!("CARGO_PKG_VERSION"));
+			return Ok(());
+		}
 		cli::Command::Help => {
-			println!(
-				"Terminal UX Designer\n\nUsage: terminal-ux-designer [document.tuxd.json]\n       terminal-ux-designer --raw INPUT\n       terminal-ux-designer --escaped INPUT\n\nINPUT is a file path or - for piped/redirected stdin. Import requires UTF-8, at most 16 MiB.\nImported content opens unsaved. F4 files · Ctrl+S save · Ctrl+Q quit · F1 settings"
-			);
+			print!("{}", cli::HELP);
 			return Ok(());
 		}
 		cli::Command::Edit(path) => document_path = path,

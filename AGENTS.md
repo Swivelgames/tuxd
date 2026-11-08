@@ -1,9 +1,9 @@
 # tuxd working agreements
 
 Read [Code organization and readability](docs/code-organization-and-readability.md)
-before meaningful implementation, refactoring, or review. This guidance was
-ported from the agnostic product and applies in Rust idioms; its examples are
-illustrative, not mandatory file layouts or reasons to build frameworks.
+before meaningful implementation, refactoring, or review. This guidance applies
+in Rust idioms; its examples are illustrative, not mandatory file layouts or
+reasons to build frameworks.
 
 - Use tabs where permitted; use four spaces only when tabs are invalid.
 - Group cohesive capabilities and let each own its assembly and private internals.

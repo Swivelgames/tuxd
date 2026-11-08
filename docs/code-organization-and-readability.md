@@ -294,7 +294,7 @@ fn task_progress_binding<Output, Error>()
 
 These are pseudocode sketches, not requests for a new framework. A helper belongs
 in a reusable library when its meaning and dependencies are library-level: generic
-event serialization can qualify; Workyard task statuses and queue-size choices do
+event serialization can qualify; application task statuses and queue-size choices do
 not automatically qualify. A convenience constructor should compose the existing
 customization path, so callers can still supply a different mapper or view.
 
@@ -441,7 +441,7 @@ Use these questions to find concrete improvements, not to demand a prescribed
 number of files, helpers, traits or abstractions. Apply them to the authorized
 change; do not turn a focused task into an unrelated repository-wide rewrite.
 
-The Workyard create-action reorganization supplied the motivating example:
+A creation workflow illustrates these principles:
 capability-owned assembly, contracts independent of views, staged construction,
 semantic argument groups and an obvious home for future actions. The lesson applies
 equally to storage components, protocol handlers, UI features and other cohesive
@@ -449,10 +449,7 @@ units. The goal is code whose structure explains how to understand and extend it
 
 ## Rust review practices in tuxd
 
-The shared guide above was copied from agnostic's
-`meta/docs/code-organization-and-readability.md`. The Workyard implementation
-review (`meta/integrations/bmad/artifacts/implementation/workyard-consistency-readability-pass.md`)
-reinforces these concrete practices:
+Apply these concrete practices during implementation and review:
 
 - Name operation modes and logical states. A pane is `Editor`, `Code` or `Tools`,
 	not a numeric convention that each caller must remember. Keep numeric indices

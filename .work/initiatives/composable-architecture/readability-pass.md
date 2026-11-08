@@ -7,11 +7,9 @@ No implementation work remains in the refactor initiative.
 
 ## Guidance and scope
 
-The existing [shared guide](../../../docs/code-organization-and-readability.md)
-was verified against agnostic's `meta/docs/code-organization-and-readability.md`:
-it matched before this pass. The Workyard consistency/readability implementation
-record supplied the peer-comparison and named-mode examples. A new Rust practices
-section codifies those lessons here, and `AGENTS.md` reinforces them.
+The [readability guide](../../../docs/code-organization-and-readability.md)
+provides the peer-comparison and named-mode practices used in this pass. A Rust
+practices section codifies those lessons, and `AGENTS.md` reinforces them.
 
 The review covered the application structure, independent libraries, features,
 components, input/render peers, tests and acceptance tooling. Changes target

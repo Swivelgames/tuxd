@@ -24,7 +24,7 @@ from terminal_smoke import ROOT, Session
 
 subprocess.run(["cargo", "build", "--locked"], cwd=ROOT, check=True)
 metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--no-deps", "--format-version=1"], cwd=ROOT))
-binary = str(Path(metadata["target_directory"]) / "debug" / "terminal-ux-designer")
+binary = str(Path(metadata["target_directory"]) / "debug" / "tuxd")
 text = "escaped \\x1b[31m 界 " + "long payload " * 800
 expected = ("\\x1b[0m" + text.replace("\\", "\\\\") + "\\x1b[0m").encode()
 
