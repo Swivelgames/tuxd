@@ -1,6 +1,6 @@
 # Character discovery
 
-Status: implemented on `feature/character-discovery`; ready for review.
+Status: squash-merged into `main` as `df26015`; included in v0.2.0.
 
 ## Delivered
 
@@ -33,6 +33,6 @@ Status: implemented on `feature/character-discovery`; ready for review.
 
 Font coverage remains terminal-dependent. Queries and browsing state are session-local.
 Favorites/recents, user catalogs, font detection, and composed-emoji rendering remain deferred.
-No new Cargo dependencies, configuration-file changes, or release changes.
-Character discovery and its refinements are committed and pushed as `08c30a3`.
-The measured symbol-width mitigation is pending review.
+No new Cargo dependencies or configuration-file changes.
+Character discovery, documentation media, and the measured symbol-width mitigation
+are included in the v0.2.0 release.
