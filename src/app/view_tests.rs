@@ -318,7 +318,7 @@ fn keyboard_reaches_control_groups_and_grid_members_in_all_layouts() {
 				if let Some(index) = app.workspace.panel.items().iter().position(|item| {
 					matches!(
 						item.group(),
-						crate::panel::Group::Colors(_) | crate::panel::Group::Glyphs(_)
+						crate::panel::Group::Colors(_) | crate::panel::Group::Glyphs
 					)
 				}) {
 					app.workspace.panel.selected = index;
@@ -332,6 +332,15 @@ fn keyboard_reaches_control_groups_and_grid_members_in_all_layouts() {
 						.unwrap();
 					app.handle(Event::Key(KeyEvent::new(KeyCode::End, KeyModifiers::NONE)));
 					terminal.draw(|frame| app.draw(frame)).unwrap();
+					let last = if group == crate::panel::Group::Glyphs {
+						assert_eq!(
+							app.workspace.panel.items()[app.workspace.panel.selected].control,
+							app.workspace.panel.characters.selected_control().unwrap()
+						);
+						app.workspace.panel.selected
+					} else {
+						last
+					};
 					assert_eq!(app.workspace.panel.selected, last);
 					assert!(
 						app.workspace

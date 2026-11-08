@@ -5,6 +5,7 @@ impl App {
 		match effect {
 			Effect::Copy(text) => self.copy_field(text),
 			Effect::Paste(field) => self.paste_rgb(field),
+			Effect::PasteCharacters => self.workspace.panel.characters.paste(&self.clipboard),
 			Effect::Notice(message) => self.notice = Some(message),
 			Effect::None => (),
 		}

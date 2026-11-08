@@ -19,9 +19,21 @@ impl super::Panel {
 		let sidebar_track = Rect::new(area.right().saturating_sub(1), area.y, 1, area.height);
 		let area = Rect::new(area.x, area.y, area.width.saturating_sub(1), area.height);
 		self.color.indexed_area = Rect::default();
+		let character_start = self.layout().1[2].0;
+		let focused = self.items().get(self.selected).map(|item| item.control);
+		let character_resized = self.characters.resize(
+			(area.height as usize).saturating_sub(character_start),
+			area.width.saturating_sub(4) as usize,
+		);
+		if character_resized
+			&& let Some(control @ (Control::Glyph(_) | Control::CharacterType(_, _))) = focused
+		{
+			self.characters.reveal_selection();
+			self.focus_character_control(control);
+		}
 		let resized = self.height != area.height as usize;
 		self.height = area.height as usize;
-		if resized && has_focus {
+		if (resized || character_resized) && has_focus {
 			self.reveal();
 		}
 		let (items, sections) = self.layout();
@@ -53,7 +65,7 @@ impl super::Panel {
 				Control::Style(action) => editing.tool_state(action),
 				Control::Target(bg) => Some(self.color.background == bg),
 				Control::Palette(tab) => Some(self.color.palette == tab),
-				Control::GlyphTab(tab) => Some(self.characters.tab == tab),
+				Control::CharacterScope => Some(self.characters.local_search),
 				_ => Some(false),
 			};
 			let selected = state == Some(true);
@@ -96,11 +108,8 @@ impl super::Panel {
 					style = style.fg(theme::accent_color()).add_modifier(Modifier::BOLD);
 					rect.width = (item.label.len() as u16 + 4).min(area.width.saturating_sub(4));
 				}
-				Control::Palette(_) | Control::GlyphTab(_) => {
-					let (labels, active) = match item.control {
-						Control::Palette(_) => (["Basic", "256", "RGB"], self.color.palette),
-						_ => (["Box", "Blocks", "Nerd"], self.characters.tab),
-					};
+				Control::Palette(_) => {
+					let (labels, active) = (["Basic", "256", "RGB"], self.color.palette);
 					let first_tab = index - item.column;
 					let focused_tab = has_focus
 						.then(|| self.selected.checked_sub(first_tab))
@@ -116,6 +125,41 @@ impl super::Panel {
 					);
 				}
 
+				Control::CharacterSearch => {
+					rect.width = (width as u16).saturating_sub(8);
+					let label_width = if rect.width >= 10 { 6 } else { 0 };
+					if label_width > 0 {
+						Paragraph::new("Find:")
+							.style(style)
+							.render(Rect::new(rect.x, rect.y, 5, 1), &mut buffer);
+					}
+					crate::components::field::draw_buffer(
+						&self.characters.query,
+						&mut buffer,
+						Rect::new(
+							rect.x + label_width,
+							rect.y,
+							rect.width.saturating_sub(label_width),
+							1,
+						),
+						focused,
+					);
+				}
+				Control::CharacterGroup => {
+					style = style.bg(if focused {
+						theme::focus_color()
+					} else {
+						theme::field_color()
+					});
+				}
+				Control::CharacterScope => {
+					rect.x = 2 + (width as u16).saturating_sub(7);
+					rect.width = 5.min(width as u16);
+				}
+				Control::CharacterClear => {
+					rect.x = 2 + (width as u16).saturating_sub(1);
+					rect.width = 1.min(width as u16);
+				}
 				Control::Field(field) => {
 					if let Some(input) =
 						self.color
@@ -204,10 +248,14 @@ impl super::Panel {
 					}
 					rect.width = item.label.len() as u16;
 				}
+				Control::CharacterType(_, _) => {
+					rect.x = 2;
+					rect.width = width as u16;
+					style = style.fg(theme::accent_color()).add_modifier(Modifier::BOLD);
+				}
 				Control::Glyph(_) => {
-					rect.x += 1;
-					rect.width =
-						unicode_width::UnicodeWidthStr::width(item.label.as_str()).max(1) as u16;
+					rect.x = (2 + item.column) as u16;
+					rect.width = unicode_width::UnicodeWidthStr::width(item.label.as_str()) as u16;
 				}
 				_ => (),
 			}
@@ -225,7 +273,7 @@ impl super::Panel {
 
 			if !matches!(
 				item.control,
-				Control::Palette(_) | Control::GlyphTab(_) | Control::Field(_)
+				Control::Palette(_) | Control::CharacterSearch | Control::Field(_)
 			) {
 				Paragraph::new(line).style(style).render(rect, &mut buffer);
 			}
@@ -269,28 +317,37 @@ impl super::Panel {
 		}
 
 		if sections[2].1 > 2 {
-			let detail = items.get(self.selected).and_then(|item| {
-				if let Control::Glyph(ch) = item.control {
-					self.characters
-						.glyphs()
-						.iter()
-						.find(|(glyph, _)| *glyph == ch)
-						.map(|(_, name)| format!("U+{:04X} · {name}", ch as u32))
-				} else {
-					None
-				}
-			});
-			let (start, height) = sections[2];
-			Paragraph::new(detail.as_deref().unwrap_or("Choose a character"))
-				.style(
-					Style::default()
-						.fg(theme::muted_color())
-						.bg(theme::surface_color()),
+			let (start, _) = sections[2];
+			let characters = &self.characters;
+			let detail = characters
+				.selected_glyph()
+				.and_then(|glyph| crate::libraries::characters::CATALOG.get(glyph));
+			let detail_row = start + characters.height - 2;
+			let detail = detail
+				.map(|entry| format!("U+{:04X} · {}", entry.glyph as u32, entry.name))
+				.unwrap_or_else(|| {
+					if characters.results.is_empty() {
+						"No matching characters".into()
+					} else {
+						String::new()
+					}
+				});
+			Paragraph::new(detail).style(theme::muted()).render(
+				Rect::new(2, detail_row as u16, width as u16, 1),
+				&mut buffer,
+			);
+			let first = (start + 5).max(top);
+			let end = (start + 5 + characters.rows).min(top + self.height);
+			self.characters.area = if end > first {
+				Rect::new(
+					area.x + 1,
+					area.y + (first - top) as u16,
+					area.width.saturating_sub(2),
+					(end - first) as u16,
 				)
-				.render(
-					Rect::new(2, (start + height - 3) as u16, width as u16, 1),
-					&mut buffer,
-				);
+			} else {
+				Rect::default()
+			};
 		}
 		for row in 0..area.height.min(count.saturating_sub(top) as u16) {
 			for column in 0..area.width {
@@ -312,6 +369,25 @@ impl super::Panel {
 				offset: top,
 			},
 		);
+		let characters = &self.characters;
+		if characters.area.height > 0 {
+			scrollbar::draw(
+				frame,
+				&mut self.scrollbars,
+				Bar {
+					target: Target::Characters,
+					area: Rect::new(
+						area.right().saturating_sub(2),
+						characters.area.y,
+						1,
+						characters.area.height,
+					),
+					content: characters.content_rows,
+					viewport: characters.rows,
+					offset: characters.top,
+				},
+			);
+		}
 		let grid = self.color.indexed_area;
 		if grid.height > 0 {
 			scrollbar::draw(
@@ -326,6 +402,7 @@ impl super::Panel {
 				},
 			);
 		}
+		self.draw_character_dropdown(frame, area);
 	}
 }
 

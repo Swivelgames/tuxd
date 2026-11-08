@@ -10,7 +10,6 @@ mod view;
 pub use input::Effect;
 
 use crate::libraries::ansi::{Action, Ink};
-use characters::{BLOCKS, BOX};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Control {
@@ -18,10 +17,34 @@ pub enum Control {
 	Style(Action),
 	Target(bool),
 	Palette(usize),
-	GlyphTab(usize),
+	CharacterGroup,
+	CharacterType(usize, usize),
+	CharacterSearch,
+	CharacterScope,
+	CharacterClear,
 	Glyph(char),
 	Field(usize),
 	Apply,
+}
+
+impl Control {
+	pub fn section(self) -> usize {
+		match self {
+			Self::Section(section) => section,
+			Self::CharacterGroup
+			| Self::CharacterType(_, _)
+			| Self::CharacterSearch
+			| Self::CharacterScope
+			| Self::CharacterClear
+			| Self::Glyph(_) => 2,
+			Self::Target(_)
+			| Self::Palette(_)
+			| Self::Field(_)
+			| Self::Apply
+			| Self::Style(Action::Foreground(_) | Action::Background(_)) => 1,
+			Self::Style(_) => 0,
+		}
+	}
 }
 
 pub struct Item {
@@ -43,8 +66,11 @@ pub enum Group {
 	Field(usize),
 	Apply,
 	Reset,
-	GlyphTabs,
-	Glyphs(usize),
+	CharacterCategory,
+	CharacterSearch,
+	CharacterScope,
+	CharacterClear,
+	Glyphs,
 }
 
 impl Item {
@@ -53,16 +79,14 @@ impl Item {
 			Control::Section(n) => Group::Section(n),
 			Control::Target(_) => Group::Target,
 			Control::Palette(_) => Group::Palette,
-			Control::GlyphTab(_) => Group::GlyphTabs,
+			Control::CharacterGroup => Group::CharacterCategory,
+			Control::CharacterType(_, _) => Group::Glyphs,
+			Control::CharacterSearch => Group::CharacterSearch,
+			Control::CharacterScope => Group::CharacterScope,
+			Control::CharacterClear => Group::CharacterClear,
 			Control::Field(n) => Group::Field(n),
 			Control::Apply => Group::Apply,
-			Control::Glyph(ch) => Group::Glyphs(if BOX.iter().any(|(c, _)| *c == ch) {
-				0
-			} else if BLOCKS.iter().any(|(c, _)| *c == ch) {
-				1
-			} else {
-				2
-			}),
+			Control::Glyph(_) => Group::Glyphs,
 			Control::Style(Action::Foreground(ink) | Action::Background(ink)) => match ink {
 				Ink::Ansi(_) => Group::Colors(0),
 				Ink::Indexed(_) => Group::Colors(1),
@@ -96,6 +120,7 @@ impl Panel {
 		self.scrollbars.clear();
 		self.area = ratatui::layout::Rect::default();
 		self.color.indexed_area = ratatui::layout::Rect::default();
+		self.characters.area = ratatui::layout::Rect::default();
 		self.color.gauge_areas.clear();
 	}
 
@@ -142,7 +167,7 @@ impl Panel {
 		let preferred = match target {
 			Group::Target => Some(Control::Target(self.color.background)),
 			Group::Palette => Some(Control::Palette(self.color.palette)),
-			Group::GlyphTabs => Some(Control::GlyphTab(self.characters.tab)),
+			Group::Glyphs => self.characters.selected_control(),
 			_ => self.group_memory.get(&target).copied(),
 		};
 		items
@@ -222,14 +247,23 @@ impl Panel {
 impl Panel {
 	pub fn input_scope(&self, index: usize) -> crate::shortcuts::InputScope {
 		use crate::shortcuts::InputScope as S;
+		if self.characters.dropdown.is_some() {
+			return S::CharacterPicker;
+		}
 		self.items()
 			.get(index)
 			.map_or(S::Tools, |item| match item.control {
 				Control::Field(0) => S::Hex,
 				Control::Field(_) => S::Channel,
 				Control::Target(_) => S::Radio,
-				Control::Palette(_) | Control::GlyphTab(_) => S::ToolTabs,
-				Control::Glyph(_) => S::Grid,
+				Control::Palette(_) => S::ToolTabs,
+				Control::CharacterSearch => S::CharacterSearch,
+				Control::Section(2) => S::Characters,
+				Control::CharacterGroup
+				| Control::CharacterType(_, _)
+				| Control::CharacterScope
+				| Control::CharacterClear
+				| Control::Glyph(_) => S::Characters,
 				_ if item.ink.is_some() => S::Grid,
 				_ => S::Tools,
 			})

@@ -21,7 +21,22 @@ impl App {
 		let field_copied = self.poll_field_copy(output);
 		let editor_pasted = self.poll_editor_paste();
 		let rgb_pasted = self.poll_rgb_paste();
-		path_updated || code_copied || editor_copied || field_copied || editor_pasted || rgb_pasted
+		let characters_pasted = match self.workspace.panel.characters.poll_paste() {
+			Some(notice) => {
+				if notice.is_some() {
+					self.notice = notice;
+				}
+				true
+			}
+			None => false,
+		};
+		path_updated
+			|| code_copied
+			|| editor_copied
+			|| field_copied
+			|| editor_pasted
+			|| rgb_pasted
+			|| characters_pasted
 	}
 
 	pub(crate) fn copy_field(&mut self, text: String) {
@@ -124,6 +139,21 @@ mod tests {
 		until(|| app.poll_clipboard_with(&mut Vec::new()));
 		assert_eq!(app.workspace.session.editing.document, document);
 		assert!(!app.editor_clipboard.pasting());
+	}
+
+	#[test]
+	fn character_search_paste_stays_in_its_field_after_focus_moves() {
+		let (service, control) = controlled();
+		let mut app = App {
+			clipboard: service,
+			..Default::default()
+		};
+		app.workspace.panel.characters.paste(&app.clipboard);
+		app.workspace.focus = Pane::Editor;
+		control.reads.send(Ok("U+2500".into())).unwrap();
+		until(|| app.poll_clipboard_with(&mut Vec::new()));
+		assert_eq!(app.workspace.panel.characters.results, vec!['─']);
+		assert!(app.workspace.session.editing.document.is_empty());
 	}
 
 	#[test]

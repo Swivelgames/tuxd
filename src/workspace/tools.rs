@@ -9,6 +9,7 @@ pub enum Effect {
 	None,
 	Copy(String),
 	Paste(usize),
+	PasteCharacters,
 	Notice(String),
 }
 
@@ -44,6 +45,7 @@ impl Workspace {
 			ToolEffect::Focus => self.focus = Pane::Tools,
 			ToolEffect::Copy(text) => return Effect::Copy(text),
 			ToolEffect::Paste(field) => return Effect::Paste(field),
+			ToolEffect::PasteCharacters => return Effect::PasteCharacters,
 			ToolEffect::Notice(message) => return Effect::Notice(message),
 		}
 		Effect::None

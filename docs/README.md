@@ -16,6 +16,7 @@ Already using tuxd? Pick the task you need below.
 | --- | --- |
 | [Getting started](getting-started.md) | Installation, first styling session, copying, saving, and uninstalling |
 | [Editing and styling](editing.md) | Movement, selection, undo, tools, layout, and clipboard editing |
+| [Character discovery](characters.md) | Browse grouped glyphs, search names/code points, and insert |
 | [Documents and ANSI](files.md) | File explorer, native format, raw/escaped import and export, control review |
 | [Theme gallery](themes.md) | Screenshots of every built-in theme |
 | [Settings](settings.md) | Themes, shortcut customization, leader, sequences, and configuration files |
@@ -34,6 +35,7 @@ Already using tuxd? Pick the task you need below.
 - [Development and validation](development.md): build, checks, PTY acceptance, and diagnostics.
 - [Architecture](architecture.md): capabilities, ownership, adapters, workflows, and extension seams.
 - [Code organization and readability](code-organization-and-readability.md): repository engineering conventions.
+- [Character catalog maintenance](character-catalog.md): pinned datasets, generation, eligibility, and ownership.
 - [Working agreements](../AGENTS.md): requirements for changes.
 
 The [work records](../.work/) contain design history and validation evidence. Older slice notes describe their own checkpoints; the user guides describe current behavior.

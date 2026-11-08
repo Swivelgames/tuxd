@@ -52,11 +52,11 @@ The preview swatch shows the candidate color. Incomplete or invalid values leave
 ## Insert a character
 
 1. Place the cursor, or select text to replace.
-2. Open **Characters** and choose Box, Blocks, or Nerd.
+2. Open **Characters** and choose a **Group** and **Type**, or use **Ctrl+F** to search.
 3. Click a glyph, or highlight it with arrows and press **Enter**.
 4. Repeat to insert more; press **Esc** to return to Editor.
 
-The detail line identifies the highlighted glyph. Each insertion can be undone separately. Nerd glyphs need a suitable font.
+The details identify the highlighted glyph. Each insertion can be undone separately. Nerd glyphs need a suitable font. See [Character discovery](characters.md) for groups, search, and navigation.
 
 ## Clipboard and ANSI output
 

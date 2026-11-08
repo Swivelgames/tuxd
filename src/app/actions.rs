@@ -14,6 +14,9 @@ impl App {
 			self.file_shortcut(action);
 			return;
 		}
+		if self.workspace.focus == Pane::Tools && self.workspace.panel.overlay_action(action) {
+			return;
+		}
 		if self.file_command(action) || self.workspace.pane_action(action) {
 			return;
 		}

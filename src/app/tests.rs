@@ -134,7 +134,8 @@ fn glyph_replacement_and_repeated_insertion_are_independent_undo_steps() {
 	app.workspace
 		.editor
 		.undo(&mut app.workspace.session.editing, true);
-	choose(&mut app, Control::GlyphTab(2));
+	app.workspace.panel.characters.query.set("U+F015".into());
+	app.workspace.panel.characters.refresh();
 	choose(&mut app, Control::Glyph('\u{f015}'));
 	assert_eq!(
 		app.workspace.session.editing.document.lines(),

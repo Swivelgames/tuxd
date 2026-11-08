@@ -465,15 +465,30 @@ fn shared_directions_ranges_and_selection_keep_control_specific_semantics() {
 fn composed_catalog_preserves_every_persisted_definition() {
 	let expected: Vec<serde_json::Value> =
 		serde_json::from_str(include_str!("fixtures/catalog-v2.json")).unwrap();
-	assert_eq!(ACTIONS.len(), expected.len());
+	assert_eq!(ACTIONS.len(), expected.len() + 1);
+	assert_eq!(ActionId::CharacterSearch.spec().defaults[0], "Ctrl+f");
 	for row in expected {
 		let id: ActionId = serde_json::from_value(row["id"].clone()).unwrap();
 		let spec = id.spec();
+		// Character discovery adds scopes without changing the historical contracts.
+		let historical_scopes: Vec<_> = spec
+			.scopes
+			.iter()
+			.filter(|s| {
+				!matches!(
+					s,
+					InputScope::Characters
+						| InputScope::CharacterSearch
+						| InputScope::CharacterPicker
+				)
+			})
+			.map(|s| format!("{s:?}"))
+			.collect();
 		assert_eq!(
 			serde_json::json!({
 				"id": id, "label": spec.label, "category": format!("{:?}", spec.section),
 				"subsection": spec.subsection.map_or("None".into(), |s| format!("{s:?}")),
-				"order": spec.order, "scopes": spec.scopes.iter().map(|s| format!("{s:?}")).collect::<Vec<_>>(),
+				"order": spec.order, "scopes": historical_scopes,
 				"defaults": spec.defaults,
 			}),
 			row

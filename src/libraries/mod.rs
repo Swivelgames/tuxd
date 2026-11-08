@@ -1,4 +1,5 @@
 pub mod ansi;
+pub mod characters;
 pub mod clipboard;
 pub mod controls;
 pub mod editing;

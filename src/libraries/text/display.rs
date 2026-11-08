@@ -12,11 +12,13 @@ pub struct Glyph<'a> {
 
 /// Conservative display for clusters whose width differs across terminal stacks.
 /// ZWJ/modifier/presentation sequences and regional indicators are escaped until
-/// component rendering can negotiate terminal widths. Never use this for export.
+/// component rendering can negotiate terminal widths. Known scalar width conflicts
+/// also use escapes. Never use this for export.
 /// Document bytes and extended-grapheme editing remain unchanged.
 pub fn display_grapheme(text: &str) -> std::borrow::Cow<'_, str> {
 	let scalar_width: usize = text.chars().map(|c| c.width().unwrap_or(0)).sum();
-	if scalar_width != text.width()
+	if text.chars().any(unstable_symbol_width)
+		|| scalar_width != text.width()
 		|| text.contains('\u{200d}')
 		|| text
 			.chars()
@@ -32,6 +34,24 @@ pub fn display_grapheme(text: &str) -> std::borrow::Cow<'_, str> {
 	} else {
 		std::borrow::Cow::Borrowed(text)
 	}
+}
+
+/// These text-default emoji occupy one cell in Alacritty 0.17 and two in tmux 3.8.
+/// VS15/VS16 do not reconcile their cursor advances. Keep this policy shared by
+/// document projection and catalog admission so redraws cannot leave stale cells.
+fn unstable_symbol_width(ch: char) -> bool {
+	matches!(
+		ch,
+		'\u{261d}'
+			| '\u{26f9}'
+			| '\u{270c}'
+			| '\u{270d}'
+			| '\u{1f3cb}'
+			| '\u{1f3cc}'
+			| '\u{1f574}'
+			| '\u{1f575}'
+			| '\u{1f590}'
+	)
 }
 
 pub fn display_width(text: &str) -> usize {
@@ -108,6 +128,24 @@ mod tests {
 			assert_eq!(display_grapheme(text), text);
 		}
 		assert_eq!(display_grapheme("\u{301}"), "◌\u{301}");
+	}
+
+	#[test]
+	fn tmux_width_conflicts_are_escaped_including_presentation_variants() {
+		for glyph in ['☝', '⛹', '✌', '✍', '🏋', '🏌', '🕴', '🕵', '🖐'] {
+			for suffix in ["", "\u{fe0e}", "\u{fe0f}"] {
+				let text = format!("{glyph}{suffix}");
+				assert!(display_grapheme(&text).is_ascii());
+				let line = format!("a{text}b");
+				let end = 1 + text.len();
+				assert_eq!(column_at(&line, end), 1 + display_width(&text));
+				assert_eq!(byte_at_column(&line, column_at(&line, end)), end);
+				assert!(crate::libraries::characters::CATALOG.get(glyph).is_none());
+			}
+		}
+		for text in ["☀", "♥", "✓", "😀", "🚀"] {
+			assert_eq!(display_grapheme(text), text);
+		}
 	}
 
 	#[test]

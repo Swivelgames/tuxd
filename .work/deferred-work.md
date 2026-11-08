@@ -10,8 +10,8 @@ This is the consolidated current backlog. Older slice documents describe what wa
 | --- | --- | --- |
 | Named custom themes | Store themes under `$XDG_CONFIG_HOME/tuxd/themes/` (fallback `~/.config/tuxd/themes/`); create and name themes in Settings | Theme file schema, naming/collision behavior, discovery and selection |
 | Shortcut defaults | Adopt the user's preferred defaults after their keymap walkthrough | User supplies reviewed bindings |
-| Component emoji | Render composed emoji/components reliably instead of display escapes | Shared terminal/multiplexer width strategy; ZWJ, modifiers, flags, selectors, keycaps; redraw/navigation regressions |
-| Character catalogs | More curated glyphs; search by glyph, name and code point | Catalog coverage, metadata and search UI |
+| Component emoji | Render composed emoji/components reliably instead of display escapes; see [width investigation](character-rendering.md) | Shared terminal/multiplexer width strategy; ZWJ, modifiers, flags, selectors, keycaps; redraw/navigation regressions |
+| Character discovery follow-ups | Favorites/recents, custom catalogs, font detection | Expanded grouped catalog and name/glyph/code-point search are implemented; these additions remain deferred |
 | Style-only clipboard | Copy/paste formatting without text, targeting selection or pending typing style, with undo | Representation, mixed selection behavior and clipboard compatibility |
 | Workspaces | Related files, left explorer and multiple open document tabs | Per-document undo/dirty state, switching, save/close rules and workspace metadata |
 | Proper Vim mode | Modal editing, composable operators/motions, counts and coherent undo | Registers, visual selection, repeat/search and compatibility contract |
@@ -39,6 +39,8 @@ Application-managed font selection/installation and guaranteed terminal capabili
 
 ## Completed work removed from the backlog
 
+- Expanded offline character discovery with meaningful groups/subgroups, glyph/name/alias/code-point search, and bounded scrolling.
+
 - Shared Settings with Midnight-default UI themes and an expanded preset catalog, per-role customization, live preview, independent reset, and persistence.
 
 - Optional shortcut leader and General settings, including staged conversion/unset prompts and resolved conflict validation.
@@ -54,4 +56,4 @@ Application-managed font selection/installation and guaranteed terminal capabili
 
 ## Suggested next selection
 
-Character discovery would be a self-contained product improvement. Component-emoji rendering and code generation each require more investigation before implementation scope can be estimated confidently. This is sequencing advice, not an approved order.
+Character discovery is implemented. Component-emoji rendering and code generation each require more investigation before implementation scope can be estimated confidently. This is sequencing advice, not an approved order.

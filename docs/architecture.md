@@ -375,3 +375,11 @@ styles and editing transactions; multi-file support adds sessions and navigation
 component-emoji work changes shared display strategy. Vim mode composes input and
 editing. Code generation remains a separate discovery initiative consuming the
 document capability. These placements do not add deferred features to this scope.
+
+## Character discovery
+
+`libraries/characters` owns the bundled Unicode/Nerd metadata, grouping, eligibility,
+and deterministic search. `panel/characters` owns query editing, browse choices,
+result navigation, and the bounded grid. Workspace applies glyph insertion through
+Editing, preserving selection, typing styles, and undo. See the
+[catalog maintenance guide](character-catalog.md) for the data and validation contract.

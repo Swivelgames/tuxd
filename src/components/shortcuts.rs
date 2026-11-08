@@ -11,7 +11,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Workspace,
 		subsection: Some(Subsection::TextFields),
 		order: 51,
-		scopes: &[Location, Filename],
+		scopes: &[Location, Filename, CharacterSearch],
 		defaults: ["Delete", "", ""],
 	},
 	ActionSpec {
@@ -191,7 +191,15 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Workspace,
 		subsection: Some(Subsection::TextFields),
 		order: 60,
-		scopes: &[Editor, Code, Location, Filename, Hex, Channel],
+		scopes: &[
+			Editor,
+			Code,
+			Location,
+			Filename,
+			Hex,
+			Channel,
+			CharacterSearch,
+		],
 		defaults: ["Ctrl+c", "", ""],
 	},
 	ActionSpec {
@@ -209,6 +217,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 			FileButtons,
 			Hex,
 			Channel,
+			CharacterSearch,
 		],
 		defaults: ["Ctrl+v", "", ""],
 	},
@@ -245,7 +254,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Workspace,
 		subsection: Some(Subsection::TextFields),
 		order: 62,
-		scopes: &[Editor, Location, Filename, Hex, Channel],
+		scopes: &[Editor, Location, Filename, Hex, Channel, CharacterSearch],
 		defaults: ["Ctrl+a", "", ""],
 	},
 ];

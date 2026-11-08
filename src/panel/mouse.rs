@@ -7,6 +7,7 @@ impl Panel {
 		match target {
 			Target::Tools => self.top = offset,
 			Target::Indexed => self.color.indexed_top = offset,
+			Target::Characters => self.scroll_characters(offset),
 		}
 	}
 
@@ -128,7 +129,14 @@ impl Panel {
 			MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
 		) {
 			let down = mouse.kind == MouseEventKind::ScrollDown;
-			if self.color.indexed_area.contains(point) {
+			if self.characters.area.contains(point) {
+				let top = if down {
+					self.characters.top + 1
+				} else {
+					self.characters.top.saturating_sub(1)
+				};
+				self.scroll_characters(top);
+			} else if self.color.indexed_area.contains(point) {
 				self.color.indexed_top = if down {
 					(self.color.indexed_top + 1).min(32)
 				} else {

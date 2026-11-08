@@ -21,8 +21,8 @@ with tempfile.TemporaryDirectory(prefix="tuxd-alacritty-config-") as directory:
 	document = folder / "check.tuxd.json"
 	document.write_bytes((ROOT / "examples/welcome.tuxd.json").read_bytes())
 	original = json.loads(document.read_text())
-	if "--unicode" in sys.argv:
-		original["text"] = "café é 界 👩🏽‍💻 🇺🇳"
+	if "--unicode" in sys.argv or "--symbols" in sys.argv:
+		original["text"] = "☝ ⛹ ✌ ✍ 🏋 🏌 🕴 🕵 🖐" if "--symbols" in sys.argv else "café é 界 👩🏽‍💻 🇺🇳"
 		original["styles"]["runs"] = [{"start": 0, "end": len(original["text"].encode()), "style": {**original["styles"]["runs"][0]["style"], "bold": False}}]
 		document.write_text(json.dumps(original))
 	read_fd, write_fd = os.pipe()
@@ -60,12 +60,33 @@ with tempfile.TemporaryDirectory(prefix="tuxd-alacritty-config-") as directory:
 		def capture(name):
 			subprocess.run(["import", "-window", window, str(artifacts / name)], env=env, check=True)
 		capture("initial.png")
-		if "--unicode" in sys.argv:
+		if "--characters" in sys.argv:
+			xdo("windowsize", "--sync", window, "640", "800")
+			keys("F6", "alt+Right", "alt+Right", "alt+Right", "F5", "ctrl+f")
+			xdo("type", "--clearmodifiers", "arrow")
+			keys("Return", "Right", "Down")
+			capture("characters-search.png")
+			xdo("windowsize", "--sync", window, "1100", "800")
+			keys("ctrl+f", "ctrl+a")
+			xdo("type", "--clearmodifiers", "U+2500")
+			keys("Return")
+			capture("characters-wide.png")
+			keys("ctrl+f", "ctrl+a", "BackSpace", "shift+Tab", "Return")
+			capture("characters-groups.png")
+			xdo("type", "--clearmodifiers", "Emoji")
+			keys("Return", "ctrl+f", "Return", "Home")
+			capture("characters-emoji.png")
+			keys("Return")
+			capture("characters-types.png")
+			keys("Escape", "Escape")
+
+		if "--unicode" in sys.argv or "--symbols" in sys.argv:
 			keys("ctrl+End", "shift+Home")
 			capture("unicode-selected.png")
-			keys("Home", *(["Return"] * 10))
+			count = 30 if "--symbols" in sys.argv else 10
+			keys("Home", *(["Return"] * count))
 			capture("unicode-newlines.png")
-			keys(*(["BackSpace"] * 10))
+			keys(*(["BackSpace"] * count))
 			capture("unicode-restored.png")
 			# Compare the full body, excluding the title's dirty marker and status rows.
 			w, h = map(int, subprocess.check_output(["identify", "-format", "%w %h", str(artifacts / "initial.png")]).split())

@@ -45,7 +45,12 @@ class Session:
 			[binary, *args], stdin=self.slave if stdin_source is None else stdin_source, stdout=self.slave, stderr=self.slave,
 			env={key: value for key, value in {**os.environ, "TERM": "xterm-256color", "XDG_CONFIG_HOME": self.config_directory.name, "TMUX": None, "TMUX_PANE": None, "SSH_CONNECTION": None, "SSH_TTY": None, **(env or {})}.items() if value is not None}, preexec_fn=controlling_terminal,
 		)
-		self.drain()
+		# Catalog/config initialization can precede the first terminal frame.
+		deadline = time.monotonic() + 5
+		while time.monotonic() < deadline:
+			self.drain()
+			if "F6 focus" in "\n".join(self.rows()) or self.process.poll() is not None:
+				break
 
 	def resize(self, columns, rows):
 		fcntl.ioctl(self.slave, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0))
@@ -414,7 +419,7 @@ def main():
 		session.send("\x1b[17~")
 		session.resize(40, 12)
 		session.send("\x1b[1;3C\x1b[1;3C")  # Style -> Color -> Characters tabs
-		session.send("\t\x1b[F\r\r")
+		session.send("\x06U+256C\r\r\r")
 		assert "Characters" in "\n".join(session.rows())
 		session.send("\x1b")
 		session.resize(80, 24)

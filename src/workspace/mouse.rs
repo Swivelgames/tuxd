@@ -4,6 +4,9 @@ use crossterm::event::{MouseButton, MouseEventKind};
 
 impl Workspace {
 	pub(crate) fn mouse(&mut self, mouse: crossterm::event::MouseEvent) -> super::Effect {
+		if self.panel.overlay_mouse(mouse) {
+			return super::Effect::None;
+		}
 		let point = (mouse.column, mouse.row).into();
 		let editor_bar = self.editor.surface.scrollbar_event(mouse);
 		let code_bar = self.code.surface.scrollbar_event(mouse);

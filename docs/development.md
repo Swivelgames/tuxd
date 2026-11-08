@@ -20,6 +20,7 @@ Run from the repository root. `uv` supplies the Python scripts’ pinned depende
 
 ```sh
 uv run scripts/terminal_smoke.py
+uv run scripts/characters_smoke.py
 uv run scripts/clipboard_smoke.py
 uv run scripts/editor_clipboard_smoke.py
 uv run scripts/stdin_import_smoke.py

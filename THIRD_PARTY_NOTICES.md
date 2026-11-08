@@ -19,6 +19,16 @@ The theme implementations in `src/libraries/themes/presets.rs` adapt published p
 
 [Pinned notice sources](licenses/themes/sources.json) record the upstream revisions reviewed. Gruvbox declares MIT/X11 in its README and MIT in its package metadata, rather than providing a standalone license file; its retained notice identifies that source and author.
 
+## Character metadata
+
+| Data | Source | Retained license |
+| --- | --- | --- |
+| Unicode names, aliases, categories, blocks, and properties | [Unicode Character Database 17.0.0](https://www.unicode.org/Public/17.0.0/ucd/) | [Unicode License v3](licenses/characters/UNICODE.txt) |
+| Emoji categories and names | [Unicode Emoji 17.0](https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt) | [Unicode License v3](licenses/characters/UNICODE.txt) |
+| Nerd Font icon names and code points | [Nerd Fonts 3.4.0](https://github.com/ryanoasis/nerd-fonts/tree/v3.4.0) | [Upstream license, including MIT for source files](licenses/characters/NERD-FONTS.txt) |
+
+[Pinned data sources](licenses/characters/sources.json) and the [catalog maintenance guide](docs/character-catalog.md) describe regeneration. tuxd redistributes derived metadata, not font binaries or chart PDFs.
+
 ## Rust dependencies
 
 [Dependency notices](licenses/dependencies.txt) contain each locked package’s version, upstream license declaration, source link, and retained license/copyright texts. The inventory includes build dependencies and packages for other target platforms; it is broader than any one compiled binary.

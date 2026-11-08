@@ -5,7 +5,7 @@ use ratatui::{
 	Frame,
 	layout::Rect,
 	style::{Modifier, Style},
-	widgets::Paragraph,
+	widgets::{Paragraph, Widget},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -22,12 +22,16 @@ pub fn action(action: A) -> Option<FieldAction> {
 	})
 }
 pub fn draw(field: &Field, frame: &mut Frame, area: Rect, focused: bool) {
-	let before = crate::libraries::text::display::sanitize(&field.text()[..field.cursor()]);
+	draw_buffer(field, frame.buffer_mut(), area, focused);
+}
+
+pub fn draw_buffer(field: &Field, buffer: &mut ratatui::buffer::Buffer, area: Rect, focused: bool) {
+	let before = display_text(&field.text()[..field.cursor()]);
 	let text = format!(
 		"{}{}{}",
 		before,
 		if focused { "▏" } else { "" },
-		crate::libraries::text::display::sanitize(&field.text()[field.cursor()..])
+		display_text(&field.text()[field.cursor()..])
 	);
 	let skip = if focused {
 		before
@@ -36,22 +40,39 @@ pub fn draw(field: &Field, frame: &mut Frame, area: Rect, focused: bool) {
 	} else {
 		0
 	};
-	frame.render_widget(
-		Paragraph::new(text)
-			.scroll((0, skip.min(u16::MAX as usize) as u16))
-			.style(
-				Style::default()
-					.bg(if focused {
-						theme::selected_color()
-					} else {
-						theme::field_color()
-					})
-					.add_modifier(if focused && field.selected() {
-						Modifier::REVERSED
-					} else {
-						Modifier::empty()
-					}),
-			),
-		area,
-	);
+	Paragraph::new(text)
+		.scroll((0, skip.min(u16::MAX as usize) as u16))
+		.style(
+			Style::default()
+				.bg(if focused {
+					theme::selected_color()
+				} else {
+					theme::field_color()
+				})
+				.add_modifier(if focused && field.selected() {
+					Modifier::REVERSED
+				} else {
+					Modifier::empty()
+				}),
+		)
+		.render(area, buffer);
+}
+
+/// Fields accept literal search/path text; display fallback must not change it.
+fn display_text(text: &str) -> String {
+	use crate::libraries::text::display::{display_grapheme, glyphs, sanitize};
+	let sanitized = sanitize(text);
+	glyphs(&sanitized)
+		.map(|glyph| display_grapheme(glyph.text))
+		.collect()
+}
+
+#[cfg(test)]
+mod tests {
+	use super::display_text;
+	#[test]
+	fn fields_use_the_same_safe_grapheme_projection_as_document_views() {
+		assert_eq!(display_text("café 界 ─"), "café 界 ─");
+		assert_eq!(display_text("flag 🇺🇳"), "flag \\u{1f1fa}\\u{1f1f3}");
+	}
 }

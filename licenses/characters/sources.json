@@ -1,0 +1,34 @@
+{
+	"unicode": "17.0.0",
+	"nerd_fonts": "3.4.0",
+	"sources": {
+		"UnicodeData.txt": {
+			"url": "https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt",
+			"sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
+		},
+		"Blocks.txt": {
+			"url": "https://www.unicode.org/Public/17.0.0/ucd/Blocks.txt",
+			"sha256": "c0edefaf1a19771e830a82735472716af6bf3c3975f6c2a23ffbe2580fbbcb15"
+		},
+		"NameAliases.txt": {
+			"url": "https://www.unicode.org/Public/17.0.0/ucd/NameAliases.txt",
+			"sha256": "793f6f1e4d15fd90f05ae66460191dc4d75d1fea90136a25f30dd6a4cb950eac"
+		},
+		"DerivedCoreProperties.txt": {
+			"url": "https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt",
+			"sha256": "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08"
+		},
+		"glyphnames.json": {
+			"url": "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v3.4.0/glyphnames.json",
+			"sha256": "e2d10d23f5bff0bd6f0676e9b01d9789fcdc656de7b498a2955c27716ea4439c"
+		},
+		"DerivedName.txt": {
+			"url": "https://www.unicode.org/Public/17.0.0/ucd/extracted/DerivedName.txt",
+			"sha256": "019758bbe6c756c40fca6d505187ea660c5e195533e2ff2c841963a212c9d369"
+		},
+		"emoji-test.txt": {
+			"url": "https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt",
+			"sha256": "1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda"
+		}
+	}
+}

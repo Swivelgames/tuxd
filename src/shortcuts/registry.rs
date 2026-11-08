@@ -10,6 +10,9 @@ pub enum InputScope {
 	Grid,
 	Hex,
 	Channel,
+	Characters,
+	CharacterSearch,
+	CharacterPicker,
 	Explorer,
 	Location,
 	Filename,
@@ -88,7 +91,8 @@ impl InputScope {
 		match self {
 			Editor => Category::Editor,
 			Code => Category::Code,
-			Tools | Radio | ToolTabs | Grid | Hex | Channel => Category::Tools,
+			Tools | Radio | ToolTabs | Grid | Hex | Channel | Characters | CharacterSearch
+			| CharacterPicker => Category::Tools,
 			Explorer | Location | Filename | Format | FileButtons => Category::Explorer,
 			Menu | Prompt | ReviewContent | ReviewButtons => Category::Dialogs,
 		}
@@ -96,7 +100,11 @@ impl InputScope {
 	pub fn text(self) -> bool {
 		matches!(
 			self,
-			Self::Editor | Self::Location | Self::Filename | Self::Hex | Self::Channel
+			Self::Editor
+				| Self::Location
+				| Self::Filename
+				| Self::Hex | Self::Channel
+				| Self::CharacterSearch
 		)
 	}
 	pub fn label(self) -> &'static str {
@@ -106,9 +114,12 @@ impl InputScope {
 			Self::Tools => "Tool buttons",
 			Self::Radio => "Tool radios",
 			Self::ToolTabs => "Tool tabs",
-			Self::Grid => "Color and character grids",
+			Self::Grid => "Color grids",
 			Self::Hex => "Hex field",
 			Self::Channel => "RGB ranges",
+			Self::Characters => "Characters",
+			Self::CharacterPicker => "Character dropdowns",
+			Self::CharacterSearch => "Character search",
 			Self::Explorer => "Explorer list",
 			Self::Location => "Location field",
 			Self::Filename => "Filename field",
@@ -122,16 +133,29 @@ impl InputScope {
 	}
 }
 use InputScope::*;
-pub(crate) const WORKSPACE: &[InputScope] =
-	&[Editor, Code, Tools, Radio, ToolTabs, Grid, Hex, Channel];
-pub(crate) const PICKER: &[InputScope] = &[Explorer, Location, Filename, Format, FileButtons];
-pub(crate) const FOCUSABLE: &[InputScope] = &[
+pub(crate) const WORKSPACE: &[InputScope] = &[
+	Editor,
+	Code,
 	Tools,
 	Radio,
 	ToolTabs,
 	Grid,
 	Hex,
 	Channel,
+	Characters,
+	CharacterSearch,
+];
+pub(crate) const PICKER: &[InputScope] = &[Explorer, Location, Filename, Format, FileButtons];
+pub(crate) const FOCUSABLE: &[InputScope] = &[
+	Tools,
+	CharacterPicker,
+	Radio,
+	ToolTabs,
+	Grid,
+	Hex,
+	Channel,
+	Characters,
+	CharacterSearch,
 	Explorer,
 	Location,
 	Filename,
@@ -144,6 +168,9 @@ pub(crate) const FOCUSABLE: &[InputScope] = &[
 ];
 pub(crate) const DIRECTIONAL: &[InputScope] = &[
 	Tools,
+	CharacterPicker,
+	Characters,
+	CharacterSearch,
 	Radio,
 	ToolTabs,
 	Grid,
@@ -159,11 +186,14 @@ pub(crate) const DIRECTIONAL: &[InputScope] = &[
 ];
 pub(crate) const VERTICAL: &[InputScope] = &[
 	Tools,
+	CharacterPicker,
 	Radio,
 	ToolTabs,
 	Grid,
 	Hex,
 	Channel,
+	Characters,
+	CharacterSearch,
 	Format,
 	FileButtons,
 	Menu,
@@ -171,9 +201,19 @@ pub(crate) const VERTICAL: &[InputScope] = &[
 	ReviewContent,
 	ReviewButtons,
 ];
-pub(crate) const PAGED: &[InputScope] = &[Tools, Grid, ReviewContent, ReviewButtons];
+pub(crate) const PAGED: &[InputScope] = &[
+	Tools,
+	CharacterPicker,
+	Grid,
+	Characters,
+	ReviewContent,
+	ReviewButtons,
+];
 pub(crate) const BOUNDARY: &[InputScope] = &[
 	Tools,
+	CharacterPicker,
+	Characters,
+	CharacterSearch,
 	Radio,
 	ToolTabs,
 	Grid,
@@ -186,6 +226,8 @@ pub(crate) const BOUNDARY: &[InputScope] = &[
 ];
 pub(crate) const ACTIVATABLE: &[InputScope] = &[
 	Tools,
+	CharacterPicker,
+	Characters,
 	Radio,
 	ToolTabs,
 	Grid,
@@ -196,7 +238,7 @@ pub(crate) const ACTIVATABLE: &[InputScope] = &[
 	Prompt,
 	ReviewButtons,
 ];
-pub(crate) const TEXT_FIELDS: &[InputScope] = &[Location, Filename, Hex, Channel];
+pub(crate) const TEXT_FIELDS: &[InputScope] = &[Location, Filename, Hex, Channel, CharacterSearch];
 pub(crate) const RESPONSES: &[InputScope] = &[Prompt, ReviewContent, ReviewButtons, FileButtons];
 
 #[derive(Clone)]
@@ -276,6 +318,7 @@ pub enum ActionId {
 	CodeStart,
 	CodeFinish,
 	RgbApply,
+	CharacterSearch,
 	PickerLocation,
 	PickerCwd,
 	PickerHidden,
@@ -351,6 +394,9 @@ pub fn catalog()
 				Grid,
 				Hex,
 				Channel,
+				Characters,
+				CharacterSearch,
+				CharacterPicker,
 				Explorer,
 				Location,
 				Filename,
@@ -422,7 +468,7 @@ impl ActionId {
 			return "File dialogs".into();
 		}
 		if scopes == TEXT_FIELDS {
-			return "Path, Hex and RGB fields".into();
+			return "Path, color and character-search fields".into();
 		}
 		if scopes.len() > 8 {
 			return "Tool controls, file dialogs and prompts".into();
@@ -447,7 +493,7 @@ impl ActionId {
 			PastePlain => "Decode ANSI and paste its text using the current typing style.".into(),
 			PasteLiteral => "Paste clipboard text literally without decoding ANSI escape notation.".into(),
 			Copy => "Copy selected field text, or the entire escaped ANSI output in Code. Editor selections are copied as escaped ANSI.".into(),
-			Paste => "Paste plain or styled ANSI text into the Editor, or text into a path or RGB field. In the explorer list, paste fills File/path.".into(),
+			Paste => "Paste plain or styled ANSI text into the Editor, or text into a path, RGB or character-search field. In the explorer list, paste fills File/path.".into(),
 			SelectAll => "Select the focused field's contents for copying or replacement.".into(),
 			NextField | PreviousField => "Move focus between fields. Radios, tabs, and grids are each one focus stop.".into(),
 			FieldLeft | FieldRight | FieldUp | FieldDown => "Navigate the focused control. Radios/tabs select immediately; grids move the highlight without applying it.".into(),

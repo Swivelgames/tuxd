@@ -36,7 +36,7 @@ See [import examples](files.md#import-existing-ansi) and [supported ANSI](format
 
 | Symptom | Explanation |
 | --- | --- |
-| Joined emoji or flags display as escapes | Safe display fallback; original text is preserved in save/export/copy |
+| Joined emoji, flags, or known width-conflicting symbols display as escapes | Safe display fallback; original text is preserved in save/export/copy |
 | Character width differs | Terminal/font handling of ambiguous-width and emoji characters varies |
 | Basic/indexed colors differ | These follow the terminal palette |
 | RGB looks wrong | True-color support is required |
@@ -44,7 +44,9 @@ See [import examples](files.md#import-existing-ansi) and [supported ANSI](format
 | Theme changes do not recolor the document | Interface themes and document formatting are independent |
 | `NO_COLOR` does not disable the preview | Color is part of the document being edited |
 
-Accents, CJK, and ordinary single emoji render normally, subject to the terminal font. tuxd does not install or choose terminal fonts.
+Accents, CJK, and most standalone emoji render normally, subject to the terminal font.
+Nine text-default emoji symbols use display escapes because tmux and Alacritty
+disagree about their cell widths; this prevents stale cells during redraws. tuxd does not install or choose terminal fonts.
 
 ## A key is recorded as another key
 

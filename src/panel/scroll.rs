@@ -2,6 +2,7 @@
 pub enum Target {
 	Tools,
 	Indexed,
+	Characters,
 }
 
 impl crate::components::scrollbar::Orientation for Target {

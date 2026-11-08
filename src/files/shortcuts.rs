@@ -111,6 +111,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		order: 3,
 		scopes: &[
 			Menu,
+			CharacterPicker,
 			Prompt,
 			ReviewContent,
 			ReviewButtons,

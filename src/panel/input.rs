@@ -9,20 +9,30 @@ pub enum Effect {
 	Focus,
 	Copy(String),
 	Paste(usize),
+	PasteCharacters,
 	Notice(String),
 }
 
 impl Panel {
 	pub fn insert_text(&mut self, text: &str) {
-		if let Some(item) = self.items().get(self.selected)
-			&& let Control::Field(field) = item.control
-		{
-			self.color.rgb.edit(field, text, false);
+		if self.characters.dropdown_text(text) {
+			return;
+		}
+		match self.items().get(self.selected).map(|item| item.control) {
+			Some(Control::Field(field)) => self.color.rgb.edit(field, text, false),
+			Some(Control::CharacterSearch) => self.characters.insert(text),
+			_ => (),
 		}
 	}
 
 	pub fn reveal(&mut self) {
 		if let Some(item) = self.items().get(self.selected) {
+			if matches!(
+				item.control,
+				Control::Glyph(_) | Control::CharacterType(_, _)
+			) {
+				self.characters.select(item.control);
+			}
 			if let Some(crate::libraries::ansi::Ink::Indexed(n)) = item.ink {
 				let row = n as usize / 7;
 				if row < self.color.indexed_top {
@@ -38,6 +48,15 @@ impl Panel {
 				}
 				if row >= self.top + self.height.max(1) {
 					self.top = row + 1 - self.height.max(1);
+				}
+			}
+			if item.control.section() == 2 {
+				let (start, height) = self.layout().1[2];
+				if height <= self.height {
+					self.top = self
+						.top
+						.min(start)
+						.max((start + height).saturating_sub(self.height));
 				}
 			}
 		}
@@ -61,11 +80,31 @@ impl Panel {
 				self.color.palette = tab;
 				Effect::None
 			}
-			Control::GlyphTab(tab) => {
-				self.characters.tab = tab;
-				Effect::None
+			Control::CharacterGroup => {
+				self.characters.open_dropdown();
+				Effect::Focus
 			}
-			Control::Glyph(ch) => Effect::Glyph(ch),
+			Control::CharacterType(group, subtype) => {
+				self.characters.toggle_type(group, subtype);
+				self.focus_character_control(control);
+				Effect::Focus
+			}
+			Control::CharacterSearch => Effect::Focus,
+			Control::CharacterScope => {
+				self.characters.local_search = !self.characters.local_search;
+				self.characters.refresh();
+				Effect::Focus
+			}
+			Control::CharacterClear => {
+				self.characters.query.set(String::new());
+				self.characters.refresh();
+				self.focus_character_control(Control::CharacterSearch);
+				Effect::Focus
+			}
+			Control::Glyph(ch) => {
+				self.characters.select(Control::Glyph(ch));
+				Effect::Glyph(ch)
+			}
 			Control::Field(_) => {
 				self.color.rgb.replace_field = true;
 				Effect::Focus
@@ -89,6 +128,16 @@ impl Panel {
 	}
 	pub fn handle(&mut self, action: crate::shortcuts::ActionId) -> Effect {
 		use crate::shortcuts::ActionId as A;
+		if action == A::CharacterSearch {
+			self.characters.collapsed = false;
+			self.focus_character_control(Control::CharacterSearch);
+			self.reveal();
+			return Effect::None;
+		}
+		if let Some(effect) = self.handle_characters(action) {
+			self.reveal();
+			return effect;
+		}
 		if action == A::Copy {
 			if let Some(item) = self.items().get(self.selected)
 				&& let Control::Field(field) = item.control
@@ -162,7 +211,7 @@ impl Panel {
 			let columns = current.columns.max(1);
 			let grid = matches!(
 				group,
-				crate::panel::Group::Colors(_) | crate::panel::Group::Glyphs(_)
+				crate::panel::Group::Colors(_) | crate::panel::Group::Glyphs
 			);
 			let rows = if matches!(current.ink, Some(crate::libraries::ansi::Ink::Indexed(_))) {
 				5
@@ -188,11 +237,7 @@ impl Panel {
 			};
 			let next = controls::navigate(at, members.len(), columns, rows, direction);
 			self.selected = members[next].0;
-			if next != at
-				&& matches!(
-					current.control,
-					Control::Target(_) | Control::Palette(_) | Control::GlyphTab(_)
-				) {
+			if next != at && matches!(current.control, Control::Target(_) | Control::Palette(_)) {
 				return self.activate();
 			}
 		}
