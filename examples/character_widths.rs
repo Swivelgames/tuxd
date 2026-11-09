@@ -1,4 +1,4 @@
-//! Input for scripts/character_width_smoke.py; no terminal I/O here.
+//! Input for `cargo xtask widths`; no terminal I/O here.
 use tuxd::libraries::text::display::display_grapheme;
 use unicode_width::UnicodeWidthStr;
 

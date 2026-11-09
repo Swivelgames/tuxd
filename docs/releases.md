@@ -41,7 +41,7 @@ The coordinator uses Rust filesystem/process APIs without a shell. Archives and 
 | Plan, version update, Git operations, GitHub/GitLab upload | Portable Rust tooling, with Git/Cargo and the selected hosting CLI installed |
 | crates.io publication | Uses Cargo verification and installation; requires a host supported by tuxd |
 | `check` | Rust checks on the host; the application's own target support still applies |
-| `check --full`, `screenshots` | Linux x86-64; existing PTY and Xvfb/Alacritty helpers |
+| `check --full`, `screenshots` | Linux x86-64; Rust PTY and Xvfb/Alacritty helpers |
 | `package`, complete `release --execute` | Linux x86-64; currently produces the reviewed static-musl artifact |
 
 Unsupported required steps fail explicitly. They are never silently omitted. A portable coordinator does **not** promise that tuxd itself or the full terminal test suite supports every operating system.
@@ -58,10 +58,10 @@ cargo install cargo-release --version 1.1.5 --locked
 ```
 
 - For full preparation: reviewed Rust **1.95.0**, its `rust-docs` component, the `x86_64-unknown-linux-musl` target, C build tools, `strip`, and `readelf`.
-- For the existing terminal/media helpers: `uv` with Python available, Alacritty, Xvfb, xdotool, tmux, ImageMagick (`magick` and `import`), and the documentation fonts.
+- For terminal/media checks: Alacritty, Xvfb, xdotool, tmux, ImageMagick (`magick` and `import`), and the documentation fonts.
 - For selected destinations: authenticated `gh`, authenticated `glab`, or a configured crates.io publishing credential.
 
-Release orchestration is Rust. The existing Python terminal tests, screenshot capture, and notice generator remain separate helpers; this change does not rewrite them. Changing the pinned compiler requires reviewing `licenses/runtime/`.
+Release orchestration, generators, media capture, and acceptance tests are Rust. See [Maintainer tooling](tooling.md) for the shared infrastructure. Changing the pinned compiler requires reviewing `licenses/runtime/`.
 
 ## Independent steps
 

@@ -19,3 +19,17 @@ sha2 = "0.10"
 tar = "0.4"
 tempfile = "3"
 toml_edit = "0.25"
+base64 = "0.22"
+portable-pty = "0.9"
+vt100 = "0.16.2"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+nix = { version = "0.28", features = ["term"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
+# Use the Windows certificate store without a C cross-compilation dependency.
+[target.'cfg(windows)'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["native-tls"] }

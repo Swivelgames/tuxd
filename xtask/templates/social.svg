@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="640">
+	<rect width="1280" height="640" fill="#161923"/>
+	<g font-family="DejaVu Sans">
+		<text x="42" y="185" font-size="80" font-weight="bold" fill="#88d2c8">tuxd</text>
+		<g fill="#e0e4ee" font-size="32">
+			<text x="42" y="238">Design styled</text>
+			<text x="42" y="279">terminal text.</text>
+		</g>
+		<g fill="#a5b1c7" font-size="23">
+			<text x="42" y="353">Visual editing.</text>
+			<text x="42" y="387">Live ANSI output.</text>
+			<text x="42" y="421">Built for your terminal.</text>
+		</g>
+		<text x="42" y="565" font-size="20" fill="#88d2c8">github.com/swivelgames/tuxd</text>
+	</g>
+	<image x="470" y="10" width="800" height="620" preserveAspectRatio="xMidYMid meet" xlink:href="data:image/png;base64,{{IMAGE}}"/>
+</svg>

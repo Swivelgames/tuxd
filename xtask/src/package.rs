@@ -18,7 +18,7 @@ pub const COMPILER: &str = "1.95.0";
 
 pub fn prerequisite(runner: &Runner) -> Result<PathBuf> {
 	check::linux()?;
-	runner.require(&["git", "cargo", "rustc", "rustup", "strip", "readelf", "uv"])?;
+	runner.require(&["git", "cargo", "rustc", "rustup", "strip", "readelf"])?;
 	ensure!(
 		runner
 			.output(runner.command("rustc").arg("--version"))?
@@ -232,14 +232,7 @@ fn verify_archives(
 		&directory.join("offline-build"),
 	))?;
 	let extracted_binary = extracted.join(binary_dir.file_name().unwrap()).join("tuxd");
-	runner.run(
-		runner
-			.command("uv")
-			.args(["run", "--script"])
-			.arg(runner.root.join("scripts/packaged_binary_smoke.py"))
-			.arg(extracted_binary)
-			.arg(version.to_string()),
-	)?;
+	crate::terminal::packaged(runner, &extracted_binary, &version.to_string())?;
 
 	Ok(())
 }

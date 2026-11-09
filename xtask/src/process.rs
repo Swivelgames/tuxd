@@ -1,5 +1,7 @@
 //! Shell-free subprocess execution with an optional retained release log.
+mod child;
 use anyhow::{Context, Result, ensure};
+pub use child::ManagedChild;
 use std::{
 	fs::OpenOptions,
 	io::Write,
@@ -74,14 +76,6 @@ impl Runner {
 	}
 	pub fn cargo(&self, args: &[&str]) -> Result<()> {
 		self.run(self.command("cargo").args(args))
-	}
-	pub fn python(&self, script: &str, args: &[&str]) -> Result<()> {
-		self.run(
-			self.command("uv")
-				.args(["run", "--script"])
-				.arg(self.root.join("scripts").join(script))
-				.args(args),
-		)
 	}
 }
 

@@ -54,6 +54,10 @@ pub fn copy_tree(source: &Path, destination: &Path) -> Result<()> {
 	Ok(())
 }
 
+pub fn digest_bytes(bytes: &[u8]) -> String {
+	format!("{:x}", Sha256::digest(bytes))
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;

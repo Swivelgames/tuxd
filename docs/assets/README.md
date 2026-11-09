@@ -10,7 +10,7 @@ These are real tuxd captures from an isolated Alacritty window on Xvfb, with a t
 
 The document is [showcase.tuxd.json](../../examples/showcase.tuxd.json). Open it with `cargo run --locked -- examples/showcase.tuxd.json` to explore the same content. Captures use a 116-column, 48-row Alacritty window, DejaVu Sans Mono at 13 points, and the default application settings. The GIF uses captured frames with a 1.4-second display delay; playback timing is condensed for demonstration.
 
-Regenerate the full set with `python3 scripts/capture_docs.py` (requires Alacritty,
+Regenerate the full set with `cargo xtask screenshots` (requires Alacritty,
 Xvfb, xdotool, and ImageMagick). It uses a temporary copy of the showcase document
 and temporary configuration; personal settings are not changed.
 

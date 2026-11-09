@@ -43,7 +43,7 @@ For dependency changes, regenerate [license notices](licenses/dependencies.txt):
 
 ```sh
 cargo fetch --locked
-python3 scripts/update_dependency_notices.py
+cargo xtask generate notices
 ```
 
 If a package omits its license text, add a source-linked supplement as described in [third-party notices](THIRD_PARTY_NOTICES.md). Keep upstream notices when adding or adapting external material.

@@ -23,10 +23,10 @@ The generated UTF-8 TSV is checked in and included in Cargo packages. Normal
 builds and application startup never fetch data.
 
 ```sh
-python3 scripts/update_character_catalog.py
+cargo xtask generate catalog
 cargo test --locked
-uv run scripts/characters_smoke.py
-python3 scripts/character_width_smoke.py
+cargo xtask smoke characters
+cargo xtask widths
 ```
 
 The generator downloads only the pinned inputs and rejects checksum mismatches.
@@ -70,7 +70,7 @@ do not use assigned-code-point status alone as the admission rule.
 | --- | --- | --- |
 | [unicode_names2](https://docs.rs/unicode_names2/latest/unicode_names2/) | Unicode name lookup and reverse lookup | Groups, categories, aliases/safety policy, Nerd metadata, discovery search |
 | [ucd-parse](https://docs.rs/ucd-parse/latest/ucd_parse/) | Typed UCD file parsing | Generation policy, grouping, search, Nerd metadata |
-| Pinned UCD + Nerd metadata | All required upstream facts in reproducible source files | Small standard-library generator and application-specific search/grouping |
+| Pinned UCD + Nerd metadata | All required upstream facts in reproducible source files | Small maintainer-only Rust generator and application-specific search/grouping |
 
 The last option avoids a runtime/build dependency for data that is generated only
 when maintainers update the catalog. It reuses upstream names and properties,

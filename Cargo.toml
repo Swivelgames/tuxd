@@ -17,7 +17,6 @@ include = [
 	"/examples/**",
 	"/docs/**",
 	"/licenses/**",
-	"/scripts/*.py",
 	"/Cargo.toml",
 	"/Cargo.lock",
 	"/LICENSE",

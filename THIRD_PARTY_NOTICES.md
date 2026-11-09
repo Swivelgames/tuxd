@@ -46,7 +46,7 @@ Regenerate the inventory after dependency changes:
 
 ```sh
 cargo fetch --locked
-python3 scripts/update_dependency_notices.py
+cargo xtask generate notices
 ```
 
 The generator runs offline and fails if a package lacks notice material. Review new declarations and supplements rather than treating generation as legal approval.

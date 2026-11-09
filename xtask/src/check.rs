@@ -30,42 +30,26 @@ pub fn core(runner: &Runner) -> Result<()> {
 
 pub fn prerequisites(runner: &Runner) -> Result<()> {
 	linux()?;
-	runner.require(&[
-		"uv",
-		"alacritty",
-		"Xvfb",
-		"xdotool",
-		"tmux",
-		"magick",
-		"import",
-	])
+	runner.require(&["alacritty", "Xvfb", "xdotool", "tmux", "magick", "import"])
 }
 
 pub fn full(runner: &Runner) -> Result<()> {
 	prerequisites(runner)?;
 	core(runner)?;
-	for name in [
-		"terminal",
-		"characters",
-		"clipboard",
-		"editor_clipboard",
-		"stdin_import",
-		"leader",
-		"theme",
-		"settings_theme",
+	crate::terminal::run(runner, crate::terminal::Suite::All)?;
+	crate::desktop::render(runner, crate::desktop::Mode::Basic, false)?;
+	for mode in [
+		crate::desktop::Mode::Unicode,
+		crate::desktop::Mode::Characters,
+		crate::desktop::Mode::Symbols,
 	] {
-		runner.python(&format!("{name}_smoke.py"), &[])?;
+		crate::desktop::render(runner, mode, false)?;
+		crate::desktop::render(runner, mode, true)?;
 	}
-	runner.python("alacritty_smoke.py", &[])?;
-	for mode in ["--unicode", "--characters", "--symbols"] {
-		runner.python("alacritty_smoke.py", &[mode])?;
-		runner.python("alacritty_smoke.py", &[mode, "--tmux"])?;
-	}
-	runner.python("character_width_smoke.py", &[])?;
-	runner.python("update_dependency_notices.py", &[])
+	crate::desktop::check(runner, false)?;
+	crate::generate::run(runner, crate::generate::Task::Notices)
 }
 
 pub fn screenshots(runner: &Runner) -> Result<()> {
-	prerequisites(runner)?;
-	runner.python("capture_docs.py", &[])
+	crate::desktop::capture(runner, None)
 }

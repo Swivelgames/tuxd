@@ -32,6 +32,7 @@ Already using tuxd? Pick the task you need below.
 
 ## Developer guides
 
+- [Maintainer tooling](tooling.md): generators, PTY acceptance, isolated media, and validation coverage.
 - [Release workflow](releases.md): validation, media, artifacts, and opt-in publication.
 - [Development and validation](development.md): build, checks, PTY acceptance, and diagnostics.
 - [Architecture](architecture.md): capabilities, ownership, adapters, workflows, and extension seams.

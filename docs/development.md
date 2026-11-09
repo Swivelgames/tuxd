@@ -16,26 +16,32 @@ cargo clippy --locked --all-targets -- -D warnings
 
 ## Terminal acceptance
 
-Run from the repository root. `uv` supplies the Python scripts’ pinned dependencies. PTY checks exercise real input and terminal behavior, including cleanup on exit, errors, and panic.
+Run from the repository root. Rust `xtask` commands use isolated PTYs and configuration directories, including cleanup checks on exit, errors, and panic. No Python or shell helpers are required.
 
 ```sh
-uv run scripts/terminal_smoke.py
-uv run scripts/characters_smoke.py
-uv run scripts/clipboard_smoke.py
-uv run scripts/editor_clipboard_smoke.py
-uv run scripts/stdin_import_smoke.py
-uv run scripts/leader_smoke.py
-uv run scripts/theme_smoke.py
-uv run scripts/settings_theme_smoke.py
+cargo xtask smoke all
+# Or target a capability:
+cargo xtask smoke editor
+cargo xtask smoke files
+cargo xtask smoke shortcuts
+cargo xtask smoke characters
+cargo xtask smoke clipboard
+cargo xtask smoke stdin
+cargo xtask smoke themes
 ```
 
-Real Alacritty checks use an isolated Xvfb display and require Alacritty, Xvfb, xdotool, and ImageMagick:
+Real Alacritty checks use an isolated Xvfb display and require Alacritty, Xvfb, xdotool, tmux, and ImageMagick:
 
 ```sh
-python3 scripts/alacritty_smoke.py
+cargo xtask render unicode --tmux
+cargo xtask render symbols
+cargo xtask render characters --tmux
+cargo xtask widths
 ```
 
-Inspect the generated screenshots as well as the script results. Automated terminal emulation does not establish font/rendering parity on every terminal.
+`cargo xtask check --full` runs core checks and the entire terminal/rendering matrix. These integration checks currently require Linux x86-64 and fail explicitly on unsupported hosts. Inspect the generated screenshots as well as test results; terminal emulation does not establish font/rendering parity everywhere.
+
+See [Maintainer tooling](tooling.md) for ownership, commands, and the migration coverage map.
 
 ## Performance and cleanup diagnostics
 
