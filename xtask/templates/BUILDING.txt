@@ -1,0 +1,45 @@
+REBUILD TUXD $version
+
+Source commit: $commit
+
+The companion source archive contains the tagged source, Cargo.lock, vendored
+Cargo dependencies, license notices, and an offline source-replacement config.
+Release-only changes are vendor/, source replacement appended to .cargo/config.toml,
+the Rust runtime notice, BUILD-INFO.json, and this file. Application source is unchanged from the tag.
+The offline recipe builds tuxd; the separate xtask development toolchain is not vendored.
+
+BUILD
+
+Use Linux x86-64, Rust $compiler with Cargo, the $target target,
+cc/ar, and strip. Rust's bundled rust-lld is used as linker. The Rust toolchain
+itself is not bundled. Install it and its target if needed (network required):
+
+	rustup toolchain install $compiler --profile minimal
+	rustup target add --toolchain $compiler $target
+
+From the extracted source directory, build offline:
+
+	env -u CARGO_ENCODED_RUSTFLAGS RUSTFLAGS='-C target-cpu=x86-64' cargo +$compiler build --release --locked --offline --target $target --config 'target.$target.linker="rust-lld"' --target-dir target
+	strip --strip-all target/$target/release/tuxd
+	./target/$target/release/tuxd --version
+
+This is a tested build recipe, not a bit-for-bit reproducibility guarantee.
+
+MODIFY A DEPENDENCY
+
+The archive includes exact dependency sources and their licenses, including
+ratatui-which-key (LGPL-3.0-or-later). To modify a dependency, copy its directory
+from vendor/ to a writable directory, then add a Cargo path override:
+
+	[patch.crates-io]
+	ratatui-which-key = { path = "modified-ratatui-which-key" }
+
+Edit the copy, then run the build command without --locked the first time so
+Cargo can update Cargo.lock. Keep --offline. You can run the rebuilt executable
+without a maintainer signing key. These instructions impose no restriction on
+license rights, including reverse engineering to debug your modifications.
+
+LICENSES
+
+Retain LICENSE, THIRD_PARTY_NOTICES.md, and licenses/ when redistributing.
+licenses/runtime/ includes musl and Rust standard-library notices.

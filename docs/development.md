@@ -74,3 +74,7 @@ cargo publish --locked
 5. After the registry makes the version available, verify `cargo install tuxd --locked` in a clean install root.
 
 The package includes source, tests, examples, user documentation, and license notices. Internal `.work/` records are excluded. README images and links use absolute GitHub URLs so the registry page can render them after source publication.
+
+## Release tooling
+
+Use [`cargo xtask`](releases.md) for independently runnable checks, screenshots, packaging, and opt-in publication. Its unpublished crate and lockfile live in `xtask/`, separate from the application.

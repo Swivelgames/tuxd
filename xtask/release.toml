@@ -1,0 +1,4 @@
+allow-branch = ["main"]
+publish = false
+push = false
+tag = false
