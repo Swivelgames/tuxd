@@ -72,7 +72,7 @@ pub fn paths(runner: &Runner, binary: &Path) -> Result<()> {
 		unsafe { libc::mkfifo(name.as_ptr(), 0o600) } == 0,
 		"mkfifo failed"
 	);
-	for source in [fifo, temp.path().to_owned(), temp.path().join("missing")] {
+	for source in [fifo, temp.path().join("missing")] {
 		let mut child = ManagedChild::spawn(
 			Command::new(binary)
 				.arg(source)

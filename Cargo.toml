@@ -26,7 +26,8 @@ include = [
 
 [dependencies]
 base64 = "0.22.1"
-crossterm = { version = "0.29", features = ["serde"] }
+# The poll-based Unix backend keeps large mouse bursts from stalling on tty readiness.
+crossterm = { version = "0.29", features = ["serde", "use-dev-tty"] }
 libc = "0.2.191"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 ratatui-explorer = "0.3.0"

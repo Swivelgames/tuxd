@@ -165,7 +165,7 @@ impl super::Workspace {
 	}
 }
 
-fn path_identity(path: &Path) -> PathBuf {
+pub(super) fn path_identity(path: &Path) -> PathBuf {
 	std::fs::canonicalize(path).unwrap_or_else(|_| {
 		let parent = path
 			.parent()

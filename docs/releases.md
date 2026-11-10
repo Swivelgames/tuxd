@@ -2,6 +2,16 @@
 
 Use **`cargo xtask`** from a clean `main` checkout after merging the work to release. Choose an explicit stable version, such as `0.3.0`, and write reviewed release notes outside the checkout.
 
+## Pre-v1 versioning
+
+| Change | Version increment |
+| --- | --- |
+| Features, fixes, and other compatible improvements | Patch (`0.3.0` → `0.3.1`) |
+| Major breaking changes | Minor (`0.3.x` → `0.4.0`) |
+
+Before v1, minor releases are reserved for major breaking changes. New features
+alone do not require a minor release.
+
 ## Preview, then run
 
 ```sh

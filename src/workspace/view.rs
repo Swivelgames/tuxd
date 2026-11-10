@@ -30,6 +30,9 @@ fn wrap_button(frame: &mut Frame, body: Rect, enabled: bool) -> Rect {
 fn draw_sidebar_divider(frame: &mut Frame, area: Rect, divider_x: u16) {
 	let style = Style::default().fg(theme::border_color());
 	for y in area.y + 1..area.bottom() - 1 {
+		if frame.buffer_mut()[(divider_x, y)].symbol() == "┤" {
+			continue;
+		}
 		frame.render_widget(
 			Paragraph::new("│").style(style),
 			Rect::new(divider_x, y, 1, 1),
@@ -63,13 +66,38 @@ impl super::Workspace {
 		self.slim_tabs.clear();
 		self.tab_hits.clear();
 		self.tab_close_hits.clear();
-		self.update_arrangement(area.width <= 64);
+		self.sidebar_overlay = area.width <= 64;
+		if self.sidebar_overlay && self.focus != Pane::Sidebar {
+			self.sidebar.visible = false;
+		}
+		let sidebar_width = if self.sidebar.visible {
+			26.min(area.width.saturating_sub(4))
+		} else {
+			0
+		};
+		let docked = sidebar_width > 0 && area.width > 64;
+		let content = if docked {
+			Rect::new(
+				area.x + sidebar_width - 1,
+				area.y,
+				area.width - sidebar_width + 1,
+				area.height,
+			)
+		} else {
+			area
+		};
+		self.update_arrangement(content.width <= 64);
 		let slim = self.slim;
 		self.active.code.surface.hide();
 		self.active.editor.surface.hide();
 		self.code_wrap_toggle = Rect::default();
+		self.sidebar_toggle = Rect::default();
+		if !self.sidebar.visible {
+			self.sidebar.hide_geometry();
+		}
 
 		if area.width < 20 || area.height < 5 {
+			self.sidebar.hide_geometry();
 			self.active
 				.editor
 				.resize(&self.active.session.editing, 0, 0);
@@ -78,7 +106,7 @@ impl super::Workspace {
 		}
 
 		let layout = super::layout::Layout::new(
-			area,
+			content,
 			self.editor_open,
 			self.code_open,
 			slim && self.slim_tab > 0,
@@ -116,20 +144,41 @@ impl super::Workspace {
 			self.code_wrap_toggle = Rect::default();
 		}
 
-		frame.render_widget(
-			Paragraph::new(" tuxd ·").style(Style::default().fg(theme::accent_color())),
-			Rect::new(area.x + 2, area.y, 7, 1),
-		);
-		self.draw_tabs(
-			frame,
-			Rect::new(
-				area.x + 9,
-				area.y,
-				layout.editor.width.saturating_sub(10),
-				1,
-			),
-		);
+		self.sidebar_toggle = Rect::new(area.x + 2, area.y, 7, 1);
+		if !self.sidebar.visible {
+			frame.render_widget(
+				Paragraph::new(" tuxd ›").style(Style::default().fg(theme::accent_color())),
+				self.sidebar_toggle,
+			);
+			self.draw_tabs(
+				frame,
+				Rect::new(
+					area.x + 9,
+					area.y,
+					layout.editor.width.saturating_sub(10),
+					1,
+				),
+			);
+		}
 		self.draw_status(frame, layout.status, chrome.status);
+		if self.sidebar.visible {
+			self.draw_directory_sidebar(
+				frame,
+				Rect::new(area.x, area.y, sidebar_width, area.height),
+			);
+			if docked {
+				draw_sidebar_divider(frame, area, content.x);
+				let symbol = if frame.buffer_mut()[(content.x, layout.code.y)].symbol() == "┤" {
+					"┼"
+				} else {
+					"├"
+				};
+				frame.render_widget(
+					Paragraph::new(symbol).style(Style::default().fg(theme::border_color())),
+					Rect::new(content.x, layout.code.y, 1, 1),
+				);
+			}
+		}
 	}
 
 	fn draw_status(&mut self, frame: &mut Frame, area: Rect, notice: Option<&str>) {

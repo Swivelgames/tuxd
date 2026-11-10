@@ -239,3 +239,29 @@ fn mouse_scrollbar_and_small_terminal_remain_usable() {
 		Outcome::Cancel
 	));
 }
+
+#[test]
+fn directory_picker_chooses_current_or_typed_directory_without_loading_a_file() {
+	let folder = tempfile::tempdir().unwrap();
+	std::fs::create_dir(folder.path().join("nested")).unwrap();
+	std::fs::write(folder.path().join("document.tuxd.json"), "").unwrap();
+	let hint = folder.path().join("document.tuxd.json");
+	let mut picker = Picker::new(Action::OpenDirectory, "", Some(&hint));
+	assert_eq!(picker.destination(), folder.path());
+	assert!(
+		picker
+			.explorer
+			.as_ref()
+			.unwrap()
+			.files()
+			.iter()
+			.all(|file| file.is_dir)
+	);
+	assert!(
+		matches!(picker.submit(), Outcome::Submit(selection) if selection.path == folder.path())
+	);
+	picker.name.set("nested".into());
+	assert!(
+		matches!(picker.submit(), Outcome::Submit(selection) if selection.path == folder.path().join("nested"))
+	);
+}

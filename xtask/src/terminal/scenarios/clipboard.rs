@@ -46,7 +46,7 @@ fn editor(binary: &Path) -> Result<()> {
 
 fn fields(binary: &Path) -> Result<()> {
 	let clip = Clipboard::new("#aabbcc")?;
-	let mut s = Session::new(binary, &[], &clip.env())?;
+	let mut s = Session::editor(binary, &clip.env())?;
 	s.click("RGB", 45)?;
 	s.click("Hex:", 45)?;
 	s.send("\x01\x16")?;
@@ -87,9 +87,8 @@ fn exercise(s: &mut Session, expected: &str) -> Result<()> {
 fn forwarding(binary: &Path) -> Result<()> {
 	let text = "escaped \\x1b[31m 界 ".to_owned() + &"long payload ".repeat(800);
 	let expected = format!("\\x1b[0m{}\\x1b[0m", text.replace('\\', "\\\\"));
-	let mut s = Session::new(
+	let mut s = Session::editor(
 		binary,
-		&[],
 		&[
 			("SSH_CONNECTION", Some(OsStr::new("test"))),
 			("DISPLAY", None),
@@ -121,6 +120,7 @@ fn forwarding(binary: &Path) -> Result<()> {
 	command.arg(&tmux.socket);
 	command.args(["attach-session", "-t", "test"]);
 	let mut s = Session::spawn(command, &[])?;
+	s.hide_sidebar()?;
 	exercise(&mut s, &expected)?;
 	let names = tmux
 		.command()
@@ -140,9 +140,8 @@ fn forwarding(binary: &Path) -> Result<()> {
 	s.send("\x11d")?;
 	ensure!(s.wait()? == 0);
 	let empty = tempfile::tempdir()?;
-	let mut s = Session::new(
+	let mut s = Session::editor(
 		binary,
-		&[],
 		&[
 			("TMUX", Some(OsStr::new("unavailable"))),
 			("PATH", Some(empty.path().as_os_str())),

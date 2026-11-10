@@ -31,7 +31,7 @@ pub fn shortcuts(binary: &Path) -> Result<()> {
 	let temp = tempfile::tempdir()?;
 	let path = temp.path().join("tuxd/shortcuts.json");
 	let env = [("XDG_CONFIG_HOME", Some(temp.path().as_os_str()))];
-	let mut s = Session::new(binary, &[], &env)?;
+	let mut s = Session::editor(binary, &env)?;
 	s.send("\x1bOP")?;
 	category(&mut s, 1)?;
 	click(&mut s, "New document")?;
@@ -81,7 +81,7 @@ pub fn shortcuts(binary: &Path) -> Result<()> {
 	s.send("\x1b")?;
 	s.send("\x11")?;
 	s.finish(0)?;
-	let mut s = Session::new(binary, &[], &env)?;
+	let mut s = Session::editor(binary, &env)?;
 	s.paste("preserved")?;
 	s.send("\x1b[19~")?;
 	s.excludes("Save changes before continuing?")?;
@@ -102,7 +102,7 @@ pub fn shortcuts(binary: &Path) -> Result<()> {
 	s.send("\x11d")?;
 	s.finish(0)?;
 	fs::write(&path, "malformed settings")?;
-	let mut s = Session::new(binary, &[], &env)?;
+	let mut s = Session::editor(binary, &env)?;
 	s.contains("Shortcuts:")?;
 	ensure!(fs::read_to_string(&path)? == "malformed settings");
 	s.send("\x11")?;
@@ -114,9 +114,8 @@ pub fn shortcuts(binary: &Path) -> Result<()> {
 
 fn leader(binary: &Path) -> Result<()> {
 	let temp = tempfile::tempdir()?;
-	let mut s = Session::new(
+	let mut s = Session::editor(
 		binary,
-		&[],
 		&[("XDG_CONFIG_HOME", Some(temp.path().as_os_str()))],
 	)?;
 	s.send("\x1bOP\x0cggjjj\r")?;
@@ -200,7 +199,7 @@ fn theme_settings(binary: &Path) -> Result<()> {
 	let temp = tempfile::tempdir()?;
 	let path = temp.path().join("tuxd/theme.json");
 	let env = [("XDG_CONFIG_HOME", Some(temp.path().as_os_str()))];
-	let mut s = Session::new(binary, &[], &env)?;
+	let mut s = Session::editor(binary, &env)?;
 	let baseline = s.cell(0, 3).fgcolor();
 	appearance(&mut s)?;
 	s.send("\r")?;
@@ -245,7 +244,7 @@ fn theme_settings(binary: &Path) -> Result<()> {
 	);
 	s.send("\x11")?;
 	s.finish(0)?;
-	let mut s = Session::new(binary, &[], &env)?;
+	let mut s = Session::editor(binary, &env)?;
 	ensure!(s.cell(0, 3).fgcolor() == Color::Rgb(137, 180, 250));
 	s.send("\x11")?;
 	s.finish(0)

@@ -179,7 +179,14 @@ impl Picker {
 			self.bar = bars.first().copied();
 		}
 		let y = inner.height - 3;
-		frame.render_widget(Paragraph::new("File/path:"), row(y));
+		frame.render_widget(
+			Paragraph::new(if self.action == Action::OpenDirectory {
+				"Directory:"
+			} else {
+				"File/path:"
+			}),
+			row(y),
+		);
 		self.name_area = Rect::new(
 			row(y).x + label_width,
 			row(y).y,
@@ -189,6 +196,7 @@ impl Picker {
 		field::draw(&self.name, frame, self.name_area, self.focus == Focus::Name);
 		let label = match self.action {
 			Action::Open => "Open",
+			Action::OpenDirectory => "Open directory",
 			Action::Save | Action::SaveAs => "Save",
 			Action::ImportRaw | Action::ImportEscaped => "Import",
 			_ => "Export",

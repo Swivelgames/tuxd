@@ -17,6 +17,14 @@ impl App {
 		if self.workspace.focus == Pane::Tools && self.workspace.panel.overlay_action(action) {
 			return;
 		}
+		// The sidebar closes its highlighted buffer; the File menu closes the active one.
+		if self.workspace.focus == Pane::Sidebar
+			&& action == crate::shortcuts::ActionId::CloseBuffer
+		{
+			let effect = self.workspace.sidebar_action(action);
+			self.workspace_effect(effect);
+			return;
+		}
 		if self.file_command(action) || self.workspace.pane_action(action) {
 			return;
 		}
@@ -30,6 +38,10 @@ impl App {
 			return;
 		}
 		match self.workspace.focus {
+			Pane::Sidebar => {
+				let effect = self.workspace.sidebar_action(action);
+				self.workspace_effect(effect);
+			}
 			Pane::Editor => self.editor_clipboard_action(action),
 			Pane::Code => {
 				if let Some(notice) = self.workspace.active.code.handle_action(

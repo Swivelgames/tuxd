@@ -39,6 +39,7 @@ pub fn full(runner: &Runner) -> Result<()> {
 	crate::terminal::run(runner, crate::terminal::Suite::All)?;
 	crate::desktop::render(runner, crate::desktop::Mode::Basic, false)?;
 	for mode in [
+		crate::desktop::Mode::Workspace,
 		crate::desktop::Mode::Unicode,
 		crate::desktop::Mode::Characters,
 		crate::desktop::Mode::Symbols,

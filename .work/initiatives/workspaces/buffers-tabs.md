@@ -50,3 +50,6 @@ format is introduced here.
 - Source and documentation review completed. Device-specific manual walkthroughs
 	for this slice are not claimed; the automated suite and isolated Alacritty run
 	are the recorded verification.
+
+The next checkpoint is the [directory sidebar](directory-sidebar.md), implemented
+on `feat/directory-workspaces`. It preserves these buffer ownership contracts.

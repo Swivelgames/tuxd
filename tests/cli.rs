@@ -37,7 +37,7 @@ fn help_is_versioned_and_works_without_a_terminal() {
 		for option in ["--raw", "--escaped", "--help", "--version"] {
 			assert!(help.contains(option), "missing {option}");
 		}
-		assert!(help.contains("tuxd [DOCUMENT]"));
+		assert!(help.contains("tuxd [DOCUMENT | DIRECTORY]"));
 		assert!(help.contains(r"\x1b"));
 		assert!(!help.contains('\u{1b}'));
 	}

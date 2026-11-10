@@ -46,6 +46,22 @@ fn every_default_slot_routes_to_its_action_in_all_applicable_scopes() {
 }
 
 #[test]
+fn printable_case_stays_distinct_with_or_without_explicit_shift() {
+	for lower in ['o', 'e', 'g', 'm'] {
+		let upper = lower.to_ascii_uppercase();
+		let plain = ShortcutKey::new(KeyCode::Char(lower), M::NONE);
+		let capital = ShortcutKey::new(KeyCode::Char(upper), M::NONE);
+		assert_ne!(plain, capital);
+		assert_eq!(ShortcutKey::new(KeyCode::Char(lower), M::SHIFT), capital);
+		assert_eq!(ShortcutKey::new(KeyCode::Char(upper), M::SHIFT), capital);
+		assert_ne!(
+			ShortcutKey::new(KeyCode::Char(lower), M::CONTROL),
+			ShortcutKey::new(KeyCode::Char(lower), M::CONTROL | M::SHIFT)
+		);
+	}
+}
+
+#[test]
 fn adapter_retains_modifiers_unicode_and_roundtrips_library_tokens() {
 	use ratatui_which_key::Key;
 	assert_eq!(
@@ -478,19 +494,20 @@ fn shared_directions_ranges_and_selection_keep_control_specific_semantics() {
 fn composed_catalog_preserves_every_persisted_definition() {
 	let expected: Vec<serde_json::Value> =
 		serde_json::from_str(include_str!("fixtures/catalog-v2.json")).unwrap();
-	assert_eq!(ACTIONS.len(), expected.len() + 5);
+	assert_eq!(ACTIONS.len(), expected.len() + 9);
 	assert_eq!(ActionId::CharacterSearch.spec().defaults[0], "Ctrl+f");
 	for row in expected {
 		let id: ActionId = serde_json::from_value(row["id"].clone()).unwrap();
 		let spec = id.spec();
-		// Character discovery adds scopes without changing the historical contracts.
+		// New controls add scopes without changing the historical contracts.
 		let historical_scopes: Vec<_> = spec
 			.scopes
 			.iter()
 			.filter(|s| {
 				!matches!(
 					s,
-					InputScope::Characters
+					InputScope::Sidebar
+						| InputScope::Characters
 						| InputScope::CharacterSearch
 						| InputScope::CharacterPicker
 				)

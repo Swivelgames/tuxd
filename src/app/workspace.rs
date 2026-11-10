@@ -3,6 +3,9 @@ use crate::workspace::Effect;
 impl App {
 	pub(super) fn workspace_effect(&mut self, effect: Effect) {
 		match effect {
+			Effect::OpenFile(path) => {
+				self.submit_path(crate::files::Action::Open, path);
+			}
 			Effect::Copy(text) => self.copy_field(text),
 			Effect::Paste(field) => self.paste_rgb(field),
 			Effect::PasteCharacters => self.workspace.panel.characters.paste(&self.clipboard),

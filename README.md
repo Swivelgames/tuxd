@@ -40,7 +40,7 @@ Ensure Cargo’s binary directory (usually `~/.cargo/bin`) is on `PATH`. For a s
 
 ## Create your first styled message
 
-1. Run `tuxd` and type a message.
+1. Run `tuxd` to browse the current directory. Press Esc to focus the empty Editor and type a message.
 2. Select part of it with Shift+arrows or a mouse drag.
 3. Choose a style or color in Tools. The Code pane shows the resulting ANSI.
 4. Focus Code with a click or F6, then press Ctrl+C to copy escaped ANSI.

@@ -10,10 +10,11 @@ This is the consolidated current backlog. Older slice documents describe what wa
 | --- | --- | --- |
 | Named custom themes | Store themes under `$XDG_CONFIG_HOME/tuxd/themes/` (fallback `~/.config/tuxd/themes/`); create and name themes in Settings | Theme file schema, naming/collision behavior, discovery and selection |
 | Shortcut defaults | Adopt the user's preferred defaults after their keymap walkthrough | User supplies reviewed bindings |
+| Shortcut portability and diagnostics | Key diagnostic view; portable defaults that avoid dependence on extended keys and function keys; legacy-alias warnings; fix leader-confirmation Shift+Tab direction | [Complete inventory and audit](initiatives/shortcuts/portability-audit.md). User's Alacritty setup needed manual configuration for extended keys; defaults must not require that. Deferred until after the directory slice ships |
 | Component emoji | Render composed emoji/components reliably instead of display escapes; see [width investigation](character-rendering.md) | Shared terminal/multiplexer width strategy; ZWJ, modifiers, flags, selectors, keycaps; redraw/navigation regressions |
 | Character discovery follow-ups | Favorites/recents, custom catalogs, font detection | Expanded grouped catalog and name/glyph/code-point search are implemented; these additions remain deferred |
 | Style-only clipboard | Copy/paste formatting without text, targeting selection or pending typing style, with undo | Representation, mixed selection behavior and clipboard compatibility |
-| Workspaces | Related files and a left explorer | Directory/workspace metadata; document tabs and per-buffer editing/save/close are implemented |
+| Workspaces | Workspace persistence and metadata | Directory sidebar and document buffers are implemented; session restoration remains separate |
 | Proper Vim mode | Modal editing, composable operators/motions, counts and coherent undo | Registers, visual selection, repeat/search and compatibility contract |
 | ANSI explanations | Readable descriptions of sequences and their styling effect | Interaction/accessibility without obscuring Code output |
 | Code generation | Explore languages, runtimes, frameworks and output forms, then choose initial targets | Separate [discovery initiative](initiatives/code-generation/overview.md); no target language committed |

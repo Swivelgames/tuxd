@@ -18,6 +18,7 @@ Already using tuxd? Pick the task you need below.
 | [Editing and styling](editing.md) | Movement, selection, undo, tools, layout, and clipboard editing |
 | [Character discovery](characters.md) | Browse grouped glyphs, search names/code points, and insert |
 | [Documents and ANSI](files.md) | File explorer, native format, raw/escaped import and export, control review |
+| [Directory workspaces](workspaces.md) | Open folders, browse a tree, and manage Open Files |
 | [Theme gallery](themes.md) | Screenshots of every built-in theme |
 | [Settings](settings.md) | Themes, shortcut customization, leader, sequences, and configuration files |
 | [CLI reference](cli.md) | Arguments, stdin, input constraints, and exit behavior |

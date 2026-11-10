@@ -2,6 +2,7 @@
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum InputScope {
+	Sidebar,
 	Editor,
 	Code,
 	Tools,
@@ -89,6 +90,7 @@ impl InputScope {
 	pub fn section(self) -> Category {
 		use InputScope::*;
 		match self {
+			Sidebar => Category::Explorer,
 			Editor => Category::Editor,
 			Code => Category::Code,
 			Tools | Radio | ToolTabs | Grid | Hex | Channel | Characters | CharacterSearch
@@ -109,6 +111,7 @@ impl InputScope {
 	}
 	pub fn label(self) -> &'static str {
 		match self {
+			Self::Sidebar => "Directory sidebar",
 			Self::Editor => "Editor",
 			Self::Code => "Code",
 			Self::Tools => "Tool buttons",
@@ -134,6 +137,7 @@ impl InputScope {
 }
 use InputScope::*;
 pub(crate) const WORKSPACE: &[InputScope] = &[
+	Sidebar,
 	Editor,
 	Code,
 	Tools,
@@ -147,6 +151,7 @@ pub(crate) const WORKSPACE: &[InputScope] = &[
 ];
 pub(crate) const PICKER: &[InputScope] = &[Explorer, Location, Filename, Format, FileButtons];
 pub(crate) const FOCUSABLE: &[InputScope] = &[
+	Sidebar,
 	Tools,
 	CharacterPicker,
 	Radio,
@@ -225,6 +230,7 @@ pub(crate) const BOUNDARY: &[InputScope] = &[
 	ReviewButtons,
 ];
 pub(crate) const ACTIVATABLE: &[InputScope] = &[
+	Sidebar,
 	Tools,
 	CharacterPicker,
 	Characters,
@@ -254,6 +260,10 @@ pub struct ActionSpec {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionId {
+	OpenDirectory,
+	ToggleSidebar,
+	FocusSidebar,
+	RefreshDirectory,
 	New,
 	Open,
 	Save,
@@ -390,6 +400,7 @@ pub fn catalog()
 	static CATALOG: std::sync::LazyLock<Catalog<ActionId, InputScope, super::ShortcutKey>> =
 		std::sync::LazyLock::new(|| {
 			let contexts = [
+				Sidebar,
 				Editor,
 				Code,
 				Tools,
@@ -466,7 +477,7 @@ impl ActionId {
 	pub fn applicability(self) -> String {
 		let scopes = self.spec().scopes;
 		if scopes == WORKSPACE {
-			return "Editor, Code and Tools".into();
+			return "Editor, Code, Tools and directory sidebar".into();
 		}
 		if scopes == PICKER {
 			return "File dialogs".into();

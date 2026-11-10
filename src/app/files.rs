@@ -28,6 +28,7 @@ impl App {
 		let command = match action {
 			A::New => Action::New,
 			A::Open => Action::Open,
+			A::OpenDirectory => Action::OpenDirectory,
 			A::Save => Action::Save,
 			A::SaveAs => Action::SaveAs,
 			A::SaveAll => Action::SaveAll,
@@ -194,11 +195,13 @@ impl App {
 				.unwrap_or_default(),
 			_ => String::new(),
 		};
-		let picker = crate::files::picker::Picker::new(
-			action,
-			&text,
-			self.workspace.active.session.directory_source(),
-		);
+		let source = self.workspace.active.session.directory_source();
+		let mut picker = crate::files::picker::Picker::new(action, &text, source);
+		if source.is_none()
+			&& let Some(root) = self.workspace.directory()
+		{
+			picker.navigate(root.to_owned());
+		}
 		self.file_dialog(Dialog::Path {
 			picker: Box::new(picker),
 		});
@@ -291,6 +294,16 @@ impl App {
 	}
 
 	pub(crate) fn submit_path(&mut self, action: Action, mut path: PathBuf) {
+		if action == Action::OpenDirectory {
+			match self.workspace.open_directory(&path) {
+				Ok(()) => {
+					self.files.cancel();
+					self.shortcuts.cancel();
+				}
+				Err(error) => self.file_failure(action, path, error),
+			}
+			return;
+		}
 		if path.as_os_str().is_empty() {
 			self.files.error = Some("Enter a file path".into());
 			return;
@@ -303,6 +316,8 @@ impl App {
 		{
 			self.files.cancel();
 			self.workspace.select_session(id);
+			self.workspace.focus = crate::workspace::Pane::Editor;
+			self.workspace.editor_open = true;
 			return;
 		}
 		if action == Action::Open

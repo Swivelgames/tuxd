@@ -14,6 +14,7 @@ use ratatui::{
 fn title(action: Action) -> &'static str {
 	match action {
 		Action::Open => "Open document",
+		Action::OpenDirectory => "Open directory",
 		Action::Save | Action::SaveAs => "Save document as",
 		Action::ImportRaw | Action::ImportEscaped => "Import ANSI",
 		Action::ExportRaw | Action::ExportEscaped => "Export ANSI",
@@ -107,7 +108,7 @@ fn draw_menu(
 			.max(33)
 			.min(u16::MAX as usize) as u16,
 	);
-	let height = area.height.min(14);
+	let height = area.height.min(15);
 	let popup = Rect::new(
 		(area.width - width) / 2,
 		(area.height - height) / 2,
@@ -122,9 +123,14 @@ fn draw_menu(
 	frame.render_widget(block, popup);
 	files.buttons.clear();
 	files.bar = None;
-	let rows: Vec<usize> = (0..MENU.len())
-		.map(|i| i + usize::from(i >= 3) + usize::from(i >= 6) + usize::from(i >= 8))
-		.collect();
+	let mut rows = Vec::with_capacity(MENU.len());
+	let mut separators = Vec::new();
+	for (index, (action, _)) in MENU.iter().enumerate() {
+		if matches!(action, Action::Save | Action::ImportEscaped | Action::Quit) {
+			separators.push(index + separators.len());
+		}
+		rows.push(index + separators.len());
+	}
 	let top = rows[index].saturating_sub(inner.height.saturating_sub(1) as usize);
 	for (i, (action, label)) in MENU.iter().enumerate() {
 		let hint = shortcuts.hint(action.shortcut());
@@ -150,7 +156,7 @@ fn draw_menu(
 		);
 		files.buttons.push((rect, i));
 	}
-	for y in [3, 7, 10] {
+	for y in separators {
 		if y >= top && y - top < inner.height as usize {
 			frame.render_widget(
 				Paragraph::new(format!(

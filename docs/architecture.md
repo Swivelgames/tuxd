@@ -30,6 +30,12 @@ one ID. Pickers and prompts block buffer navigation; file failures retain the
 pending operation. Clipboard completions are polled across all buffers and retain
 their original session checks. Closing a buffer drops its pending transactions.
 
+`workspace/sidebar` owns the Open Files projection, directory navigation, and
+scroll geometry. Its private `tree` module discovers filesystem entries without
+knowing about buffers or rendering. Filter changes and refresh publish together
+after successful discovery. Sidebar requests flow through Workspace to App for
+document opening and dirty-close prompts; the sidebar never loads document content.
+
 ## Implemented boundary: Stage 1
 
 `src/lib.rs` exposes `libraries::ansi`: private authoritative text/styles, checked
@@ -163,6 +169,7 @@ records contracts and evidence. Stage 8 completes the App/Workspace composition.
 | Owner | Current contract |
 | --- | --- |
 | `main` | Parse/load startup input, enter the terminal, run the event/completion loop |
+| `terminal::input` | Coalesce consecutive drag positions within a bounded read window; preserve button, modifier and non-drag event boundaries before routing input |
 | `app` | Assemble services/configuration; route modal precedence and cross-feature effects; order replacement/save/quit/review decisions |
 | `workspace` | Own session, Editor, Code and Tools; reconcile normal/slim layouts; handle pane focus, wrapping, collapse and pointer interactions |
 | `files` | Own picker/menu/prompt interaction and geometry; return typed cancel/activate/submit/copy effects |

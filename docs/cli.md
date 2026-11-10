@@ -3,7 +3,7 @@
 [Documentation index](README.md) · [Project overview](../README.md)
 
 ```text
-tuxd [document.tuxd.json]
+tuxd [DOCUMENT | DIRECTORY]
 tuxd --raw INPUT
 tuxd --escaped INPUT
 tuxd --help
@@ -12,8 +12,9 @@ tuxd --version
 
 | Argument | Behavior |
 | --- | --- |
-| No arguments | Open a new, empty document |
+| No arguments | Open the current working directory in the workspace sidebar, with an empty untitled document |
 | Document path | Open a native `.tuxd.json` document |
+| Directory path | Open the [directory workspace sidebar](workspaces.md) |
 | `--raw INPUT` | Import UTF-8 text containing actual ANSI escape bytes |
 | `--escaped INPUT` | Import UTF-8 text containing escaped ANSI notation |
 | `-h`, `--help` | Print usage and exit without entering the terminal UI |
@@ -23,6 +24,7 @@ tuxd --version
 
 ```sh
 tuxd ./greeting.tuxd.json
+tuxd ./my-project
 tuxd --raw ./output.ansi
 tuxd --escaped ./output.txt
 printf '\033[31mRed\033[0m\n' | tuxd --raw -

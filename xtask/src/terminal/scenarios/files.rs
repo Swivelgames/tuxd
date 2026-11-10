@@ -10,6 +10,7 @@ pub fn run(runner: &Runner, binary: &Path) -> Result<()> {
 	persistence(binary).context("persistence scenario")?;
 	super::buffers::run(binary).context("buffers scenario")?;
 	explorer(runner, binary).context("explorer scenario")?;
+	super::directories::run(runner, binary).context("directory workspace scenario")?;
 	#[cfg(unix)]
 	super::super::unix::paths(runner, binary)?;
 	println!("PASS: save/open/export/import, picker, overwrite, invalid startup paths");
@@ -24,7 +25,7 @@ fn persistence(binary: &Path) -> Result<()> {
 	let escaped = folder.join("snippet.txt");
 	let bad = folder.join("review.tuxd.json");
 	fs::write(&bad, r"\x1b[31mImported\x1b[2J\nUnicode 界\q")?;
-	let mut s = Session::new(binary, &[], &[])?;
+	let mut s = Session::editor(binary, &[])?;
 	s.paste("Save me\n界")?;
 	s.send("\x13")?;
 	s.contains("Save document as")?;
@@ -48,7 +49,7 @@ fn persistence(binary: &Path) -> Result<()> {
 	s.send("\x1b")?;
 	ensure!(s.row(1).contains("Save me"));
 	s.send("X")?;
-	let import = "\x1b[14~".to_owned() + &"\x1b[B".repeat(6) + "\r";
+	let import = "\x1b[14~".to_owned() + &"\x1b[B".repeat(7) + "\r";
 	s.send(&import)?;
 	s.paste(bad.to_str().unwrap())?;
 	s.send("\r")?;
@@ -86,7 +87,7 @@ fn explorer(runner: &Runner, binary: &Path) -> Result<()> {
 	fs::copy(&document, folder.join(".hidden.tuxd.json"))?;
 	let destination = folder.join("clipboard path.tuxd.json");
 	fs::write(&clip.path, destination.to_str().unwrap())?;
-	let mut s = Session::new(binary, &[], &clip.env())?;
+	let mut s = Session::editor(binary, &clip.env())?;
 	s.send("\x0f\x0c")?;
 	s.paste(folder.to_str().unwrap())?;
 	s.send("\r")?;
@@ -103,7 +104,7 @@ fn explorer(runner: &Runner, binary: &Path) -> Result<()> {
 	s.send("\x06jggMG\r")?;
 	ensure!(s.row(1).contains("Terminal UX Designer"));
 	s.send("Z")?;
-	let save_as = "\x1b[14~".to_owned() + &"\x1b[B".repeat(4) + "\r";
+	let save_as = "\x1b[14~".to_owned() + &"\x1b[B".repeat(5) + "\r";
 	s.send(&save_as)?;
 	s.send("\x01\x16")?;
 	s.send("\r")?;

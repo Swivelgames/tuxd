@@ -1,3 +1,5 @@
+pub mod input;
+
 use std::{
 	io::{self, IsTerminal},
 	sync::atomic::{AtomicBool, Ordering},

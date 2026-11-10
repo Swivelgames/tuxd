@@ -7,7 +7,7 @@ pub fn run(binary: &Path) -> Result<()> {
 	let folder = tempfile::tempdir()?;
 	let first = folder.path().join("first.tuxd.json");
 	let second = folder.path().join("second.tuxd.json");
-	let mut s = Session::new(binary, &[], &[])?;
+	let mut s = Session::editor(binary, &[])?;
 	s.paste("first buffer")?;
 	s.send("\x0e")?;
 	s.paste("second buffer")?;

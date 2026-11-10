@@ -36,6 +36,19 @@ impl Session {
 		Self::spawn(command, env)
 	}
 
+	/// Start in the default workspace, then hide its sidebar for editor scenarios.
+	pub fn editor(binary: &Path, env: &[(&str, Option<&OsStr>)]) -> Result<Self> {
+		let mut session = Self::new(binary, &[], env)?;
+		session.hide_sidebar()?;
+		Ok(session)
+	}
+
+	pub fn hide_sidebar(&mut self) -> Result<()> {
+		self.contains("Open Files")?;
+		self.send("\x1b[<0;5;1M\x1b[<0;5;1m")?;
+		self.excludes("Open Files")
+	}
+
 	pub fn spawn(mut command: CommandBuilder, env: &[(&str, Option<&OsStr>)]) -> Result<Self> {
 		let config = tempfile::tempdir()?;
 		command.env("TERM", "xterm-256color");

@@ -4,6 +4,7 @@ mod layout;
 mod mouse;
 mod panes;
 pub mod shortcuts;
+mod sidebar;
 mod tabs;
 mod tools;
 mod view;
@@ -15,6 +16,7 @@ use ratatui::layout::Rect;
 
 /// Requests that require application-owned services or modal workflows.
 pub enum Effect {
+	OpenFile(std::path::PathBuf),
 	None,
 	Copy(String),
 	Paste(usize),
@@ -28,6 +30,7 @@ pub enum Effect {
 pub(crate) enum Pane {
 	#[default]
 	Editor,
+	Sidebar,
 	Tools,
 	Code,
 }
@@ -38,6 +41,7 @@ impl Pane {
 			Self::Editor => Self::Tools,
 			Self::Tools => Self::Code,
 			Self::Code => Self::Editor,
+			Self::Sidebar => Self::Editor,
 		}
 	}
 }
@@ -50,6 +54,9 @@ pub(crate) enum TextPane {
 }
 
 pub struct Workspace {
+	sidebar: sidebar::Sidebar,
+	sidebar_toggle: Rect,
+	sidebar_overlay: bool,
 	pub(crate) active: buffers::Buffer,
 	// Inactive buffers retain tab order; active_index is the gap occupied by active.
 	inactive: Vec<buffers::Buffer>,
@@ -73,6 +80,9 @@ pub struct Workspace {
 impl Default for Workspace {
 	fn default() -> Self {
 		Self {
+			sidebar: Default::default(),
+			sidebar_toggle: Rect::default(),
+			sidebar_overlay: false,
 			active: buffers::Buffer::new(Document::default(), None, false, 1),
 			inactive: Vec::new(),
 			active_index: 0,
@@ -122,6 +132,7 @@ impl Workspace {
 		use crate::shortcuts::InputScope as S;
 		match self.focus {
 			Pane::Editor => S::Editor,
+			Pane::Sidebar => S::Sidebar,
 			Pane::Code => S::Code,
 			Pane::Tools => self.panel.input_scope(self.panel.selected),
 		}

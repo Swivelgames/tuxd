@@ -26,7 +26,7 @@ Desktop clipboard access needs a suitable helper: `wl-copy` and `wl-paste` on Wa
 
 ## Explore an example
 
-A registry install starts without a document:
+Launch in the current directory to browse its files, with an empty untitled document ready for editing:
 
 ```sh
 tuxd
@@ -58,7 +58,7 @@ At **64 columns or fewer**, Code and tools share the lower pane.
 
 ## Make a message
 
-1. Run `tuxd` for a new document.
+1. Run `tuxd`, then press Esc to focus the empty Editor.
 2. Type `Hello, terminal`.
 3. Select `Hello` with Shift+arrows or a mouse drag.
 4. Press **Ctrl+B** or click Bold.

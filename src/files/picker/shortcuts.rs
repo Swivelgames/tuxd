@@ -26,7 +26,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Display),
 		order: 0,
-		scopes: PICKER,
+		scopes: &[Explorer, Location, Filename, Format, FileButtons, Sidebar],
 		defaults: ["Ctrl+h", "Ctrl+.", ""],
 	},
 	ActionSpec {
@@ -35,7 +35,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Display),
 		order: 1,
-		scopes: PICKER,
+		scopes: &[Explorer, Location, Filename, Format, FileButtons, Sidebar],
 		defaults: ["Ctrl+f", "", ""],
 	},
 	ActionSpec {
@@ -44,7 +44,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Locations),
 		order: 2,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["Left", "Backspace", "h"],
 	},
 	ActionSpec {
@@ -53,7 +53,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Locations),
 		order: 3,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["Right", "l", ""],
 	},
 	ActionSpec {
@@ -62,7 +62,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Navigation),
 		order: 0,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["Up", "k", ""],
 	},
 	ActionSpec {
@@ -71,7 +71,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Navigation),
 		order: 1,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["Down", "j", ""],
 	},
 	ActionSpec {
@@ -80,7 +80,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Navigation),
 		order: 2,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["Home", "g g", ""],
 	},
 	ActionSpec {
@@ -89,7 +89,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Navigation),
 		order: 3,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["End", "G", ""],
 	},
 	ActionSpec {
@@ -98,7 +98,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Navigation),
 		order: 4,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["M", "", ""],
 	},
 	ActionSpec {
@@ -107,7 +107,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Navigation),
 		order: 5,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["PageUp", "", ""],
 	},
 	ActionSpec {
@@ -116,7 +116,7 @@ pub static ACTIONS: &[ActionSpec] = &[
 		section: Category::Explorer,
 		subsection: Some(Subsection::Navigation),
 		order: 6,
-		scopes: &[Explorer],
+		scopes: &[Explorer, Sidebar],
 		defaults: ["PageDown", "", ""],
 	},
 ];

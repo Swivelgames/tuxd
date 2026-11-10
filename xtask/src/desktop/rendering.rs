@@ -9,6 +9,7 @@ use std::{ffi::OsString, fs, time::Duration};
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Mode {
+	Workspace,
 	Basic,
 	Unicode,
 	Characters,
@@ -60,7 +61,14 @@ pub fn render(runner: &Runner, mode: Mode, with_tmux: bool) -> Result<()> {
 			"test".into(),
 		]);
 	}
-	command.extend([binary.into_os_string(), document.clone().into_os_string()]);
+	let source = if matches!(mode, Mode::Workspace) {
+		fs::create_dir(folder.join("nested"))?;
+		fs::copy(&document, folder.join("nested/child.tuxd.json"))?;
+		folder.to_path_buf()
+	} else {
+		document.clone()
+	};
+	command.extend([binary.into_os_string(), source.into_os_string()]);
 	let mut window = Window::open(&display, &config, &command, &evidence.join("alacritty.log"))?;
 	if with_tmux {
 		tmux.run(&["set-option", "prefix", "C-a"])?;
@@ -69,6 +77,22 @@ pub fn render(runner: &Runner, mode: Mode, with_tmux: bool) -> Result<()> {
 	// Dismiss the startup notice so restoration compares the same status line.
 	window.keys(&["Home"])?;
 	window.capture(&evidence.join("initial.png"))?;
+	if matches!(mode, Mode::Workspace) {
+		window.keys(&["G", "Return"])?;
+		window.capture(&evidence.join("workspace-wide.png"))?;
+		window.keys(&["ctrl+alt+e"])?;
+		window.resize(600, 740)?;
+		window.capture(&evidence.join("workspace-slim.png"))?;
+		window.keys(&["Escape"])?;
+		// Allow tmux Escape forwarding to settle before capture and the next key.
+		std::thread::sleep(Duration::from_millis(700));
+		window.capture(&evidence.join("workspace-slim-hidden.png"))?;
+
+		window.keys(&["ctrl+q"])?;
+		ensure!(window.app.wait(Duration::from_secs(5))?.success());
+		println!("PASS: Alacritty workspace sidebar and slim overlay");
+		return Ok(());
+	}
 	if matches!(mode, Mode::Characters) {
 		characters(&window, &evidence)?;
 	}

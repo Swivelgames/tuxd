@@ -132,14 +132,15 @@ impl Picker {
 	}
 
 	fn filter(&mut self) {
-		let only = self.projects_only;
+		let native_only = self.projects_only;
+		let directories_only = self.action == Action::OpenDirectory;
 		if let Some(explorer) = &mut self.explorer
 			&& let Err(error) = explorer.set_filter_map(move |mut file| {
-				let keep = !only
-					|| file.is_dir || file
+				let native = file
 					.path
 					.file_name()
 					.is_some_and(|name| name.to_string_lossy().ends_with(".tuxd.json"));
+				let keep = file.is_dir || (!directories_only && (!native_only || native));
 				file.name = sanitize(&file.name);
 				keep.then_some(file)
 			}) {
@@ -159,13 +160,17 @@ impl Picker {
 
 	pub fn destination(&self) -> PathBuf {
 		if self.name.text().is_empty() {
-			PathBuf::new()
+			if self.action == Action::OpenDirectory {
+				self.cwd.clone()
+			} else {
+				PathBuf::new()
+			}
 		} else {
 			self.resolve(self.name.text())
 		}
 	}
 
-	fn navigate(&mut self, path: PathBuf) {
+	pub(crate) fn navigate(&mut self, path: PathBuf) {
 		let result = (|| {
 			let path = path.canonicalize()?;
 			if self.explorer.is_none() {
@@ -178,7 +183,10 @@ impl Picker {
 			Ok(path) => {
 				if matches!(
 					self.action,
-					Action::Open | Action::ImportRaw | Action::ImportEscaped
+					Action::Open
+						| Action::OpenDirectory
+						| Action::ImportRaw
+						| Action::ImportEscaped
 				) {
 					self.name.set(String::new());
 				}
@@ -236,17 +244,16 @@ impl Picker {
 			self.error = Some("Enter a filename or choose a file".into());
 			return Outcome::None;
 		}
-		if path.is_dir() {
+		if self.action != Action::OpenDirectory && path.is_dir() {
 			self.navigate(path);
 			self.name.set(String::new());
 			self.focus = Focus::List;
-			Outcome::None
-		} else {
-			Outcome::Submit(Selection {
-				path,
-				action: self.action,
-			})
+			return Outcome::None;
 		}
+		Outcome::Submit(Selection {
+			path,
+			action: self.action,
+		})
 	}
 
 	fn move_selection(&mut self, code: KeyCode) {

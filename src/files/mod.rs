@@ -13,6 +13,7 @@ use std::path::PathBuf;
 pub enum Action {
 	New,
 	Open,
+	OpenDirectory,
 	Save,
 	SaveAs,
 	SaveAll,
@@ -29,6 +30,7 @@ impl Action {
 		match self {
 			Self::New => A::New,
 			Self::Open => A::Open,
+			Self::OpenDirectory => A::OpenDirectory,
 			Self::Save => A::Save,
 			Self::SaveAs => A::SaveAs,
 			Self::SaveAll => A::SaveAll,
@@ -39,9 +41,10 @@ impl Action {
 		}
 	}
 }
-pub const MENU: [(Action, &str); 9] = [
+pub const MENU: [(Action, &str); 10] = [
 	(Action::New, "New document"),
 	(Action::Open, "Open document"),
+	(Action::OpenDirectory, "Open directory"),
 	(Action::CloseBuffer, "Close document"),
 	(Action::Save, "Save"),
 	(Action::SaveAs, "Save as"),

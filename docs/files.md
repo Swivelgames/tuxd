@@ -14,6 +14,8 @@
 
 Each native file holds **one document**. Open several documents in tabs; each keeps its own editing history and view state.
 
+Open a folder with `tuxd DIRECTORY` or **F4 → Open directory** to browse files in a sidebar. See [Directory workspaces](workspaces.md).
+
 ## Work with document tabs
 
 - **New** opens a separate buffer. **Open** and **Import** reuse the unchanged initial untitled buffer; otherwise they open a new buffer without replacing your work.

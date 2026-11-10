@@ -4,6 +4,17 @@ use crossterm::event::{MouseButton, MouseEventKind};
 
 impl Workspace {
 	pub(crate) fn mouse(&mut self, mouse: crossterm::event::MouseEvent) -> super::Effect {
+		if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+			&& self
+				.sidebar_toggle
+				.contains((mouse.column, mouse.row).into())
+		{
+			self.pane_action(crate::shortcuts::ActionId::ToggleSidebar);
+			return super::Effect::None;
+		}
+		if let Some(effect) = self.sidebar_mouse(mouse) {
+			return effect;
+		}
 		if self.panel.overlay_mouse(mouse) {
 			return super::Effect::None;
 		}

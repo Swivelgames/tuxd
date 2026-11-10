@@ -13,11 +13,13 @@ pub const HELP: &str = concat!(
 Design styled terminal text with live ANSI output.
 
 Usage:
-    tuxd [DOCUMENT]
+    tuxd [DOCUMENT | DIRECTORY]
     tuxd --raw INPUT
     tuxd --escaped INPUT
     tuxd --help
     tuxd --version
+
+    With no DOCUMENT or DIRECTORY, open the current working directory.
 
 Options:
         --raw INPUT    Import text containing actual ANSI escape bytes
@@ -29,6 +31,7 @@ Options:
 Examples:
     tuxd
     tuxd greeting.tuxd.json
+    tuxd ./my-project
     tuxd --raw output.ansi
     tuxd --escaped output.txt
     printf '\033[31mRed\033[0m\n' | tuxd --raw -
@@ -38,7 +41,7 @@ Examples:
 );
 
 pub enum Command {
-	Edit(Option<PathBuf>),
+	Edit(PathBuf),
 	Import { mode: Mode, source: PathBuf },
 	Help,
 	Version,
@@ -48,16 +51,16 @@ pub enum Command {
 pub fn parse(args: Vec<OsString>) -> io::Result<Command> {
 	let invalid = || {
 		io::Error::other(
-			"Usage: tuxd [document.tuxd.json] | --raw INPUT | --escaped INPUT (use - for stdin)",
+			"Usage: tuxd [DOCUMENT | DIRECTORY] | --raw INPUT | --escaped INPUT (use - for stdin)",
 		)
 	};
 	match args.as_slice() {
-		[] => Ok(Command::Edit(None)),
+		[] => Ok(Command::Edit(std::env::current_dir()?)),
 		[arg] if arg == "--version" || arg == "-V" => Ok(Command::Version),
 		[arg] if arg == "--help" || arg == "-h" => Ok(Command::Help),
 		[arg] if arg == "--diagnostic-error" => Ok(Command::Diagnostic(false)),
 		[arg] if arg == "--diagnostic-panic" => Ok(Command::Diagnostic(true)),
-		[arg] if !arg.as_encoded_bytes().starts_with(b"-") => Ok(Command::Edit(Some(arg.into()))),
+		[arg] if !arg.as_encoded_bytes().starts_with(b"-") => Ok(Command::Edit(arg.into())),
 		[mode, source] if mode == "--raw" || mode == "--escaped" => {
 			if source != "-" && source.as_encoded_bytes().starts_with(b"-") {
 				return Err(invalid());
@@ -116,6 +119,14 @@ fn read_bounded(reader: impl Read) -> io::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	#[test]
+	fn no_arguments_open_the_current_directory() {
+		assert!(matches!(
+			parse(vec![]).unwrap(),
+			Command::Edit(path) if path == std::env::current_dir().unwrap()
+		));
+	}
+
 	#[test]
 	fn explicit_source_grammar() {
 		for args in [

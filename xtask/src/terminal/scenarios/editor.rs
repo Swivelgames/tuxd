@@ -6,6 +6,7 @@ use vt100::Color;
 
 pub fn run(_runner: &Runner, binary: &Path) -> Result<()> {
 	typing(binary)?;
+	drag_burst(binary)?;
 	styles(binary)?;
 	colors(binary)?;
 	code_clipboard(binary)?;
@@ -13,7 +14,7 @@ pub fn run(_runner: &Runner, binary: &Path) -> Result<()> {
 		let mut s = Session::new(binary, &[argument.as_ref()], &[])?;
 		s.finish(expected)?;
 	}
-	let mut s = Session::new(binary, &[], &[])?;
+	let mut s = Session::editor(binary, &[])?;
 	s.send("\x11")?;
 	s.finish(0)?;
 	println!("PASS: editor, Unicode, styling, code clipboard, resize, error/panic restoration");
@@ -21,7 +22,7 @@ pub fn run(_runner: &Runner, binary: &Path) -> Result<()> {
 }
 
 fn typing(binary: &Path) -> Result<()> {
-	let mut s = Session::new(binary, &[], &[])?;
+	let mut s = Session::editor(binary, &[])?;
 	ensure!(s.row(0).contains("tuxd"));
 	s.send("abc")?;
 	s.segment(1, 7, "abc")?;
@@ -89,8 +90,32 @@ fn typing(binary: &Path) -> Result<()> {
 	s.finish(0)
 }
 
+fn drag_burst(binary: &Path) -> Result<()> {
+	let mut s = Session::editor(binary, &[])?;
+	s.paste("abcdef\nsecond\nthird\nfourth")?;
+	s.send("\x1b[<0;8;2M")?;
+	let mut burst = String::new();
+	for index in 0..3000 {
+		burst.push_str(&format!("\x1b[<32;{};{}M", 8 + index % 6, 2 + index % 4));
+	}
+	// Finish on the first three characters, release, then send stray motion.
+	// Typing must replace exactly that selection, with release still respected.
+	burst.push_str("\x1b[<32;11;2M\x1b[<0;11;2m\x1b[<32;12;4M");
+	s.send(&burst)?;
+	s.send("X")?;
+	s.segment(1, 7, "Xdef")?;
+	s.segment(2, 7, "second")?;
+	s.segment(3, 7, "third")?;
+	s.send("\x1a")?;
+	s.segment(1, 7, "abcdef")?;
+	s.send("\x11d")?;
+	s.finish(0)?;
+	println!("PASS: 3,000 queued drag positions, final selection, release, typing and undo");
+	Ok(())
+}
+
 fn styles(binary: &Path) -> Result<()> {
-	let mut s = Session::new(binary, &[], &[])?;
+	let mut s = Session::editor(binary, &[])?;
 	s.paste("Hello\nworld")?;
 	s.send(&("\x1b[1;5H".to_owned() + &"\x1b[1;2C".repeat(5)))?;
 	s.send("\x02\x1b[105;5u\x15")?;
@@ -138,7 +163,7 @@ fn styles(binary: &Path) -> Result<()> {
 }
 
 fn colors(binary: &Path) -> Result<()> {
-	let mut s = Session::new(binary, &[], &[])?;
+	let mut s = Session::editor(binary, &[])?;
 	ensure!(s.row(0).contains("tuxd") && s.row(0).contains("untitled"));
 	s.excludes("Code: on")?;
 	s.excludes("F6 focus")?;
@@ -192,7 +217,7 @@ fn colors(binary: &Path) -> Result<()> {
 
 fn code_clipboard(binary: &Path) -> Result<()> {
 	let clip = Clipboard::new("")?;
-	let mut s = Session::new(binary, &[], &clip.env())?;
+	let mut s = Session::editor(binary, &clip.env())?;
 	s.paste("alpha\nbeta\t\\n")?;
 	s.send("\x1b[17~\x1b[17~")?;
 	s.send("\x03")?;

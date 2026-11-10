@@ -5,6 +5,42 @@ use crate::shortcuts::registry::{
 use InputScope::*;
 pub static ACTIONS: &[ActionSpec] = &[
 	ActionSpec {
+		id: ActionId::OpenDirectory,
+		label: "Open directory",
+		section: Category::Workspace,
+		subsection: Some(Subsection::Files),
+		order: 2,
+		scopes: WORKSPACE,
+		defaults: ["Ctrl+Shift+o", "", ""],
+	},
+	ActionSpec {
+		id: ActionId::ToggleSidebar,
+		label: "Toggle directory sidebar",
+		section: Category::Workspace,
+		subsection: Some(Subsection::Panes),
+		order: 6,
+		scopes: WORKSPACE,
+		defaults: ["Ctrl+Shift+e", "", ""],
+	},
+	ActionSpec {
+		id: ActionId::FocusSidebar,
+		label: "Focus directory sidebar",
+		section: Category::Workspace,
+		subsection: Some(Subsection::Panes),
+		order: 7,
+		scopes: WORKSPACE,
+		defaults: ["Ctrl+Alt+e", "", ""],
+	},
+	ActionSpec {
+		id: ActionId::RefreshDirectory,
+		label: "Refresh directory",
+		section: Category::Explorer,
+		subsection: Some(Subsection::Display),
+		order: 2,
+		scopes: &[Sidebar],
+		defaults: ["Ctrl+r", "", ""],
+	},
+	ActionSpec {
 		id: ActionId::CyclePanes,
 		label: "Cycle panes",
 		section: Category::Workspace,

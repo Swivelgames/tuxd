@@ -88,12 +88,61 @@ impl Workspace {
 		self.active.session.editing.break_group();
 	}
 
+	fn cycle_panes(&mut self) {
+		if self.focus == Pane::Sidebar {
+			self.focus = Pane::Editor;
+			self.editor_open = true;
+			if self.sidebar_overlay {
+				self.sidebar.visible = false;
+			}
+		} else if self.sidebar.visible
+			&& ((self.slim && self.focus != Pane::Editor) || self.focus == Pane::Code)
+		{
+			self.focus = Pane::Sidebar;
+		} else if self.slim {
+			if self.focus == Pane::Editor {
+				self.select_slim_tab(self.slim_tab);
+			} else {
+				self.focus = Pane::Editor;
+				self.editor_open = true;
+			}
+		} else {
+			self.focus = self.focus.next();
+			if self.focus == Pane::Editor {
+				self.editor_open = true;
+			}
+			if self.focus == Pane::Code {
+				self.code_open = true;
+			}
+			if self.focus == Pane::Tools {
+				self.reveal_tool();
+			}
+		}
+		self.active.session.editing.break_group();
+	}
+
 	pub(crate) fn pane_action(&mut self, action: crate::shortcuts::ActionId) -> bool {
 		use crate::shortcuts::ActionId as A;
 		match action {
+			A::ToggleSidebar | A::FocusSidebar => {
+				self.sidebar.visible = action == A::FocusSidebar || !self.sidebar.visible;
+				self.focus = if self.sidebar.visible {
+					Pane::Sidebar
+				} else {
+					Pane::Editor
+				};
+				if !self.sidebar.visible {
+					self.editor_open = true;
+				}
+				self.cancel_pointer_interactions();
+				self.active.session.editing.break_group();
+			}
 			A::ToggleCode => self.toggle_pane(TextPane::Code),
 			A::ToggleEditor => self.toggle_pane(TextPane::Editor),
 			A::ClearSelection => {
+				if self.sidebar_overlay && self.focus == Pane::Sidebar {
+					self.sidebar.visible = false;
+				}
 				self.active.session.editing.anchor = None;
 				self.focus = Pane::Editor;
 				self.editor_open = true;
@@ -107,28 +156,7 @@ impl Workspace {
 					);
 				}
 			}
-			A::CyclePanes => {
-				if self.slim {
-					if self.focus == Pane::Editor {
-						self.select_slim_tab(self.slim_tab);
-					} else {
-						self.focus = Pane::Editor;
-						self.editor_open = true;
-					}
-				} else {
-					self.focus = self.focus.next();
-					if self.focus == Pane::Editor {
-						self.editor_open = true;
-					}
-					if self.focus == Pane::Code {
-						self.code_open = true;
-					}
-					if self.focus == Pane::Tools {
-						self.reveal_tool();
-					}
-				}
-				self.active.session.editing.break_group();
-			}
+			A::CyclePanes => self.cycle_panes(),
 			A::FocusEditor => {
 				self.focus = Pane::Editor;
 				self.editor_open = true;
@@ -153,6 +181,9 @@ impl Workspace {
 				self.active.session.editing.break_group();
 			}
 			_ => return false,
+		}
+		if self.sidebar_overlay && self.focus != Pane::Sidebar {
+			self.sidebar.visible = false;
 		}
 		true
 	}
