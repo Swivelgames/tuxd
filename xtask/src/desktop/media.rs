@@ -27,14 +27,13 @@ pub fn capture(runner: &Runner, output: Option<&Path>) -> Result<()> {
 	);
 	let temp = tempfile::tempdir()?;
 	let folder = temp.path();
-	let fixture = folder.join("showcase.tuxd.json");
-	fs::copy(runner.root.join("examples/showcase.tuxd.json"), &fixture)?;
+	let examples = runner.root.join("examples");
 	let config = folder.join("alacritty.toml");
 	fs::write(
 		&config,
-		"[window]\ndimensions = { columns = 116, lines = 48 }\npadding = { x = 12, y = 10 }\n[font]\nsize = 13\nnormal = { family = \"DejaVu Sans Mono\" }\n[cursor]\nstyle = { shape = \"Block\", blinking = \"Never\" }\n",
+		"[window]\ndimensions = { columns = 200, lines = 60 }\npadding = { x = 12, y = 10 }\n[font]\nsize = 13\nnormal = { family = \"DejaVu Sans Mono\" }\n[cursor]\nstyle = { shape = \"Block\", blinking = \"Never\" }\n",
 	)?;
-	let display = Display::new(folder, 1800, 1600)?;
+	let display = Display::new(folder, 2560, 1800)?;
 	fs::create_dir(folder.join("tuxd"))?;
 	for preset in presets {
 		let identifier = &preset[1];
@@ -45,12 +44,14 @@ pub fn capture(runner: &Runner, output: Option<&Path>) -> Result<()> {
 		let window = Window::open(
 			&display,
 			&config,
-			&[
-				binary.clone().into_os_string(),
-				fixture.clone().into_os_string(),
-			],
+			&examples,
+			&[binary.clone().into_os_string()],
 			&folder.join("alacritty.log"),
 		)?;
+		// Jump to the directory heading, then open the first example in the tree.
+		window.keys(&["Tab", "Down", "Return"])?;
+		// Clear the open notice and capture the normal cursor status.
+		window.keys(&["Home"])?;
 		window.capture(&assets.join("themes").join(format!("{identifier}.png")))?;
 		if identifier == "midnight" {
 			demo(runner, &window, folder, &assets)?;

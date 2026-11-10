@@ -168,7 +168,7 @@ fn glyph_replacement_and_repeated_insertion_are_independent_undo_steps() {
 }
 
 #[test]
-fn control_and_alt_word_bindings_and_focus_specific_wrap() {
+fn control_and_alt_word_bindings_and_shared_wrap() {
 	for modifier in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
 		let mut app = App::default();
 		app.handle(Event::Paste("one two".into()));
@@ -183,13 +183,13 @@ fn control_and_alt_word_bindings_and_focus_specific_wrap() {
 		);
 		app.handle(key(KeyCode::F(3), KeyModifiers::NONE));
 		assert!(!app.workspace.active.editor.surface.viewport.wrap);
-		assert!(app.workspace.active.code.surface.viewport.wrap);
+		assert!(!app.workspace.active.code.surface.viewport.wrap);
 		app.workspace.code_open = true;
 		app.workspace.focus = Pane::Code;
 		app.handle(key(KeyCode::F(3), KeyModifiers::NONE));
 		assert!(
-			!app.workspace.active.editor.surface.viewport.wrap
-				&& !app.workspace.active.code.surface.viewport.wrap
+			app.workspace.active.editor.surface.viewport.wrap
+				&& app.workspace.active.code.surface.viewport.wrap
 		);
 	}
 }

@@ -75,8 +75,8 @@ impl Workspace {
 		}
 		if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
 			self.dragging = false;
-			if self.code_wrap_toggle.contains(point) {
-				self.toggle_wrap(TextPane::Code);
+			if self.wrap_toggle.contains(point) {
+				self.toggle_wrap();
 				return super::Effect::None;
 			}
 			if self.pane_toggles[0].contains(point) {

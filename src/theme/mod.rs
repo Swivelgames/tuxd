@@ -102,11 +102,14 @@ pub fn accent() -> Style {
 pub fn muted() -> Style {
 	Style::default().fg(muted_color())
 }
+pub fn border() -> Style {
+	Style::default().fg(border_color()).bg(surface_color())
+}
 pub fn block<'a>() -> Block<'a> {
 	Block::bordered()
 		.style(Style::default().fg(text_color()).bg(surface_color()))
 		.border_type(BorderType::Rounded)
-		.border_style(Style::default().fg(border_color()))
+		.border_style(border())
 }
 
 #[cfg(test)]

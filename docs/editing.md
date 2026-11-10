@@ -91,7 +91,7 @@ Over SSH, use your terminal’s paste command. For clipboard setup and forwardin
 | Focus another pane | F6 or click it |
 | Collapse / expand Code | F2 or its title indicator |
 | Collapse / expand Editor | F5; click the collapsed Editor label to expand |
-| Toggle wrapping in the focused text pane | F3; Code also has a Wrap button |
+| Toggle wrapping in Editor and Code together | F3 in either pane, or click Wrap at the right of the status line |
 | Scroll | Wheel, scrollbar track, or draggable thumb |
 | Change lower tabs on a narrow terminal | Alt+Left / Alt+Right, or click a tab |
 

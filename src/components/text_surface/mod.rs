@@ -35,6 +35,22 @@ impl Surface {
 	pub fn cancel_drag(&mut self) {
 		self.drag = None;
 	}
+	pub fn layout_content(
+		&self,
+		mut inner: Rect,
+		lines: &[String],
+		cursor_space: bool,
+	) -> (Rect, Rect, Layout) {
+		let mut text = view::text_area(inner, lines.len());
+		let width = text.width as usize;
+		let layout = Layout::new(lines, width, self.viewport.wrap, cursor_space);
+		if !self.viewport.wrap && width > 0 && layout.columns(cursor_space) > width {
+			inner.height = inner.height.saturating_sub(1);
+			text.height = inner.height;
+		}
+		(inner, text, layout)
+	}
+
 	pub fn draw(
 		&mut self,
 		frame: &mut Frame,
@@ -72,13 +88,7 @@ impl Surface {
 			(
 				Axis::Horizontal,
 				Rect::new(text.x, border.bottom().saturating_sub(1), text.width, 1),
-				content
-					.layout
-					.rows
-					.iter()
-					.map(|row| row.width)
-					.max()
-					.unwrap_or(0) + usize::from(content.cursor_space),
+				content.layout.columns(content.cursor_space),
 				text.width as usize,
 				self.viewport.left,
 			),

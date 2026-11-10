@@ -142,7 +142,7 @@ fn draw_heading(frame: &mut Frame, area: Rect, label: String, style: Style) {
 			.title(Span::styled(label, style)),
 		area,
 	);
-	let border = Style::default().fg(theme::border_color());
+	let border = theme::border();
 	for (x, symbol) in [(area.x, "├"), (area.right() - 1, "┤")] {
 		frame.render_widget(
 			Paragraph::new(symbol).style(border),

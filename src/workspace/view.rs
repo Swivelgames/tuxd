@@ -14,21 +14,8 @@ pub struct Chrome<'a> {
 	pub focused: bool,
 }
 
-fn wrap_button(frame: &mut Frame, body: Rect, enabled: bool) -> Rect {
-	if body.width < 16 || body.height == 0 {
-		return Rect::default();
-	}
-	let area = Rect::new(body.right() - 12, body.y, 11, 1);
-	frame.render_widget(
-		Paragraph::new(if enabled { "[Wrap: on]" } else { "[Wrap: off]" })
-			.style(Style::default().fg(theme::accent_color())),
-		area,
-	);
-	area
-}
-
 fn draw_sidebar_divider(frame: &mut Frame, area: Rect, divider_x: u16) {
-	let style = Style::default().fg(theme::border_color());
+	let style = theme::border();
 	for y in area.y + 1..area.bottom() - 1 {
 		if frame.buffer_mut()[(divider_x, y)].symbol() == "┤" {
 			continue;
@@ -90,7 +77,7 @@ impl super::Workspace {
 		let slim = self.slim;
 		self.active.code.surface.hide();
 		self.active.editor.surface.hide();
-		self.code_wrap_toggle = Rect::default();
+		self.wrap_toggle = Rect::default();
 		self.sidebar_toggle = Rect::default();
 		if !self.sidebar.visible {
 			self.sidebar.hide_geometry();
@@ -140,8 +127,6 @@ impl super::Workspace {
 				&self.active.session.editing,
 				self.focus == Pane::Tools,
 			);
-			self.active.code.surface.hide();
-			self.code_wrap_toggle = Rect::default();
 		}
 
 		self.sidebar_toggle = Rect::new(area.x + 2, area.y, 7, 1);
@@ -174,7 +159,7 @@ impl super::Workspace {
 					"├"
 				};
 				frame.render_widget(
-					Paragraph::new(symbol).style(Style::default().fg(theme::border_color())),
+					Paragraph::new(symbol).style(theme::border()),
 					Rect::new(content.x, layout.code.y, 1, 1),
 				);
 			}
@@ -199,9 +184,24 @@ impl super::Workspace {
 		} else {
 			format!("▸ Editor · {status}")
 		};
-		frame.render_widget(Paragraph::new(status).style(theme::muted()), area);
+		let wrap = if self.active.editor.surface.viewport.wrap {
+			"Wrap: on"
+		} else {
+			"Wrap: off"
+		};
+		let wrap_width = wrap.len() as u16;
+		let mut status_area = area;
+		if area.width > wrap_width {
+			self.wrap_toggle = Rect::new(area.right() - wrap_width, area.y, wrap_width, 1);
+			frame.render_widget(
+				Paragraph::new(wrap).style(Style::default().fg(theme::accent_color())),
+				self.wrap_toggle,
+			);
+			status_area.width -= wrap_width + 1;
+		}
+		frame.render_widget(Paragraph::new(status).style(theme::muted()), status_area);
 		if !self.editor_open {
-			self.pane_toggles[0] = area;
+			self.pane_toggles[0] = status_area;
 		}
 	}
 
@@ -217,16 +217,18 @@ impl super::Workspace {
 			} else {
 				"  ▸ Code "
 			});
-		let (surface, mut inner) =
-			super::layout::surface_rects(code_rect, self.active.code.surface.viewport.wrap);
+		let (surface, inner) = super::layout::surface_rects(code_rect);
 		let junction = if frame.buffer_mut()[(code_rect.right() - 1, code_rect.y)].symbol() == "├"
 		{
 			"┼"
 		} else {
 			"┤"
 		};
-		frame.render_widget(block, code_rect);
-		let style = Style::default().fg(theme::border_color());
+		frame.render_widget(
+			block,
+			Rect::new(code_rect.x, code_rect.y, code_rect.width, 1),
+		);
+		let style = theme::border();
 		frame.render_widget(
 			Paragraph::new("├").style(style),
 			Rect::new(code_rect.x, code_rect.y, 1, 1),
@@ -245,16 +247,10 @@ impl super::Workspace {
 			self.draw_slim_tabs(frame, code_rect);
 		}
 
-		if slim && self.slim_tab > 0 {
-			inner = Rect::default();
+		if !self.code_open || (slim && self.slim_tab > 0) {
+			return;
 		}
 
-		self.code_wrap_toggle =
-			if self.code_open && (!slim || (self.slim_tab == 0 && code_rect.width >= 53)) {
-				wrap_button(frame, code_rect, self.active.code.surface.viewport.wrap)
-			} else {
-				Rect::default()
-			};
 		self.active.code.draw(
 			frame,
 			surface,
@@ -270,11 +266,7 @@ impl super::Workspace {
 		} else {
 			["Code", "Style", "Color", "Characters"]
 		};
-		let end = if self.code_open && self.slim_tab == 0 && code_rect.width >= 53 {
-			code_rect.right() - 13
-		} else {
-			code_rect.right().saturating_sub(1)
-		};
+		let end = code_rect.right().saturating_sub(1);
 		let start = if code_rect.width < 35 {
 			self.slim_tab.saturating_sub(1)
 		} else {
@@ -319,8 +311,10 @@ impl super::Workspace {
 	}
 
 	fn draw_editor(&mut self, frame: &mut Frame, body: Rect, focused: bool) {
-		let (surface, inner) =
-			super::layout::surface_rects(body, self.active.editor.surface.viewport.wrap);
+		if !self.editor_open {
+			return;
+		}
+		let (surface, inner) = super::layout::surface_rects(body);
 		self.active.editor.draw(
 			frame,
 			surface,

@@ -41,8 +41,8 @@ impl Layout {
 	}
 }
 
-/// Scrollbar tracks sit inside the frame; an unwrapped pane reserves a bottom track.
-pub(super) fn surface_rects(bounds: Rect, wrap: bool) -> (Rect, Rect) {
+/// Leave room inside the frame for the vertical scrollbar track.
+pub(super) fn surface_rects(bounds: Rect) -> (Rect, Rect) {
 	let border = Rect::new(
 		bounds.x,
 		bounds.y,
@@ -53,7 +53,7 @@ pub(super) fn surface_rects(bounds: Rect, wrap: bool) -> (Rect, Rect) {
 		bounds.x + 1,
 		bounds.y + 1,
 		bounds.width.saturating_sub(3),
-		bounds.height.saturating_sub(if wrap { 2 } else { 3 }),
+		bounds.height.saturating_sub(2),
 	);
 	(border, inner)
 }

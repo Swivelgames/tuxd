@@ -69,7 +69,13 @@ pub fn render(runner: &Runner, mode: Mode, with_tmux: bool) -> Result<()> {
 		document.clone()
 	};
 	command.extend([binary.into_os_string(), source.into_os_string()]);
-	let mut window = Window::open(&display, &config, &command, &evidence.join("alacritty.log"))?;
+	let mut window = Window::open(
+		&display,
+		&config,
+		&runner.root,
+		&command,
+		&evidence.join("alacritty.log"),
+	)?;
 	if with_tmux {
 		tmux.run(&["set-option", "prefix", "C-a"])?;
 		tmux.run(&["set-option", "-s", "escape-time", "10"])?;

@@ -726,3 +726,43 @@ fn tiny_sizes_and_overlays_never_lose_the_document() {
 		}
 	}
 }
+
+#[test]
+fn unwrapped_panes_reserve_a_row_only_for_horizontal_overflow() {
+	use crate::components::scrollbar::Axis;
+	use crate::shortcuts::ActionId;
+
+	let mut app = App::default();
+	let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+	terminal.draw(|frame| app.draw(frame)).unwrap();
+	let buffer = &app.workspace.active;
+	let full_heights = [
+		buffer.editor.surface.inner.height,
+		buffer.code.surface.inner.height,
+	];
+
+	app.execute_action(ActionId::EditorWrap);
+	for (content, reserved_rows) in [("short".to_owned(), 0), ("x".repeat(120), 1)] {
+		app.workspace.active.editor.insert(
+			&mut app.workspace.active.session.editing,
+			&content,
+			EditKind::Atomic,
+			Instant::now(),
+		);
+		terminal.draw(|frame| app.draw(frame)).unwrap();
+		let buffer = &app.workspace.active;
+		for (surface, full_height) in [&buffer.editor.surface, &buffer.code.surface]
+			.into_iter()
+			.zip(full_heights)
+		{
+			assert_eq!(surface.inner.height, full_height - reserved_rows);
+			assert_eq!(
+				surface
+					.bars
+					.iter()
+					.any(|bar| bar.target == Axis::Horizontal),
+				reserved_rows > 0,
+			);
+		}
+	}
+}

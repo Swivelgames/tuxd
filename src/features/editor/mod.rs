@@ -21,18 +21,24 @@ impl Editor {
 		editing: &Editing,
 		focused: bool,
 	) {
-		use crate::components::text_surface::{Content, gutter_style, view::text_area};
+		use crate::components::text_surface::{Content, gutter_style};
 		use ratatui::{
 			style::{Color, Style},
 			widgets::Block,
 		};
-		let text = text_area(inner, editing.document.lines().len());
-		self.resize(editing, text.width as usize, text.height as usize);
+		let (inner, text, layout) =
+			self.surface
+				.layout_content(inner, editing.document.lines(), true);
+		let view = &mut self.surface.viewport;
+		let size = (text.width as usize, text.height as usize);
+		if (view.width, view.height) != size {
+			(view.width, view.height) = size;
+			view.reveal(&layout, editing.cursor);
+		}
 		frame.render_widget(
 			Block::default().style(Style::default().fg(Color::Reset).bg(Color::Reset)),
 			text,
 		);
-		let layout = self.layout(editing);
 		self.surface.draw(
 			frame,
 			border,

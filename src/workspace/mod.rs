@@ -72,7 +72,7 @@ pub struct Workspace {
 	pub(crate) slim_tab: usize,
 	pane_toggles: [Rect; 2],
 	pub(crate) slim_tabs: Vec<(Rect, usize)>,
-	code_wrap_toggle: Rect,
+	wrap_toggle: Rect,
 	pub(crate) focus: Pane,
 	dragging: bool,
 }
@@ -97,7 +97,7 @@ impl Default for Workspace {
 			slim_tab: 0,
 			pane_toggles: [Rect::default(); 2],
 			slim_tabs: Vec::new(),
-			code_wrap_toggle: Default::default(),
+			wrap_toggle: Default::default(),
 			focus: Default::default(),
 			dragging: Default::default(),
 		}

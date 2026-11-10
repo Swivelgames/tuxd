@@ -418,9 +418,7 @@ impl super::Panel {
 /// Paint the sidebar rails and connect each visible section header to them.
 fn draw_section_frame(buffer: &mut Buffer, sections: &[(usize, usize)]) {
 	let area = buffer.area;
-	let style = Style::default()
-		.fg(theme::border_color())
-		.bg(theme::surface_color());
+	let style = theme::border();
 	for row in 0..area.height {
 		for x in [0, area.width - 1] {
 			buffer[(x, row)].set_symbol("│").set_style(style);
@@ -433,7 +431,6 @@ fn draw_section_frame(buffer: &mut Buffer, sections: &[(usize, usize)]) {
 		}
 		theme::block()
 			.borders(Borders::TOP)
-			.border_style(Style::default().fg(theme::border_color()))
 			.style(Style::default().bg(theme::surface_color()))
 			.render(
 				Rect::new(0, start as u16, area.width, height as u16),

@@ -82,6 +82,7 @@ impl<'a> Window<'a> {
 	pub fn open(
 		display: &'a Display,
 		config: &Path,
+		working_directory: &Path,
 		args: &[OsString],
 		log: &Path,
 	) -> Result<Self> {
@@ -89,6 +90,7 @@ impl<'a> Window<'a> {
 		let app = ManagedChild::spawn(
 			display
 				.command("alacritty")
+				.current_dir(working_directory)
 				.arg("--config-file")
 				.arg(config)
 				.args(["--title", "tuxd-isolated-check", "-e"])

@@ -35,14 +35,13 @@ impl Workspace {
 		}
 	}
 
-	pub(crate) fn toggle_wrap(&mut self, pane: TextPane) {
-		if pane == TextPane::Code {
-			self.active.code.surface.viewport.toggle_wrap();
-		} else {
-			self.active
-				.editor
-				.toggle_wrap(&mut self.active.session.editing);
-		}
+	pub(super) fn toggle_wrap(&mut self) {
+		self.active
+			.editor
+			.toggle_wrap(&mut self.active.session.editing);
+		let code = &mut self.active.code.surface.viewport;
+		code.wrap = self.active.editor.surface.viewport.wrap;
+		code.reset();
 	}
 
 	pub fn toggle_pane(&mut self, pane: TextPane) {
@@ -137,6 +136,7 @@ impl Workspace {
 				self.cancel_pointer_interactions();
 				self.active.session.editing.break_group();
 			}
+			A::EditorWrap | A::CodeWrap => self.toggle_wrap(),
 			A::ToggleCode => self.toggle_pane(TextPane::Code),
 			A::ToggleEditor => self.toggle_pane(TextPane::Editor),
 			A::ClearSelection => {

@@ -38,7 +38,6 @@ impl Code {
 		use crate::shortcuts::ActionId as A;
 		match action {
 			A::Copy => return self.copy(document, clipboard),
-			A::CodeWrap => self.surface.viewport.toggle_wrap(),
 			_ => self.navigate(action),
 		}
 		None
@@ -77,15 +76,14 @@ impl Code {
 		document: &Document,
 		active_source: usize,
 	) {
-		use crate::components::text_surface::{Content, gutter_style, view::text_area};
+		use crate::components::text_surface::{Content, gutter_style};
 		// Rebuilt from authoritative content: replacement, edits, and appearance cannot
 		// leave stale derived rows. Layout is rebuilt for the current width/wrapping.
 		let projection = projection::Projection::new(document);
-		let text = text_area(inner, projection.lines.len());
+		let (inner, text, layout) = self.surface.layout_content(inner, &projection.lines, false);
 		let view = &mut self.surface.viewport;
 		view.width = text.width as usize;
 		view.height = text.height as usize;
-		let layout = view.layout(&projection.lines, false);
 		let active_line = projection.active_line(active_source);
 		self.follow_active_line(&layout, active_line);
 		self.surface.viewport.clamp(&layout, false);

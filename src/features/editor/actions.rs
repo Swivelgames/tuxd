@@ -43,7 +43,6 @@ impl Editor {
 		let now = std::time::Instant::now();
 		use crate::libraries::{ansi::Action as StyleAction, editing::EditKind};
 		match action {
-			A::EditorWrap => self.toggle_wrap(editing),
 			A::Bold => editing.apply_tool(StyleAction::Bold),
 			A::Italic => editing.apply_tool(StyleAction::Italic),
 			A::Underline => editing.apply_tool(StyleAction::Underline),

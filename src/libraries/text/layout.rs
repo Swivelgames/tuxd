@@ -75,6 +75,10 @@ impl Layout {
 		Self { rows }
 	}
 
+	pub fn columns(&self, cursor_space: bool) -> usize {
+		self.rows.iter().map(|row| row.width).max().unwrap_or(0) + usize::from(cursor_space)
+	}
+
 	pub fn location(&self, position: Position) -> (usize, usize) {
 		let index = self
 			.rows

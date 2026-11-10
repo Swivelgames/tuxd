@@ -31,9 +31,8 @@ impl Viewport {
 		self.left = if self.wrap {
 			0
 		} else {
-			let columns = layout.rows.iter().map(|row| row.width).max().unwrap_or(0);
 			self.left
-				.min((columns + usize::from(cursor_space)).saturating_sub(self.width))
+				.min(layout.columns(cursor_space).saturating_sub(self.width))
 		};
 	}
 
