@@ -5,8 +5,9 @@ pub mod shortcuts;
 
 use super::clipboard_notice;
 use crate::libraries::{
-	ansi::Document,
+	ansi::{Document, Position},
 	clipboard::{Service, WriteRequest},
+	text::Layout,
 };
 use std::io::Write;
 
@@ -86,27 +87,9 @@ impl Code {
 		view.height = text.height as usize;
 		let layout = view.layout(&projection.lines, false);
 		let active_line = projection.active_line(active_source);
-		if text.width > 0
-			&& text.height > 0
-			&& let Some(line) = active_line
-		{
-			let visual_row = layout
-				.location(crate::libraries::ansi::Position { row: line, byte: 0 })
-				.0;
-			let target = FollowTarget {
-				line,
-				visual_row,
-				rows: layout.rows.len(),
-				width: view.width,
-				height: view.height,
-				wrap: view.wrap,
-			};
-			if self.follow_target.as_ref() != Some(&target) {
-				view.top = visual_row.saturating_sub(view.height / 2);
-				self.follow_target = Some(target);
-			}
-		}
-		view.clamp(&layout, false);
+		self.follow_active_line(&layout, active_line);
+		self.surface.viewport.clamp(&layout, false);
+
 		self.surface.draw(
 			frame,
 			border,
@@ -121,6 +104,29 @@ impl Code {
 			},
 			|position| projection.style_at(position),
 		);
+	}
+
+	fn follow_active_line(&mut self, layout: &Layout, active_line: Option<usize>) {
+		let view = &mut self.surface.viewport;
+		let Some(line) = active_line.filter(|_| view.width > 0 && view.height > 0) else {
+			return;
+		};
+
+		let visual_row = layout.location(Position { row: line, byte: 0 }).0;
+		let target = FollowTarget {
+			line,
+			visual_row,
+			rows: layout.rows.len(),
+			width: view.width,
+			height: view.height,
+			wrap: view.wrap,
+		};
+		if self.follow_target.as_ref() == Some(&target) {
+			return;
+		}
+
+		view.top = visual_row.saturating_sub(view.height / 2);
+		self.follow_target = Some(target);
 	}
 
 	pub fn copy(&mut self, document: &Document, clipboard: &Service) -> Option<String> {
@@ -138,9 +144,6 @@ impl Code {
 	}
 }
 
-#[cfg(test)]
-mod tests;
-
 impl Default for Code {
 	fn default() -> Self {
 		let mut surface = crate::components::text_surface::Surface::default();
@@ -152,3 +155,6 @@ impl Default for Code {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests;

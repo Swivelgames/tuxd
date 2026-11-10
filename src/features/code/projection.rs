@@ -18,6 +18,7 @@ pub struct Projection {
 	pub source_rows: Vec<usize>,
 	pub highlights: Vec<super::highlight::Highlight>,
 }
+
 impl Projection {
 	pub fn new(document: &Document) -> Self {
 		let lines: Vec<String> = text(document).split('\n').map(str::to_owned).collect();
@@ -42,9 +43,11 @@ impl Projection {
 			highlights,
 		}
 	}
+
 	pub fn active_line(&self, source: usize) -> Option<usize> {
 		self.source_rows.iter().position(|row| *row == source)
 	}
+
 	pub fn style_at(&self, position: crate::libraries::ansi::Position) -> ratatui::style::Style {
 		debug_assert!(position.byte <= self.encoded_rows[position.row].len());
 		self.highlights[position.row].style_at(position.byte)
@@ -66,11 +69,7 @@ mod tests {
 		assert_eq!(text(&document), "\\x1b[0ma\\n\n\\tb\\\\n\\n\n\\x1b[0m");
 		assert_eq!(text(&document).lines().count(), 3);
 	}
-}
 
-#[cfg(test)]
-mod mapping_tests {
-	use super::*;
 	#[test]
 	fn encoded_offsets_and_document_rows_survive_escapes_and_trailing_newlines() {
 		let document = Document::from_text("界\t\\x1b[31m\n\n", Default::default()).unwrap();
