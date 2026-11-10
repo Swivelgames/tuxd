@@ -1,0 +1,32 @@
+Template ::= Item*
+Item ::= Text | Escape | Reference | Include | Helper
+
+Reference ::= US Path US
+Include ::= FS IncludePath FS
+Helper ::= SOH Header (EM | STX Item* EM)
+
+Header ::= Name (HeaderSpace Argument? | Reference Literal?)*
+Argument ::= Reference | Literal
+Name ::= Identifier
+Path ::= Identifier ('.' Identifier)*
+Identifier ::= [A-Za-z_] [A-Za-z_0-9]*
+
+HeaderSpace ::= [#x09#x0A#x0D#x20]+
+Literal ::= LiteralChar+
+LiteralChar ::= [^#x01#x02#x06#x09#x0A#x0D#x10#x19#x1C-#x20]
+
+Text ::= TextChar+
+TextChar ::= [^#x01#x02#x06#x10#x19#x1C-#x1F]
+IncludePath ::= (TextChar | Escape)+
+Escape ::= DLE ReservedByte
+ReservedByte ::= SOH | STX | ACK | DLE | EM | FS | GS | RS | US
+
+SOH ::= #x01
+STX ::= #x02
+ACK ::= #x06
+DLE ::= #x10
+EM ::= #x19
+FS ::= #x1C
+GS ::= #x1D
+RS ::= #x1E
+US ::= #x1F
