@@ -100,6 +100,9 @@ Over SSH, use your terminal’s paste command. For clipboard setup and forwardin
 - Collapsing a pane gives its space to the other; at least one stays expanded.
 - At **64 columns or fewer**, Code and the tools share tabs in the lower pane.
 - Wrapping and scrolling affect presentation only. Copied ANSI has no gutters or display wrap breaks.
+- Code centers the active editor line when it changes or the displayed layout changes.
+	Near the beginning/end, scrolling stops at the document boundary. Manual scrolling
+	is retained until the next active-line or layout change.
 - Code is read-only. Newlines appear as `\n`, tabs as `\t`, and literal backslashes are doubled.
 
 ## Movement reference

@@ -10,9 +10,21 @@ use crate::libraries::{
 };
 use std::io::Write;
 
+/// Changes that should resume following after the user manually scrolls Code.
+#[derive(PartialEq, Eq)]
+struct FollowTarget {
+	line: usize,
+	visual_row: usize,
+	rows: usize,
+	width: usize,
+	height: usize,
+	wrap: bool,
+}
+
 pub struct Code {
 	pub surface: crate::components::text_surface::Surface,
 	copy: Option<WriteRequest>,
+	follow_target: Option<FollowTarget>,
 }
 
 impl Code {
@@ -73,6 +85,27 @@ impl Code {
 		view.width = text.width as usize;
 		view.height = text.height as usize;
 		let layout = view.layout(&projection.lines, false);
+		let active_line = projection.active_line(active_source);
+		if text.width > 0
+			&& text.height > 0
+			&& let Some(line) = active_line
+		{
+			let visual_row = layout
+				.location(crate::libraries::ansi::Position { row: line, byte: 0 })
+				.0;
+			let target = FollowTarget {
+				line,
+				visual_row,
+				rows: layout.rows.len(),
+				width: view.width,
+				height: view.height,
+				wrap: view.wrap,
+			};
+			if self.follow_target.as_ref() != Some(&target) {
+				view.top = visual_row.saturating_sub(view.height / 2);
+				self.follow_target = Some(target);
+			}
+		}
 		view.clamp(&layout, false);
 		self.surface.draw(
 			frame,
@@ -82,7 +115,7 @@ impl Code {
 			Content {
 				lines: &projection.lines,
 				layout: &layout,
-				active_line: projection.active_line(active_source),
+				active_line,
 				cursor_space: false,
 				gutter_style: gutter_style(),
 			},
@@ -115,6 +148,7 @@ impl Default for Code {
 		Self {
 			surface,
 			copy: None,
+			follow_target: None,
 		}
 	}
 }

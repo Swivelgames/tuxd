@@ -64,7 +64,10 @@ fn typing(binary: &Path) -> Result<()> {
 	))?;
 	s.contains("line 39")?;
 	s.send("\x1b[<64;10;10M")?;
-	s.excludes("line 39")?;
+	let rows = s.rows();
+	let code_start = rows.iter().position(|row| row.contains("Code")).unwrap();
+	ensure!(rows[..code_start].iter().all(|row| !row.contains("line 39")));
+	ensure!(rows[code_start + 1..].iter().any(|row| row.contains("line 39")));
 	s.resize(12, 3)?;
 	ensure!(s.row(0).contains("Resize"));
 	s.resize(100, 30)?;
