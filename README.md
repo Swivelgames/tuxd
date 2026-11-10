@@ -76,7 +76,7 @@ Imports open as unsaved documents. Unsupported controls are listed for review; i
 
 ## Current scope
 
-tuxd currently edits one document at a time and targets modest documents. There is no autosave, crash recovery, or external-change detection. Some composed emoji use a display-only escape fallback while preserving their original text. Clipboard forwarding and font/style support depend on your terminal environment.
+tuxd supports multiple document tabs and targets modest documents. Buffers are not restored after exit. There is no autosave, crash recovery, or external-change detection. Some composed emoji use a display-only escape fallback while preserving their original text. Clipboard forwarding and font/style support depend on your terminal environment.
 
 See [compatibility and limitations](https://github.com/swivelgames/tuxd/blob/main/docs/troubleshooting.md) and the [product backlog](https://github.com/swivelgames/tuxd/blob/main/.work/deferred-work.md). Language/framework code generation, workspaces, and Vim mode are future work.
 

@@ -118,12 +118,13 @@ mod tests {
 			Source::Clipboard
 		));
 		app.workspace
+			.active
 			.session
 			.editing
 			.insert(" changed", EditKind::Atomic, Instant::now());
-		let before = app.workspace.session.editing.document.clone();
+		let before = app.workspace.active.session.editing.document.clone();
 		app.decide_review(Decision::Strip);
-		assert_eq!(app.workspace.session.editing.document, before);
+		assert_eq!(app.workspace.active.session.editing.document, before);
 		assert!(app.notice.as_ref().unwrap().contains("editor changed"));
 		assert!(app.import_review.is_none());
 	}
@@ -137,12 +138,15 @@ mod tests {
 			let mut app = App::default();
 			let import = parse_bytes(br"new\x1b[2J".to_vec(), Mode::Escaped).unwrap();
 			app.import_document(import, source.clone());
-			assert_eq!(app.workspace.session.editing.document.lines(), [""]);
+			assert_eq!(app.workspace.active.session.editing.document.lines(), [""]);
 			app.decide_review(Decision::Strip);
-			assert_eq!(app.workspace.session.editing.document.lines(), ["new"]);
-			assert!(app.workspace.session.path.is_none());
-			assert_eq!(app.workspace.session.origin, source.path());
-			assert!(app.workspace.session.dirty());
+			assert_eq!(
+				app.workspace.active.session.editing.document.lines(),
+				["new"]
+			);
+			assert!(app.workspace.active.session.path.is_none());
+			assert_eq!(app.workspace.active.session.origin, source.path());
+			assert!(app.workspace.active.session.dirty());
 		}
 		assert!(
 			parse_bytes(vec![0xff], Mode::Raw)

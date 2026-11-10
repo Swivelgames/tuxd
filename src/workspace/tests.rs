@@ -9,34 +9,34 @@ use ratatui::{Terminal, backend::TestBackend};
 #[test]
 fn replacement_installs_a_new_session_and_resets_views_without_resetting_preferences() {
 	let mut workspace = Workspace::default();
-	let previous = workspace.session.id;
+	let previous = workspace.active.session.id;
 	workspace.editor_open = false;
 	workspace.code_open = false;
 	workspace.focus = Pane::Tools;
 	workspace.dragging = true;
-	workspace.editor.surface.viewport.wrap = false;
-	workspace.editor.surface.viewport.top = 42;
-	workspace.code.surface.viewport.top = 10;
-	workspace.code.surface.viewport.left = 20;
+	workspace.active.editor.surface.viewport.wrap = false;
+	workspace.active.editor.surface.viewport.top = 42;
+	workspace.active.code.surface.viewport.top = 10;
+	workspace.active.code.surface.viewport.left = 20;
 	let mut document = Document::default();
 	document.insert(Position::default(), "replacement").unwrap();
 	workspace.replace(document.clone(), Some("/tmp/source.ansi".into()), true);
-	assert_ne!(workspace.session.id, previous);
-	assert_eq!(workspace.session.editing.document, document);
-	assert!(workspace.session.path.is_none());
+	assert_ne!(workspace.active.session.id, previous);
+	assert_eq!(workspace.active.session.editing.document, document);
+	assert!(workspace.active.session.path.is_none());
 	assert_eq!(
-		workspace.session.origin.as_deref(),
+		workspace.active.session.origin.as_deref(),
 		Some(std::path::Path::new("/tmp/source.ansi"))
 	);
-	assert!(workspace.session.dirty());
+	assert!(workspace.active.session.dirty());
 	assert!(workspace.editor_open);
 	assert!(!workspace.code_open);
 	assert_eq!(workspace.input_scope(), InputScope::Editor);
 	assert!(!workspace.dragging);
-	assert!(!workspace.editor.surface.viewport.wrap);
-	assert_eq!(workspace.editor.surface.viewport.top, 0);
-	assert_eq!(workspace.code.surface.viewport.top, 0);
-	assert_eq!(workspace.code.surface.viewport.left, 0);
+	assert!(!workspace.active.editor.surface.viewport.wrap);
+	assert_eq!(workspace.active.editor.surface.viewport.top, 0);
+	assert_eq!(workspace.active.code.surface.viewport.top, 0);
+	assert_eq!(workspace.active.code.surface.viewport.left, 0);
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn workspace_composes_slim_tools_and_collapsed_panes_without_application_service
 	workspace.panel.color.palette = 2;
 	draw(&mut workspace, &mut terminal);
 	assert_eq!(workspace.panel.active_section, Some(1));
-	assert_eq!(workspace.code.surface.text.width, 0);
+	assert_eq!(workspace.active.code.surface.text.width, 0);
 	workspace.toggle_pane(TextPane::Code);
 	assert!(workspace.editor_open);
 	assert_eq!(workspace.input_scope(), InputScope::Editor);
@@ -75,6 +75,6 @@ fn workspace_composes_slim_tools_and_collapsed_panes_without_application_service
 	assert_eq!(workspace.panel.color.palette, 2);
 	workspace.toggle_pane(TextPane::Editor);
 	draw(&mut workspace, &mut terminal);
-	assert!(workspace.code.surface.inner.height > 15);
+	assert!(workspace.active.code.surface.inner.height > 15);
 	assert!(!workspace.editor_open);
 }

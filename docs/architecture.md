@@ -9,6 +9,24 @@ contains the source inventory, detailed contracts, implementation stages, and
 verification ledger. [Readability guidance](code-organization-and-readability.md)
 applies at every level of this design.
 
+## Document buffers
+
+Workspace owns an ordered set of buffers and one active buffer. Each buffer owns
+its `DocumentSession`, Editor, Code projection/viewport, and Editor clipboard
+transactions. Switching changes which buffer is composed into the panes; it does
+not replace document content or reconstruct history.
+
+`workspace/buffers.rs` owns insertion, switching, removal, and native-path identity.
+`workspace/tabs.rs` paints the tab strip and records hit targets. Layout, pane focus,
+collapse state, and tool instances remain workspace-wide. The active buffer is
+stored separately so consumers can borrow its session and views together without
+indexing or duplicating ownership.
+
+App coordinates Save All and quit with queues of stable session IDs. Close targets
+one ID. Pickers and prompts block buffer navigation; file failures retain the
+pending operation. Clipboard completions are polled across all buffers and retain
+their original session checks. Closing a buffer drops its pending transactions.
+
 ## Implemented boundary: Stage 1
 
 `src/lib.rs` exposes `libraries::ansi`: private authoritative text/styles, checked

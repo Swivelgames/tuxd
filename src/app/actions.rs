@@ -23,17 +23,18 @@ impl App {
 		// These commands deliberately remain eligible across workspace scopes.
 		if self
 			.workspace
+			.active
 			.editor
-			.handle_action(&mut self.workspace.session.editing, action)
+			.handle_action(&mut self.workspace.active.session.editing, action)
 		{
 			return;
 		}
 		match self.workspace.focus {
 			Pane::Editor => self.editor_clipboard_action(action),
 			Pane::Code => {
-				if let Some(notice) = self.workspace.code.handle_action(
+				if let Some(notice) = self.workspace.active.code.handle_action(
 					action,
-					&self.workspace.session.editing.document,
+					&self.workspace.active.session.editing.document,
 					&self.clipboard,
 				) {
 					self.notice = Some(notice);
@@ -41,7 +42,7 @@ impl App {
 			}
 			Pane::Tools => {
 				let effect = self.workspace.panel_action(action);
-				self.tool_effect(effect);
+				self.workspace_effect(effect);
 			}
 		}
 	}

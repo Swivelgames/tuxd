@@ -1,15 +1,26 @@
 //! Session, pane composition, geometry and focus. Modal and runtime policy belongs to App.
+mod buffers;
 mod mouse;
 mod panes;
 pub mod shortcuts;
+mod tabs;
 mod tools;
 mod view;
 
-pub use tools::Effect;
 pub use view::Chrome;
 
 use crate::{libraries::ansi::Document, panel::Panel};
 use ratatui::layout::Rect;
+
+/// Requests that require application-owned services or modal workflows.
+pub enum Effect {
+	None,
+	Copy(String),
+	Paste(usize),
+	PasteCharacters,
+	Notice(String),
+	CloseBuffer(crate::session::SessionId),
+}
 
 /// Logical focus is independent of the wide/slim pane arrangement.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -38,9 +49,13 @@ pub(crate) enum TextPane {
 }
 
 pub struct Workspace {
-	pub(crate) session: crate::session::DocumentSession,
-	pub(crate) editor: crate::features::editor::Editor,
-	pub(crate) code: crate::features::code::Code,
+	pub(crate) active: buffers::Buffer,
+	inactive: Vec<buffers::Buffer>,
+	active_index: usize,
+	next_untitled: usize,
+	tab_hits: Vec<(Rect, usize)>,
+	tab_close_hits: Vec<(Rect, crate::session::SessionId)>,
+	tab_start: usize,
 	pub(crate) panel: Panel,
 	pub(crate) editor_open: bool,
 	pub(crate) code_open: bool,
@@ -51,18 +66,19 @@ pub struct Workspace {
 	editor_wrap_toggle: Rect,
 	code_wrap_toggle: Rect,
 	pub(crate) focus: Pane,
-	code_toggle: Rect,
 	dragging: bool,
 }
 
 impl Default for Workspace {
 	fn default() -> Self {
-		let mut editor = crate::features::editor::Editor::default();
-		editor.surface.viewport.wrap = true;
 		Self {
-			session: Default::default(),
-			editor,
-			code: Default::default(),
+			active: buffers::Buffer::new(Document::default(), None, false, 1),
+			inactive: Vec::new(),
+			active_index: 0,
+			next_untitled: 2,
+			tab_hits: Vec::new(),
+			tab_close_hits: Vec::new(),
+			tab_start: 0,
 			panel: Default::default(),
 			editor_open: true,
 			code_open: true,
@@ -73,7 +89,6 @@ impl Default for Workspace {
 			editor_wrap_toggle: Default::default(),
 			code_wrap_toggle: Default::default(),
 			focus: Default::default(),
-			code_toggle: Default::default(),
 			dragging: Default::default(),
 		}
 	}
@@ -83,8 +98,8 @@ impl Workspace {
 	pub(crate) fn cancel_pointer_interactions(&mut self) {
 		self.dragging = false;
 		self.panel.scrollbar_drag = None;
-		self.editor.surface.cancel_drag();
-		self.code.surface.cancel_drag();
+		self.active.editor.surface.cancel_drag();
+		self.active.code.surface.cancel_drag();
 		self.panel.color.gauge_drag = None;
 	}
 
@@ -94,11 +109,11 @@ impl Workspace {
 		path: Option<std::path::PathBuf>,
 		imported: bool,
 	) {
-		self.session = crate::session::DocumentSession::new(document, path, imported);
+		self.active.session = crate::session::DocumentSession::new(document, path, imported);
 		self.editor_open = true;
-		self.editor.surface.viewport.reset();
-		self.code.surface.viewport.top = 0;
-		self.code.surface.viewport.left = 0;
+		self.active.editor.surface.viewport.reset();
+		self.active.code.surface.viewport.top = 0;
+		self.active.code.surface.viewport.left = 0;
 		self.focus = Pane::Editor;
 		self.cancel_pointer_interactions();
 	}

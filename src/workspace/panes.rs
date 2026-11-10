@@ -4,9 +4,11 @@ use crate::workspace::{Pane, TextPane};
 impl Workspace {
 	pub(crate) fn toggle_wrap(&mut self, pane: TextPane) {
 		if pane == TextPane::Code {
-			self.code.surface.viewport.toggle_wrap();
+			self.active.code.surface.viewport.toggle_wrap();
 		} else {
-			self.editor.toggle_wrap(&mut self.session.editing);
+			self.active
+				.editor
+				.toggle_wrap(&mut self.active.session.editing);
 		}
 	}
 
@@ -34,9 +36,9 @@ impl Workspace {
 		}
 		self.dragging = false;
 		self.panel.scrollbar_drag = None;
-		self.editor.surface.cancel_drag();
-		self.code.surface.cancel_drag();
-		self.session.editing.break_group();
+		self.active.editor.surface.cancel_drag();
+		self.active.code.surface.cancel_drag();
+		self.active.session.editing.break_group();
 	}
 
 	pub fn select_slim_tab(&mut self, tab: usize) {
@@ -48,9 +50,9 @@ impl Workspace {
 		self.panel.selected = 0;
 		self.panel.color.gauge_drag = None;
 		self.panel.scrollbar_drag = None;
-		self.editor.surface.cancel_drag();
-		self.code.surface.cancel_drag();
-		self.session.editing.break_group();
+		self.active.editor.surface.cancel_drag();
+		self.active.code.surface.cancel_drag();
+		self.active.session.editing.break_group();
 	}
 
 	pub(crate) fn pane_action(&mut self, action: crate::shortcuts::ActionId) -> bool {
@@ -59,11 +61,11 @@ impl Workspace {
 			A::ToggleCode => self.toggle_pane(TextPane::Code),
 			A::ToggleEditor => self.toggle_pane(TextPane::Editor),
 			A::ClearSelection => {
-				self.session.editing.anchor = None;
+				self.active.session.editing.anchor = None;
 				self.focus = Pane::Editor;
 				self.editor_open = true;
 				self.dragging = false;
-				self.session.editing.break_group();
+				self.active.session.editing.break_group();
 			}
 			A::NextTab | A::PreviousTab => {
 				if self.slim {
@@ -92,12 +94,12 @@ impl Workspace {
 						self.reveal_tool();
 					}
 				}
-				self.session.editing.break_group();
+				self.active.session.editing.break_group();
 			}
 			A::FocusEditor => {
 				self.focus = Pane::Editor;
 				self.editor_open = true;
-				self.session.editing.break_group();
+				self.active.session.editing.break_group();
 			}
 			A::FocusCode => {
 				if self.slim {
@@ -106,7 +108,7 @@ impl Workspace {
 					self.focus = Pane::Code;
 					self.code_open = true;
 				}
-				self.session.editing.break_group();
+				self.active.session.editing.break_group();
 			}
 			A::FocusTools => {
 				if self.slim {
@@ -115,7 +117,7 @@ impl Workspace {
 					self.focus = Pane::Tools;
 					self.reveal_tool();
 				}
-				self.session.editing.break_group();
+				self.active.session.editing.break_group();
 			}
 			_ => return false,
 		}

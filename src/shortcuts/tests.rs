@@ -252,35 +252,37 @@ fn app_dispatch_obeys_unset_bindings_selection_independence_and_extra_modifiers(
 	install(&mut app.shortcuts, config);
 	app.handle(Event::Paste("abc".into()));
 	app.handle(event("Ctrl+b"));
-	assert!(!app.workspace.session.editing.typing_style().bold);
+	assert!(!app.workspace.active.session.editing.typing_style().bold);
 	app.handle(event("Ctrl+g"));
-	assert_eq!(app.workspace.session.editing.cursor.byte, 2);
+	assert_eq!(app.workspace.active.session.editing.cursor.byte, 2);
 	app.handle(event("Shift+Left"));
-	assert!(app.workspace.session.editing.selection().is_some());
-	app.workspace.session.editing.anchor = None;
-	let before = app.workspace.session.editing.cursor;
+	assert!(app.workspace.active.session.editing.selection().is_some());
+	app.workspace.active.session.editing.anchor = None;
+	let before = app.workspace.active.session.editing.cursor;
 	app.handle(event("Ctrl+Alt+Left"));
-	assert_eq!(app.workspace.session.editing.cursor, before);
+	assert_eq!(app.workspace.active.session.editing.cursor, before);
 	app.handle(event("h"));
-	assert!(app.workspace.session.editing.document.lines()[0].contains('h'));
+	assert!(app.workspace.active.session.editing.document.lines()[0].contains('h'));
 }
 
 #[test]
 fn settings_openers_preserve_selection_and_underlying_dialog_context() {
 	let mut app = App::default();
 	app.handle(Event::Paste("keep".into()));
-	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Home, true);
-	let selection = app.workspace.session.editing.selection();
-	let document = app.workspace.session.editing.document.clone();
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Home,
+		true,
+	);
+	let selection = app.workspace.active.session.editing.selection();
+	let document = app.workspace.active.session.editing.document.clone();
 	for opener in ["F1", "Ctrl+/", "Ctrl+,", "Ctrl+7"] {
 		app.handle(event(opener));
 		assert!(app.settings.is_some());
 		app.handle(Event::Paste("ignored".into()));
 		app.handle(event("Esc"));
-		assert_eq!(app.workspace.session.editing.selection(), selection);
-		assert_eq!(app.workspace.session.editing.document, document);
+		assert_eq!(app.workspace.active.session.editing.selection(), selection);
+		assert_eq!(app.workspace.active.session.editing.document, document);
 	}
 	app.file_action(FileAction::Open);
 	let scope = app.input_scope();
@@ -294,7 +296,7 @@ fn settings_openers_preserve_selection_and_underlying_dialog_context() {
 	app.handle(event("Esc"));
 	assert!(matches!(app.files.dialog, Some(Dialog::Dirty)));
 	app.handle(event("Esc"));
-	assert_eq!(app.workspace.session.editing.document, document);
+	assert_eq!(app.workspace.active.session.editing.document, document);
 }
 
 #[test]
@@ -304,11 +306,11 @@ fn remapped_prompt_responses_and_two_choice_fallback_use_actions() {
 	bind(&mut config, ActionId::Negative, 0, "x");
 	install(&mut app.shortcuts, config);
 	app.handle(Event::Paste("dirty".into()));
-	app.file_action(FileAction::New);
+	app.file_action(FileAction::CloseBuffer);
 	app.handle(event("d"));
 	assert!(matches!(app.files.dialog, Some(Dialog::Dirty)));
 	app.handle(event("x"));
-	assert!(app.workspace.session.editing.document.is_empty());
+	assert!(app.workspace.active.session.editing.document.is_empty());
 	let folder = tempfile::tempdir().unwrap();
 	let path = folder.path().join("existing.txt");
 	std::fs::write(&path, "keep").unwrap();
@@ -331,7 +333,7 @@ fn pending_sequences_never_leak_into_text_and_cancel_on_nonkey_events() {
 	install(&mut app.shortcuts, config);
 	app.handle(event("Ctrl+w"));
 	app.handle(event("x"));
-	assert!(app.workspace.session.editing.document.is_empty());
+	assert!(app.workspace.active.session.editing.document.is_empty());
 	for interrupt in [
 		Event::FocusLost,
 		Event::Resize(80, 24),
@@ -382,15 +384,18 @@ fn one_shared_field_binding_operates_tools_picker_review_and_prompts() {
 	app.handle(event("Esc"));
 	app.workspace.focus = Pane::Editor;
 	app.handle(Event::Paste("keep".into()));
-	app.file_action(FileAction::New);
+	app.file_action(FileAction::CloseBuffer);
 	// Cancel is initially focused. Next wraps to Save, previous returns to Cancel.
 	app.handle(event("F8"));
 	app.handle(event("Shift+Tab"));
 	app.handle(event("Enter"));
 	assert!(app.files.dialog.is_none());
-	assert_eq!(app.workspace.session.editing.document.lines()[0], "keep");
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines()[0],
+		"keep"
+	);
 	app.handle(event("Tab"));
-	assert!(app.workspace.session.editing.document.lines()[0].ends_with('\t'));
+	assert!(app.workspace.active.session.editing.document.lines()[0].ends_with('\t'));
 }
 
 #[test]
@@ -425,19 +430,27 @@ fn shared_directions_ranges_and_selection_keep_control_specific_semantics() {
 		&mut app,
 		Control::Style(Action::Background(Ink::Indexed(0))),
 	);
-	let before = app.workspace.session.editing.typing_style();
+	let before = app.workspace.active.session.editing.typing_style();
 	app.handle(event("F8"));
-	assert_eq!(app.workspace.session.editing.typing_style(), before);
+	assert_eq!(app.workspace.active.session.editing.typing_style(), before);
 	app.handle(event("Enter"));
 	assert_eq!(
-		app.workspace.session.editing.typing_style().background,
+		app.workspace
+			.active
+			.session
+			.editing
+			.typing_style()
+			.background,
 		Ink::Indexed(1)
 	);
 	choose(&mut app, Control::Glyph('─'));
 	app.handle(event("F8"));
-	assert!(app.workspace.session.editing.document.is_empty());
+	assert!(app.workspace.active.session.editing.document.is_empty());
 	app.handle(event("Enter"));
-	assert_eq!(app.workspace.session.editing.document.lines()[0], "│");
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines()[0],
+		"│"
+	);
 	app.handle(event("Tab"));
 	app.handle(event("Shift+Tab"));
 	assert_eq!(
@@ -465,7 +478,7 @@ fn shared_directions_ranges_and_selection_keep_control_specific_semantics() {
 fn composed_catalog_preserves_every_persisted_definition() {
 	let expected: Vec<serde_json::Value> =
 		serde_json::from_str(include_str!("fixtures/catalog-v2.json")).unwrap();
-	assert_eq!(ACTIONS.len(), expected.len() + 1);
+	assert_eq!(ACTIONS.len(), expected.len() + 5);
 	assert_eq!(ActionId::CharacterSearch.spec().defaults[0], "Ctrl+f");
 	for row in expected {
 		let id: ActionId = serde_json::from_value(row["id"].clone()).unwrap();
@@ -524,7 +537,7 @@ fn modal_scopes_mask_workspace_actions_and_restore_underlying_focus() {
 	}
 	assert!(app.files.dialog.is_some());
 	assert!(app.workspace.code_open);
-	assert!(!app.workspace.session.editing.typing_style().bold);
+	assert!(!app.workspace.active.session.editing.typing_style().bold);
 	assert_eq!(app.workspace.focus, Pane::Code);
 	app.handle(event("Esc"));
 	assert_eq!(app.input_scope(), InputScope::Code);

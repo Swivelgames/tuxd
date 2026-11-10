@@ -231,6 +231,10 @@ pub fn paste_text(
 }
 
 impl PasteReview {
+	pub fn session(&self) -> crate::session::SessionId {
+		self.target.session
+	}
+
 	pub fn apply(
 		self,
 		session: &mut crate::session::DocumentSession,

@@ -11,12 +11,16 @@ use crate::{
 use std::time::Instant;
 
 fn select_all(app: &mut App) {
-	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Start, false);
-	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Finish, true);
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Start,
+		false,
+	);
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Finish,
+		true,
+	);
 }
 
 #[test]
@@ -24,14 +28,21 @@ fn styled_selection_roundtrips_and_paste_is_one_undo_step() {
 	let mut source = App::default();
 	source.paste_editor_text("one\n界é", PasteMode::Styled);
 	select_all(&mut source);
-	source.workspace.session.editing.apply_tool(Action::Bold);
 	source
 		.workspace
+		.active
+		.session
+		.editing
+		.apply_tool(Action::Bold);
+	source
+		.workspace
+		.active
 		.session
 		.editing
 		.apply_tool(Action::Foreground(Ink::Rgb(0, 128, 255)));
 	let selection = source
 		.workspace
+		.active
 		.session
 		.editing
 		.selected_document()
@@ -40,42 +51,45 @@ fn styled_selection_roundtrips_and_paste_is_one_undo_step() {
 	let mut target = App::default();
 	target.paste_editor_text("replace", PasteMode::Styled);
 	select_all(&mut target);
-	target.workspace.session.editing.pending = Some(TextStyle {
+	target.workspace.active.session.editing.pending = Some(TextStyle {
 		italic: true,
 		..Default::default()
 	});
-	let before = target.workspace.session.editing.document.clone();
-	let pending = target.workspace.session.editing.pending;
+	let before = target.workspace.active.session.editing.document.clone();
+	let pending = target.workspace.active.session.editing.pending;
 	target.paste_editor_text(&copied, PasteMode::Styled);
-	assert_eq!(target.workspace.session.editing.document, selection);
-	assert_eq!(target.workspace.session.editing.pending, pending);
+	assert_eq!(target.workspace.active.session.editing.document, selection);
+	assert_eq!(target.workspace.active.session.editing.pending, pending);
 	target
 		.workspace
+		.active
 		.editor
-		.undo(&mut target.workspace.session.editing, false);
-	assert_eq!(target.workspace.session.editing.document, before);
+		.undo(&mut target.workspace.active.session.editing, false);
+	assert_eq!(target.workspace.active.session.editing.document, before);
 	target
 		.workspace
+		.active
 		.editor
-		.undo(&mut target.workspace.session.editing, true);
-	assert_eq!(target.workspace.session.editing.document, selection);
+		.undo(&mut target.workspace.active.session.editing, true);
+	assert_eq!(target.workspace.active.session.editing.document, selection);
 }
 
 #[test]
 fn plain_literal_and_automatic_detection_are_distinct() {
 	let text = r"\x1b[31mred\nnext\x1b[0m";
 	let mut app = App::default();
-	app.workspace.session.editing.pending = Some(TextStyle {
+	app.workspace.active.session.editing.pending = Some(TextStyle {
 		italic: true,
 		..Default::default()
 	});
 	app.paste_editor_text(text, PasteMode::Plain);
 	assert_eq!(
-		app.workspace.session.editing.document.lines(),
+		app.workspace.active.session.editing.document.lines(),
 		["red", "next"]
 	);
 	assert!(
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -85,15 +99,21 @@ fn plain_literal_and_automatic_detection_are_distinct() {
 	);
 	let mut app = App::default();
 	app.paste_editor_text(text, PasteMode::Literal);
-	assert_eq!(app.workspace.session.editing.document.lines(), [text]);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		[text]
+	);
 	for literal in [r"C:\new\text", r"\n\t", r"\\x1b[31m"] {
 		assert!(import_mode(literal).is_none());
 	}
 	let mut app = App::default();
 	app.paste_editor_text("\x1b[1mraw\x1b[0m", PasteMode::Styled);
-	assert_eq!(app.workspace.session.editing.document.lines(), ["raw"]);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		["raw"]
+	);
 	assert!(
-		app.workspace.session.editing.document.style_runs()[0]
+		app.workspace.active.session.editing.document.style_runs()[0]
 			.style
 			.bold
 	);
@@ -105,9 +125,9 @@ fn review_does_not_change_document_until_accepted() {
 		let mut app = App::default();
 		app.paste_editor_text("old", PasteMode::Styled);
 		select_all(&mut app);
-		let before = app.workspace.session.editing.document.clone();
+		let before = app.workspace.active.session.editing.document.clone();
 		app.paste_editor_text(r"\x1b[31mnew\x1b[2J", PasteMode::Styled);
-		assert_eq!(app.workspace.session.editing.document, before);
+		assert_eq!(app.workspace.active.session.editing.document, before);
 		assert_eq!(app.import_review.as_ref().unwrap().import.issues.len(), 1);
 		app.decide_review(if accepted {
 			crate::components::import_review::Decision::Strip
@@ -115,14 +135,15 @@ fn review_does_not_change_document_until_accepted() {
 			crate::components::import_review::Decision::Abort
 		});
 		assert_eq!(
-			app.workspace.session.editing.document.lines(),
+			app.workspace.active.session.editing.document.lines(),
 			[if accepted { "new" } else { "old" }]
 		);
 		if accepted {
 			app.workspace
+				.active
 				.editor
-				.undo(&mut app.workspace.session.editing, false);
-			assert_eq!(app.workspace.session.editing.document, before);
+				.undo(&mut app.workspace.active.session.editing, false);
+			assert_eq!(app.workspace.active.session.editing.document, before);
 		}
 	}
 }
@@ -137,22 +158,23 @@ fn cut_requires_success_and_an_unchanged_target_and_is_undoable() {
 		app.clipboard = service;
 		app.copy_selection(true);
 		if scenario == 2 {
-			app.workspace.editor.navigate(
-				&mut app.workspace.session.editing,
+			app.workspace.active.editor.navigate(
+				&mut app.workspace.active.session.editing,
 				Movement::Left,
 				false,
 			);
 		}
 		if scenario == 3 {
-			app.workspace.editor.insert(
-				&mut app.workspace.session.editing,
+			app.workspace.active.editor.insert(
+				&mut app.workspace.active.session.editing,
 				"changed",
 				EditKind::Atomic,
 				Instant::now(),
 			);
 			app.workspace
+				.active
 				.editor
-				.undo(&mut app.workspace.session.editing, false);
+				.undo(&mut app.workspace.active.session.editing, false);
 		}
 		control
 			.writes
@@ -166,14 +188,18 @@ fn cut_requires_success_and_an_unchanged_target_and_is_undoable() {
 			.unwrap();
 		crate::test_clipboard::until(|| app.poll_editor_copy(&mut Vec::new()));
 		assert_eq!(
-			app.workspace.session.editing.document.lines(),
+			app.workspace.active.session.editing.document.lines(),
 			[if scenario == 0 { "" } else { "keep" }]
 		);
 		if scenario == 0 {
 			app.workspace
+				.active
 				.editor
-				.undo(&mut app.workspace.session.editing, false);
-			assert_eq!(app.workspace.session.editing.document.lines(), ["keep"]);
+				.undo(&mut app.workspace.active.session.editing, false);
+			assert_eq!(
+				app.workspace.active.session.editing.document.lines(),
+				["keep"]
+			);
 		}
 	}
 }
@@ -187,5 +213,8 @@ fn delayed_paste_cannot_overwrite_new_editing() {
 	app.paste_editor_text("new", PasteMode::Styled);
 	control.reads.send(Ok("stale".into())).unwrap();
 	crate::test_clipboard::until(|| app.poll_editor_paste());
-	assert_eq!(app.workspace.session.editing.document.lines(), ["new"]);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		["new"]
+	);
 }

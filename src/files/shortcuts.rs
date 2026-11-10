@@ -5,6 +5,42 @@ use crate::shortcuts::registry::{
 use InputScope::*;
 pub static ACTIONS: &[ActionSpec] = &[
 	ActionSpec {
+		id: ActionId::SaveAll,
+		label: "Save all",
+		section: Category::Workspace,
+		subsection: Some(Subsection::Files),
+		order: 8,
+		scopes: WORKSPACE,
+		defaults: ["Ctrl+Alt+s", "", ""],
+	},
+	ActionSpec {
+		id: ActionId::CloseBuffer,
+		label: "Close document",
+		section: Category::Workspace,
+		subsection: Some(Subsection::Files),
+		order: 9,
+		scopes: WORKSPACE,
+		defaults: ["Ctrl+F4", "", ""],
+	},
+	ActionSpec {
+		id: ActionId::NextBuffer,
+		label: "Next document",
+		section: Category::Workspace,
+		subsection: Some(Subsection::Files),
+		order: 10,
+		scopes: WORKSPACE,
+		defaults: ["Ctrl+PageDown", "", ""],
+	},
+	ActionSpec {
+		id: ActionId::PreviousBuffer,
+		label: "Previous document",
+		section: Category::Workspace,
+		subsection: Some(Subsection::Files),
+		order: 11,
+		scopes: WORKSPACE,
+		defaults: ["Ctrl+PageUp", "", ""],
+	},
+	ActionSpec {
 		id: ActionId::New,
 		label: "New document",
 		section: Category::Workspace,

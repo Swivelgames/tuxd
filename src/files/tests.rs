@@ -30,7 +30,7 @@ fn imported_document_dialogs_keep_source_directory_and_cwd_shortcut() {
 	std::fs::write(&source, "Imported").unwrap();
 	let mut app = App::default();
 	app.submit_path(Action::ImportEscaped, source.clone());
-	assert!(app.workspace.session.path.is_none());
+	assert!(app.workspace.active.session.path.is_none());
 	for action in [
 		Action::SaveAs,
 		Action::Open,
@@ -68,23 +68,27 @@ fn open_non_document_offers_import_and_uses_selected_format() {
 	std::fs::write(&path, r"\x1b[31mRed\x1b[0m").unwrap();
 	let mut app = App::default();
 	type_text(&mut app, "keep");
-	let before = app.workspace.session.editing.document.clone();
+	let before = app.workspace.active.session.editing.document.clone();
 	app.submit_path(Action::Open, path.clone());
 	assert!(matches!(
 		&app.files.dialog,
 		Some(Dialog::Path { picker }) if picker.action() == Action::ImportEscaped
 	));
 	key(&mut app, KeyCode::Esc);
-	assert_eq!(app.workspace.session.editing.document, before);
+	assert_eq!(app.workspace.active.session.editing.document, before);
 	app.submit_path(Action::Open, path.clone());
 	key(&mut app, KeyCode::Right); // Raw -> Escaped, still no import.
-	assert_eq!(app.workspace.session.editing.document, before);
+	assert_eq!(app.workspace.active.session.editing.document, before);
 	key(&mut app, KeyCode::Enter); // Import directly from the selected format.
-	assert!(matches!(app.files.dialog, Some(Dialog::Dirty)));
-	key(&mut app, KeyCode::Char('d'));
-	assert_eq!(app.workspace.session.editing.document.lines(), ["Red"]);
+	assert!(app.files.dialog.is_none());
+	assert_eq!(app.workspace.buffers().count(), 2);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		["Red"]
+	);
 	assert_eq!(
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -92,7 +96,7 @@ fn open_non_document_offers_import_and_uses_selected_format() {
 			.foreground,
 		Ink::Ansi(1)
 	);
-	assert!(app.workspace.session.path.is_none());
+	assert!(app.workspace.active.session.path.is_none());
 	assert!(app.dirty());
 }
 
@@ -102,37 +106,43 @@ fn save_dirty_undo_redo_and_export_are_independent() {
 	let path = folder.path().join("styled.tuxd.json");
 	let mut app = App::default();
 	type_text(&mut app, "Hello\n界");
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Start,
+		true,
+	);
 	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Start, true);
-	app.workspace
+		.active
 		.session
 		.editing
 		.apply_tool(StyleAction::Background(Ink::Rgb(1, 2, 3)));
-	app.workspace.session.editing.anchor = None;
+	app.workspace.active.session.editing.anchor = None;
 	assert!(app.dirty());
 	save_as(&mut app, &path);
 	assert!(!app.dirty());
 	assert!(app.files.dialog.is_none());
 	assert_eq!(
 		persistence::load(&path).unwrap(),
-		app.workspace.session.editing.document
+		app.workspace.active.session.editing.document
 	);
 	type_text(&mut app, "X");
 	assert!(app.dirty());
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
+		.undo(&mut app.workspace.active.session.editing, false);
 	assert!(!app.dirty());
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, true);
+		.undo(&mut app.workspace.active.session.editing, true);
 	assert!(app.dirty());
 	let raw = folder.path().join("output.ansi");
 	app.write_file(Action::ExportRaw, raw.clone(), false);
 	assert_eq!(
 		std::fs::read(raw).unwrap(),
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -144,6 +154,7 @@ fn save_dirty_undo_redo_and_export_are_independent() {
 	assert_eq!(
 		std::fs::read(escaped).unwrap(),
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -151,34 +162,41 @@ fn save_dirty_undo_redo_and_export_are_independent() {
 			.as_bytes()
 	);
 	assert!(app.dirty());
-	assert_eq!(app.workspace.session.path, Some(path));
+	assert_eq!(app.workspace.active.session.path, Some(path));
 }
 
 #[test]
-fn pending_new_can_cancel_save_or_discard_without_losing_history() {
+fn closing_buffer_can_cancel_or_save_without_losing_history() {
 	let folder = tempfile::tempdir().unwrap();
 	let mut app = App::default();
 	type_text(&mut app, "keep");
-	let before = app.workspace.session.editing.document.clone();
-	app.file_action(Action::New);
+	let before = app.workspace.active.session.editing.document.clone();
+	app.file_action(Action::CloseBuffer);
 	assert!(matches!(app.files.dialog, Some(Dialog::Dirty)));
 	assert_eq!(app.files.choice, 2);
 	key(&mut app, KeyCode::Enter); // Default Cancel leaves the document unchanged.
 	assert!(app.files.dialog.is_none());
-	assert_eq!(app.workspace.session.editing.document, before);
-	app.file_action(Action::New);
+	assert_eq!(app.workspace.active.session.editing.document, before);
+	app.file_action(Action::CloseBuffer);
 	key(&mut app, KeyCode::Char('s'));
 	assert!(matches!(app.files.dialog, Some(Dialog::Path { .. })));
 	let path = folder.path().join("saved.tuxd.json");
 	type_text(&mut app, path.to_str().unwrap());
 	key(&mut app, KeyCode::Enter);
 	assert_eq!(persistence::load(&path).unwrap(), before);
-	assert_eq!(app.workspace.session.editing.document, Document::default());
+	assert_eq!(
+		app.workspace.active.session.editing.document,
+		Document::default()
+	);
 	assert!(!app.dirty());
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
-	assert_eq!(app.workspace.session.editing.document, Document::default());
+		.undo(&mut app.workspace.active.session.editing, false);
+	assert_eq!(
+		app.workspace.active.session.editing.document,
+		Document::default()
+	);
 }
 
 #[test]
@@ -188,7 +206,7 @@ fn failures_and_overwrite_cancel_preserve_document_path_and_dirty_state() {
 	std::fs::write(&existing, b"keep bytes").unwrap();
 	let mut app = App::default();
 	type_text(&mut app, "unsaved");
-	let before = app.workspace.session.editing.document.clone();
+	let before = app.workspace.active.session.editing.document.clone();
 	save_as(&mut app, &existing);
 	assert!(matches!(app.files.dialog, Some(Dialog::Overwrite { .. })));
 	key(&mut app, KeyCode::Char('n'));
@@ -210,14 +228,15 @@ fn failures_and_overwrite_cancel_preserve_document_path_and_dirty_state() {
 	);
 	assert!(app.files.error.is_some());
 	assert!(!app.handle(Event::Resize(80, 24)));
-	assert!(app.workspace.session.path.is_none());
+	assert!(app.workspace.active.session.path.is_none());
 	assert!(app.dirty());
-	assert_eq!(app.workspace.session.editing.document, before);
+	assert_eq!(app.workspace.active.session.editing.document, before);
 	key(&mut app, KeyCode::Esc);
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
-	assert!(app.workspace.session.editing.document.is_empty());
+		.undo(&mut app.workspace.active.session.editing, false);
+	assert!(app.workspace.active.session.editing.document.is_empty());
 }
 
 #[test]
@@ -227,7 +246,7 @@ fn import_review_abort_strip_and_dirty_protection() {
 	std::fs::write(&source, r"\x1b[31mRed\x1b[2J\n界\q").unwrap();
 	let mut app = App::default();
 	type_text(&mut app, "original");
-	let original = app.workspace.session.editing.document.clone();
+	let original = app.workspace.active.session.editing.document.clone();
 	for abort in [true, false] {
 		app.file_action(Action::ImportEscaped);
 		app.submit_path(Action::ImportEscaped, source.to_str().unwrap().into());
@@ -238,18 +257,30 @@ fn import_review_abort_strip_and_dirty_protection() {
 		}
 		// Pasting a response cannot answer a confirmation.
 		type_text(&mut app, "s");
-		assert_eq!(app.workspace.session.editing.document, original);
+		assert_eq!(app.workspace.active.session.editing.document, original);
 		key(&mut app, KeyCode::Char(if abort { 'a' } else { 's' }));
-		assert_eq!(app.workspace.session.editing.document, original);
+		if abort {
+			assert_eq!(app.workspace.active.session.editing.document, original);
+		}
 	}
-	assert!(matches!(app.files.dialog, Some(Dialog::Dirty)));
-	key(&mut app, KeyCode::Char('d'));
+	assert!(app.files.dialog.is_none());
 	assert_eq!(
-		app.workspace.session.editing.document.lines(),
+		app.workspace
+			.buffers()
+			.next()
+			.unwrap()
+			.session
+			.editing
+			.document,
+		original
+	);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
 		["Red", "界"]
 	);
 	assert_eq!(
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -258,12 +289,13 @@ fn import_review_abort_strip_and_dirty_protection() {
 		Ink::Ansi(1)
 	);
 	assert!(app.dirty());
-	assert!(app.workspace.session.path.is_none());
+	assert!(app.workspace.active.session.path.is_none());
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
+		.undo(&mut app.workspace.active.session.editing, false);
 	assert_eq!(
-		app.workspace.session.editing.document.lines(),
+		app.workspace.active.session.editing.document.lines(),
 		["Red", "界"]
 	);
 }
@@ -282,7 +314,7 @@ fn clean_document_quit_and_save_before_quit() {
 	assert!(key(&mut app, KeyCode::Char('s')));
 	assert_eq!(
 		persistence::load(&path).unwrap(),
-		app.workspace.session.editing.document
+		app.workspace.active.session.editing.document
 	);
 	assert!(!app.dirty());
 }
@@ -298,7 +330,7 @@ fn export_refuses_to_replace_active_document() {
 	assert!(app.files.error.is_some());
 	assert_eq!(
 		persistence::load(&path).unwrap(),
-		app.workspace.session.editing.document
+		app.workspace.active.session.editing.document
 	);
 }
 
@@ -328,7 +360,7 @@ fn long_review_and_narrow_menus_remain_navigable() {
 			.unwrap();
 		key(&mut app, KeyCode::Down);
 	}
-	assert!(matches!(app.files.dialog, Some(Dialog::Menu { index: 6 })));
+	assert!(matches!(app.files.dialog, Some(Dialog::Menu { index: 8 })));
 }
 
 #[test]
@@ -341,6 +373,6 @@ fn selected_native_path_retains_non_utf8_bytes() {
 	std::fs::write(&path, bytes).unwrap();
 	let mut app = App::default();
 	app.submit_path(Action::Open, path.clone());
-	assert_eq!(app.workspace.session.path, Some(path));
+	assert_eq!(app.workspace.active.session.path, Some(path));
 	assert!(app.files.dialog.is_none());
 }

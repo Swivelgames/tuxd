@@ -1,4 +1,6 @@
 mod actions;
+#[cfg(test)]
+mod buffer_tests;
 mod clipboard;
 mod editor_clipboard;
 #[cfg(test)]
@@ -8,10 +10,10 @@ mod focus;
 mod review;
 mod settings;
 mod startup;
-mod tools;
 mod view;
 #[cfg(test)]
 mod view_tests;
+mod workspace;
 
 #[cfg(test)]
 use crate::panel::Control;
@@ -25,7 +27,6 @@ pub struct App {
 	pub workspace: crate::workspace::Workspace,
 	pub theme: crate::theme::Config,
 	pub theme_path: Result<std::path::PathBuf, String>,
-	editor_clipboard: crate::features::editor::clipboard::Clipboard,
 	pub clipboard: crate::libraries::clipboard::Service,
 	pub import_review: Option<crate::workflows::PendingReview>,
 	pub files: crate::files::Files,
@@ -44,7 +45,6 @@ impl Default for App {
 			workspace: Default::default(),
 			theme: crate::theme::Config::default(),
 			theme_path: crate::configuration::directory().map(|dir| dir.join("theme.json")),
-			editor_clipboard: Default::default(),
 			clipboard: Default::default(),
 			import_review: None,
 			files: Default::default(),
@@ -76,7 +76,7 @@ impl App {
 			let decoded = ShortcutKey::from(key);
 			if decoded.opener() {
 				self.shortcuts.cancel();
-				self.workspace.session.editing.break_group();
+				self.workspace.active.session.editing.break_group();
 				self.settings = Some(crate::settings::Settings::for_scope(
 					&self.shortcuts.config,
 					scope,
@@ -97,8 +97,8 @@ impl App {
 						} else if self.files.dialog.is_some() {
 							self.file_event(&Event::Paste(ch.to_string()));
 						} else if self.workspace.focus == Pane::Editor {
-							self.workspace.editor.insert(
-								&mut self.workspace.session.editing,
+							self.workspace.active.editor.insert(
+								&mut self.workspace.active.session.editing,
 								&ch.to_string(),
 								EditKind::Typing,
 								Instant::now(),
@@ -107,7 +107,7 @@ impl App {
 							self.workspace.panel.insert_text(&ch.to_string());
 						}
 					} else {
-						self.workspace.session.editing.break_group();
+						self.workspace.active.session.editing.break_group();
 					}
 				}
 				Dispatch::Pending | Dispatch::Consumed => (),
@@ -131,10 +131,10 @@ impl App {
 						),
 					Event::Mouse(mouse) => {
 						let effect = self.workspace.mouse(mouse);
-						self.tool_effect(effect);
+						self.workspace_effect(effect);
 					}
 					Event::Resize(_, _) | Event::FocusLost => {
-						self.workspace.session.editing.break_group()
+						self.workspace.active.session.editing.break_group()
 					}
 					_ => (),
 				}

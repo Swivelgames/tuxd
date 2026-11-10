@@ -12,7 +12,20 @@
 | Raw ANSI | Output consumed by a terminal | Actual ANSI escape bytes |
 | Escaped ANSI | Copying or embedding escape notation | Literal `\x1b`, `\n`, `\t`, and `\\` |
 
-Each native file holds **one document**. tuxd currently opens one document at a time.
+Each native file holds **one document**. Open several documents in tabs; each keeps its own editing history and view state.
+
+## Work with document tabs
+
+- **New** opens a separate buffer. **Open** and **Import** reuse the unchanged initial untitled buffer; otherwise they open a new buffer without replacing your work.
+- Click a tab or use **Ctrl+PageUp / Ctrl+PageDown** to switch documents.
+- Click a tab’s **x** to close it. Unsaved documents offer Save / Discard / Cancel.
+- Tabs show the filename (or a numbered untitled name) and `*` for unsaved changes.
+- When tabs overflow, use the edge arrows or keyboard navigation. The active tab stays visible.
+- Opening a native file already in a tab selects that tab, preserving unsaved edits.
+- Cursor, selection, undo/redo, pending text style, scrolling, and wrapping belong to each buffer.
+- Tools, pane focus, and the wide/slim arrangement remain shared across the workspace.
+
+Buffers are kept for this run only. Directory workspaces and session restoration are not implemented yet.
 
 ## Save an editable document
 
@@ -25,11 +38,15 @@ Each native file holds **one document**. tuxd currently opens one document at a 
 | Open a document | Ctrl+O |
 | Save | Ctrl+S |
 | Save under a new name | Ctrl+Shift+S |
+| Save all modified documents | Ctrl+Alt+S |
+| Close the active document | Ctrl+F4 |
 | New document | Ctrl+N |
 | Open the File menu | F4 |
 
 - Save As adds `.tuxd.json` when you enter no extension.
 - Saving preserves undo history.
+- Save All visits modified buffers in tab order and asks for destinations when needed. On completion it returns to your original tab. Cancel or a failed save stops progress until you resolve or dismiss that dialog; earlier saves remain saved.
+- Save As cannot overwrite another open buffer’s native file.
 - The title’s `*` disappears after saving, or after undoing back to the saved content.
 - Imported content starts unsaved; saving asks for a native document destination.
 
@@ -84,7 +101,7 @@ See [CLI reference](cli.md) for file arguments and startup behavior.
 | Raw | Preserves newlines/tabs and includes a final style reset |
 | Escaped | Matches Code’s clipboard payload without display-only line breaks |
 | Document state | Native path and unsaved marker stay unchanged |
-| Active native document as destination | Rejected to protect the editable file |
+| Any open native document as destination | Rejected to protect editable files |
 
 **Export is not Save.** Save a `.tuxd.json` copy to preserve your editable work.
 
@@ -116,13 +133,15 @@ Paths may be absolute, relative to the displayed directory, or start with `~/`. 
 
 ## Handle unsaved changes
 
-New, Open, import, and Quit prompt before replacing unsaved work. **Cancel is initially focused.**
+Close prompts for the active buffer; Quit reviews every modified buffer in tab order. The prompt names its document, and **Cancel is initially focused**.
 
 | Choice | Result |
 | --- | --- |
 | Save | Save first, then continue |
 | Discard | Continue without saving |
 | Cancel | Keep editing |
+
+Closing the last buffer creates a fresh untitled document. Canceling Quit leaves all buffers open, including any for which you chose Discard earlier in that quit attempt.
 
 There is no autosave, crash recovery, or external-change detection. Avoid concurrent edits to the same file.
 

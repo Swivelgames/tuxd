@@ -8,8 +8,27 @@ impl Workspace {
 			return super::Effect::None;
 		}
 		let point = (mouse.column, mouse.row).into();
-		let editor_bar = self.editor.surface.scrollbar_event(mouse);
-		let code_bar = self.code.surface.scrollbar_event(mouse);
+		if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+			&& let Some((_, id)) = self
+				.tab_close_hits
+				.iter()
+				.find(|(rect, _)| rect.contains(point))
+				.copied()
+		{
+			return super::Effect::CloseBuffer(id);
+		}
+		if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+			&& let Some((_, index)) = self
+				.tab_hits
+				.iter()
+				.find(|(rect, _)| rect.contains(point))
+				.copied()
+		{
+			self.select_buffer(index);
+			return super::Effect::None;
+		}
+		let editor_bar = self.active.editor.surface.scrollbar_event(mouse);
+		let code_bar = self.active.code.surface.scrollbar_event(mouse);
 		if (editor_bar || code_bar) && mouse.kind != MouseEventKind::Up(MouseButton::Left) {
 			self.dragging = false;
 			return super::Effect::None;
@@ -26,12 +45,12 @@ impl Workspace {
 
 		if self.dragging
 			&& mouse.kind == MouseEventKind::Drag(MouseButton::Left)
-			&& self.editor.surface.text.width > 0
-			&& self.editor.surface.text.height > 0
+			&& self.active.editor.surface.text.width > 0
+			&& self.active.editor.surface.text.height > 0
 		{
-			let area = self.editor.surface.text;
-			self.editor.click(
-				&mut self.session.editing,
+			let area = self.active.editor.surface.text;
+			self.active.editor.click(
+				&mut self.active.session.editing,
 				mouse
 					.column
 					.clamp(area.x, area.right() - 1)
@@ -57,7 +76,7 @@ impl Workspace {
 				self.toggle_pane(TextPane::Editor);
 				return super::Effect::None;
 			}
-			if self.code_toggle.contains(point) || self.pane_toggles[1].contains(point) {
+			if self.pane_toggles[1].contains(point) {
 				self.toggle_pane(TextPane::Code);
 				return super::Effect::None;
 			}
@@ -71,19 +90,21 @@ impl Workspace {
 				return super::Effect::None;
 			}
 
-			if self.code.surface.inner.contains(point) {
+			if self.active.code.surface.inner.contains(point) {
 				self.focus = Pane::Code;
-				self.session.editing.break_group();
+				self.active.session.editing.break_group();
 				return super::Effect::None;
 			}
-			if self.editor.surface.inner.contains(point) {
+			if self.active.editor.surface.inner.contains(point) {
 				self.focus = Pane::Editor;
-				self.editor.click(
-					&mut self.session.editing,
-					mouse.column.saturating_sub(self.editor.surface.text.x) as usize,
-					(mouse.row - self.editor.surface.text.y) as usize,
+				self.active.editor.click(
+					&mut self.active.session.editing,
+					mouse
+						.column
+						.saturating_sub(self.active.editor.surface.text.x) as usize,
+					(mouse.row - self.active.editor.surface.text.y) as usize,
 				);
-				self.session.editing.anchor = Some(self.session.editing.cursor);
+				self.active.session.editing.anchor = Some(self.active.session.editing.cursor);
 				self.dragging = true;
 			}
 		}
@@ -92,13 +113,15 @@ impl Workspace {
 			MouseEventKind::ScrollDown | MouseEventKind::ScrollUp
 		) {
 			let down = mouse.kind == MouseEventKind::ScrollDown;
-			if self.editor.surface.inner.contains(point) {
-				self.editor.scroll(&mut self.session.editing, down);
-			} else if self.code.surface.inner.contains(point) {
-				self.code.surface.viewport.top = if down {
-					self.code.surface.viewport.top.saturating_add(3)
+			if self.active.editor.surface.inner.contains(point) {
+				self.active
+					.editor
+					.scroll(&mut self.active.session.editing, down);
+			} else if self.active.code.surface.inner.contains(point) {
+				self.active.code.surface.viewport.top = if down {
+					self.active.code.surface.viewport.top.saturating_add(3)
 				} else {
-					self.code.surface.viewport.top.saturating_sub(3)
+					self.active.code.surface.viewport.top.saturating_sub(3)
 				};
 			}
 		}

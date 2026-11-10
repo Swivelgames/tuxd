@@ -84,8 +84,9 @@ pub fn shortcuts(binary: &Path) -> Result<()> {
 	let mut s = Session::new(binary, &[], &env)?;
 	s.paste("preserved")?;
 	s.send("\x1b[19~")?;
-	s.contains("Save changes before continuing?")?;
-	s.send("\x1b")?;
+	s.excludes("Save changes before continuing?")?;
+	s.send("\x1b[5;5~")?;
+	s.contains("preserved")?;
 	let before = fs::read(&path)?;
 	s.send("\x1bOP")?;
 	category(&mut s, 1)?;

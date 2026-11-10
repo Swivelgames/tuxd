@@ -22,18 +22,20 @@ fn choose(app: &mut App, control: Control) {
 fn collapsing_sections_preserves_selection_and_document_history() {
 	let mut app = App::default();
 	app.handle(Event::Paste("selected".into()));
-	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Home, true);
-	let selection = app.workspace.session.editing.selection();
-	let original = app.workspace.session.editing.document.clone();
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Home,
+		true,
+	);
+	let selection = app.workspace.active.session.editing.selection();
+	let original = app.workspace.active.session.editing.document.clone();
 	for section in 0..3 {
 		choose(&mut app, Control::Section(section));
 		assert!(app.workspace.panel.collapsed(section));
 	}
 	assert_eq!(app.workspace.panel.items().len(), 3);
-	assert_eq!(app.workspace.session.editing.selection(), selection);
-	assert_eq!(app.workspace.session.editing.document, original);
+	assert_eq!(app.workspace.active.session.editing.selection(), selection);
+	assert_eq!(app.workspace.active.session.editing.document, original);
 	for section in 0..3 {
 		choose(&mut app, Control::Section(section));
 	}
@@ -45,9 +47,10 @@ fn collapsing_sections_preserves_selection_and_document_history() {
 			.any(|item| item.control == Control::Glyph('┌'))
 	);
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
-	assert!(app.workspace.session.editing.document.is_empty());
+		.undo(&mut app.workspace.active.session.editing, false);
+	assert!(app.workspace.active.session.editing.document.is_empty());
 }
 
 #[test]
@@ -56,21 +59,22 @@ fn palettes_preserve_selection_and_rgb_is_staged_until_valid_apply() {
 	let mut app = App::default();
 	assert!(
 		app.workspace.code_open
-			&& app.workspace.code.surface.viewport.wrap
-			&& app.workspace.editor.surface.viewport.wrap
+			&& app.workspace.active.code.surface.viewport.wrap
+			&& app.workspace.active.editor.surface.viewport.wrap
 	);
 	app.handle(Event::Paste("hello".into()));
 	app.handle(key(KeyCode::Home, KeyModifiers::SHIFT));
-	let selection = app.workspace.session.editing.selection();
-	let original = app.workspace.session.editing.document.clone();
+	let selection = app.workspace.active.session.editing.selection();
+	let original = app.workspace.active.session.editing.document.clone();
 	choose(&mut app, Control::Target(true));
 	choose(&mut app, Control::Palette(2));
 	choose(&mut app, Control::Field(0));
 	app.handle(Event::Paste("#00ff80".into()));
-	assert_eq!(app.workspace.session.editing.document, original);
+	assert_eq!(app.workspace.active.session.editing.document, original);
 	app.handle(key(KeyCode::Enter, KeyModifiers::NONE));
 	assert_eq!(
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -78,43 +82,52 @@ fn palettes_preserve_selection_and_rgb_is_staged_until_valid_apply() {
 			.background,
 		Ink::Rgb(0, 255, 128)
 	);
-	assert_eq!(app.workspace.session.editing.selection(), selection);
-	let colored = app.workspace.session.editing.document.clone();
+	assert_eq!(app.workspace.active.session.editing.selection(), selection);
+	let colored = app.workspace.active.session.editing.document.clone();
 	choose(&mut app, Control::Field(2));
 	app.handle(Event::Paste("256".into()));
 	app.handle(key(KeyCode::Enter, KeyModifiers::NONE));
 	assert!(app.workspace.panel.color.rgb.error.is_some());
-	assert_eq!(app.workspace.session.editing.document, colored);
+	assert_eq!(app.workspace.active.session.editing.document, colored);
 	// Invalid apply did not add an undo transaction.
 	app.handle(key(KeyCode::Char('z'), KeyModifiers::CONTROL));
-	assert_eq!(app.workspace.session.editing.document, original);
+	assert_eq!(app.workspace.active.session.editing.document, original);
 	app.handle(key(KeyCode::Char('y'), KeyModifiers::CONTROL));
-	assert_eq!(app.workspace.session.editing.document, colored);
+	assert_eq!(app.workspace.active.session.editing.document, colored);
 	choose(&mut app, Control::Style(Action::Clear));
-	assert_eq!(app.workspace.session.editing.document, original);
+	assert_eq!(app.workspace.active.session.editing.document, original);
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
-	assert_eq!(app.workspace.session.editing.document, colored);
+		.undo(&mut app.workspace.active.session.editing, false);
+	assert_eq!(app.workspace.active.session.editing.document, colored);
 }
 
 #[test]
 fn glyph_replacement_and_repeated_insertion_are_independent_undo_steps() {
 	let mut app = App::default();
 	app.handle(Event::Paste("界x".into()));
-	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Start, false);
-	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Right, true);
-	app.workspace.session.editing.apply_tool(Action::Dim);
-	let before = app.workspace.session.editing.document.clone();
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Start,
+		false,
+	);
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Right,
+		true,
+	);
+	app.workspace.active.session.editing.apply_tool(Action::Dim);
+	let before = app.workspace.active.session.editing.document.clone();
 	choose(&mut app, Control::Glyph('┌'));
 	assert_eq!(app.workspace.focus, Pane::Tools);
-	assert_eq!(app.workspace.session.editing.document.lines(), ["┌x"]);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		["┌x"]
+	);
 	assert!(
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -122,23 +135,32 @@ fn glyph_replacement_and_repeated_insertion_are_independent_undo_steps() {
 			.dim
 	);
 	choose(&mut app, Control::Glyph('─'));
-	assert_eq!(app.workspace.session.editing.document.lines(), ["┌─x"]);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		["┌─x"]
+	);
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
-	assert_eq!(app.workspace.session.editing.document.lines(), ["┌x"]);
+		.undo(&mut app.workspace.active.session.editing, false);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		["┌x"]
+	);
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, false);
-	assert_eq!(app.workspace.session.editing.document, before);
+		.undo(&mut app.workspace.active.session.editing, false);
+	assert_eq!(app.workspace.active.session.editing.document, before);
 	app.workspace
+		.active
 		.editor
-		.undo(&mut app.workspace.session.editing, true);
+		.undo(&mut app.workspace.active.session.editing, true);
 	app.workspace.panel.characters.query.set("U+F015".into());
 	app.workspace.panel.characters.refresh();
 	choose(&mut app, Control::Glyph('\u{f015}'));
 	assert_eq!(
-		app.workspace.session.editing.document.lines(),
+		app.workspace.active.session.editing.document.lines(),
 		["┌\u{f015}x"]
 	);
 	app.handle(key(KeyCode::Esc, KeyModifiers::NONE));
@@ -151,20 +173,23 @@ fn control_and_alt_word_bindings_and_focus_specific_wrap() {
 		let mut app = App::default();
 		app.handle(Event::Paste("one two".into()));
 		app.handle(key(KeyCode::Left, modifier));
-		assert_eq!(app.workspace.session.editing.cursor.byte, 4);
+		assert_eq!(app.workspace.active.session.editing.cursor.byte, 4);
 		app.handle(key(KeyCode::Right, modifier | KeyModifiers::SHIFT));
-		assert!(app.workspace.session.editing.selection().is_some());
+		assert!(app.workspace.active.session.editing.selection().is_some());
 		app.handle(key(KeyCode::Backspace, modifier));
-		assert_eq!(app.workspace.session.editing.document.lines(), ["one "]);
+		assert_eq!(
+			app.workspace.active.session.editing.document.lines(),
+			["one "]
+		);
 		app.handle(key(KeyCode::F(3), KeyModifiers::NONE));
-		assert!(!app.workspace.editor.surface.viewport.wrap);
-		assert!(app.workspace.code.surface.viewport.wrap);
+		assert!(!app.workspace.active.editor.surface.viewport.wrap);
+		assert!(app.workspace.active.code.surface.viewport.wrap);
 		app.workspace.code_open = true;
 		app.workspace.focus = Pane::Code;
 		app.handle(key(KeyCode::F(3), KeyModifiers::NONE));
 		assert!(
-			!app.workspace.editor.surface.viewport.wrap
-				&& !app.workspace.code.surface.viewport.wrap
+			!app.workspace.active.editor.surface.viewport.wrap
+				&& !app.workspace.active.code.surface.viewport.wrap
 		);
 	}
 }
@@ -177,10 +202,11 @@ fn keyboard_selection_applies_styles_to_text() {
 	for _ in 0..5 {
 		app.handle(key(KeyCode::Right, KeyModifiers::SHIFT));
 	}
-	assert!(app.workspace.session.editing.selection().is_some());
+	assert!(app.workspace.active.session.editing.selection().is_some());
 	app.handle(key(KeyCode::Char('b'), KeyModifiers::CONTROL));
 	assert!(
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -199,7 +225,10 @@ fn quit_is_cancelable_and_paste_cannot_answer_a_dialog() {
 		Some(crate::files::Dialog::Dirty)
 	));
 	assert!(!app.handle(Event::Paste("y".into())));
-	assert_eq!(app.workspace.session.editing.document.lines(), ["hello"]);
+	assert_eq!(
+		app.workspace.active.session.editing.document.lines(),
+		["hello"]
+	);
 	app.handle(key(KeyCode::Esc, KeyModifiers::NONE));
 	assert!(app.settings.is_none());
 	app.handle(key(KeyCode::Char('q'), KeyModifiers::CONTROL));
@@ -212,7 +241,7 @@ fn help_blocks_edits_and_empty_editor_exits_directly() {
 	app.handle(key(KeyCode::F(1), KeyModifiers::NONE));
 	app.handle(Event::Paste("ignored".into()));
 	app.handle(key(KeyCode::Char('x'), KeyModifiers::NONE));
-	assert!(app.workspace.session.editing.document.is_empty());
+	assert!(app.workspace.active.session.editing.document.is_empty());
 	app.handle(key(KeyCode::Esc, KeyModifiers::NONE));
 	assert!(app.handle(key(KeyCode::Char('q'), KeyModifiers::CONTROL)));
 }

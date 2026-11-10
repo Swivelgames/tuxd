@@ -12,13 +12,13 @@ impl App {
 			A::PasteLiteral => self.request_editor_paste(PasteMode::Literal),
 			A::SelectAll => {
 				use crate::libraries::editing::Movement;
-				self.workspace.editor.navigate(
-					&mut self.workspace.session.editing,
+				self.workspace.active.editor.navigate(
+					&mut self.workspace.active.session.editing,
 					Movement::Start,
 					false,
 				);
-				self.workspace.editor.navigate(
-					&mut self.workspace.session.editing,
+				self.workspace.active.editor.navigate(
+					&mut self.workspace.active.session.editing,
 					Movement::Finish,
 					true,
 				);
@@ -28,40 +28,50 @@ impl App {
 	}
 
 	pub fn copy_selection(&mut self, cut: bool) {
-		let effect = self
-			.editor_clipboard
-			.copy(&self.workspace.session, &self.clipboard, cut);
+		let effect = self.workspace.active.clipboard.copy(
+			&self.workspace.active.session,
+			&self.clipboard,
+			cut,
+		);
 		self.editor_clipboard_effect(effect);
 	}
 
 	pub fn poll_editor_copy(&mut self, output: &mut impl std::io::Write) -> bool {
 		let available = self.workspace_available();
-		let effect = self.editor_clipboard.poll_copy(
-			&mut self.workspace.session,
-			&mut self.workspace.editor,
-			available,
-			output,
-		);
-		if let Some(effect) = effect {
+		let effects: Vec<_> = self
+			.workspace
+			.buffers_mut()
+			.filter_map(|buffer| {
+				buffer.clipboard.poll_copy(
+					&mut buffer.session,
+					&mut buffer.editor,
+					available,
+					output,
+				)
+			})
+			.collect();
+		let updated = !effects.is_empty();
+		for effect in effects {
 			self.editor_clipboard_effect(effect);
-			true
-		} else {
-			false
 		}
+		updated
 	}
 
 	pub fn request_editor_paste(&mut self, mode: PasteMode) {
-		self.editor_clipboard
-			.request_paste(&self.workspace.session, &self.clipboard, mode);
+		self.workspace.active.clipboard.request_paste(
+			&self.workspace.active.session,
+			&self.clipboard,
+			mode,
+		);
 	}
 
 	pub fn poll_editor_paste(&mut self) -> bool {
 		let available = self.workspace_available();
-		let effect = self.editor_clipboard.poll_paste(
-			&mut self.workspace.session,
-			&mut self.workspace.editor,
-			available,
-		);
+		let effect = self.workspace.buffers_mut().find_map(|buffer| {
+			buffer
+				.clipboard
+				.poll_paste(&mut buffer.session, &mut buffer.editor, available)
+		});
 		if let Some(effect) = effect {
 			self.editor_clipboard_effect(effect);
 			true
@@ -72,8 +82,8 @@ impl App {
 
 	pub fn paste_editor_text(&mut self, text: &str, mode: PasteMode) {
 		let effect = crate::features::editor::clipboard::paste_text(
-			&mut self.workspace.session,
-			&mut self.workspace.editor,
+			&mut self.workspace.active.session,
+			&mut self.workspace.active.editor,
 			text,
 			mode,
 		);
@@ -85,11 +95,14 @@ impl App {
 		review: crate::features::editor::clipboard::PasteReview,
 		document: &crate::libraries::ansi::Document,
 	) {
-		let effect = review.apply(
-			&mut self.workspace.session,
-			&mut self.workspace.editor,
-			document,
-		);
+		let Some(buffer) = self
+			.workspace
+			.buffers_mut()
+			.find(|buffer| buffer.session.id == review.session())
+		else {
+			return;
+		};
+		let effect = review.apply(&mut buffer.session, &mut buffer.editor, document);
 		self.editor_clipboard_effect(effect);
 	}
 
@@ -98,11 +111,14 @@ impl App {
 		match effect {
 			Effect::None => (),
 			Effect::Notice(message) => self.notice = Some(message),
-			Effect::Review { import, target } => self.begin_review(
-				import,
-				crate::workflows::Source::Clipboard,
-				crate::workflows::Destination::Paste(target),
-			),
+			Effect::Review { import, target } => {
+				self.workspace.select_session(target.session());
+				self.begin_review(
+					import,
+					crate::workflows::Source::Clipboard,
+					crate::workflows::Destination::Paste(target),
+				);
+			}
 		}
 	}
 }

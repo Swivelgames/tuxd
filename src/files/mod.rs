@@ -15,6 +15,8 @@ pub enum Action {
 	Open,
 	Save,
 	SaveAs,
+	SaveAll,
+	CloseBuffer,
 	ImportRaw,
 	ImportEscaped,
 	ExportRaw,
@@ -29,17 +31,21 @@ impl Action {
 			Self::Open => A::Open,
 			Self::Save => A::Save,
 			Self::SaveAs => A::SaveAs,
+			Self::SaveAll => A::SaveAll,
+			Self::CloseBuffer => A::CloseBuffer,
 			Self::ImportRaw | Self::ImportEscaped => A::Import,
 			Self::ExportRaw | Self::ExportEscaped => A::Export,
 			Self::Quit => A::Quit,
 		}
 	}
 }
-pub const MENU: [(Action, &str); 7] = [
+pub const MENU: [(Action, &str); 9] = [
 	(Action::New, "New document"),
 	(Action::Open, "Open document"),
+	(Action::CloseBuffer, "Close document"),
 	(Action::Save, "Save"),
 	(Action::SaveAs, "Save as"),
+	(Action::SaveAll, "Save all"),
 	(Action::ImportEscaped, "Import"),
 	(Action::ExportEscaped, "Export"),
 	(Action::Quit, "Quit"),
@@ -62,6 +68,7 @@ pub enum Dialog {
 pub struct Files {
 	pub dialog: Option<Dialog>,
 	pub error: Option<String>,
+	pub(crate) document_name: String,
 	scroll: usize,
 	viewport: usize,
 	bar: Option<Bar>,
@@ -102,6 +109,7 @@ impl Default for Files {
 		Self {
 			dialog: None,
 			error: None,
+			document_name: String::new(),
 			scroll: 0,
 			viewport: 1,
 			bar: None,

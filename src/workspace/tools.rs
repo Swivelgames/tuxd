@@ -1,17 +1,8 @@
 //! Workspace applies typed tool outcomes; Tools owns input, selection and drafts.
-use super::Workspace;
+use super::{Effect, Workspace};
 use crate::workspace::Pane;
 use crate::{libraries::editing::EditKind, panel::Effect as ToolEffect};
 use std::time::Instant;
-
-/// Effects requiring application-owned services; local tool effects never escape.
-pub enum Effect {
-	None,
-	Copy(String),
-	Paste(usize),
-	PasteCharacters,
-	Notice(String),
-}
 
 impl Workspace {
 	pub fn reveal_tool(&mut self) {
@@ -32,11 +23,11 @@ impl Workspace {
 	pub(crate) fn tool_effect(&mut self, effect: ToolEffect) -> Effect {
 		match effect {
 			ToolEffect::None => (),
-			ToolEffect::Style(action) => self.session.editing.apply_tool(action),
+			ToolEffect::Style(action) => self.active.session.editing.apply_tool(action),
 			ToolEffect::Glyph(ch) => {
 				self.focus = Pane::Tools;
-				self.editor.insert(
-					&mut self.session.editing,
+				self.active.editor.insert(
+					&mut self.active.session.editing,
 					&ch.to_string(),
 					EditKind::Atomic,
 					Instant::now(),

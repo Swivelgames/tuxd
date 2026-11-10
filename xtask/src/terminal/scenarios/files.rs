@@ -2,13 +2,14 @@ use crate::{
 	process::Runner,
 	terminal::{clipboard::Clipboard, fixtures, session::Session},
 };
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use std::{fs, path::Path};
 use vt100::Color;
 
 pub fn run(runner: &Runner, binary: &Path) -> Result<()> {
-	persistence(binary)?;
-	explorer(runner, binary)?;
+	persistence(binary).context("persistence scenario")?;
+	super::buffers::run(binary).context("buffers scenario")?;
+	explorer(runner, binary).context("explorer scenario")?;
 	#[cfg(unix)]
 	super::super::unix::paths(runner, binary)?;
 	println!("PASS: save/open/export/import, picker, overwrite, invalid startup paths");
@@ -47,21 +48,19 @@ fn persistence(binary: &Path) -> Result<()> {
 	s.send("\x1b")?;
 	ensure!(s.row(2).contains("Save me"));
 	s.send("X")?;
-	let import = "\x1b[14~".to_owned() + &"\x1b[B".repeat(4) + "\r";
+	let import = "\x1b[14~".to_owned() + &"\x1b[B".repeat(6) + "\r";
 	s.send(&import)?;
 	s.paste(bad.to_str().unwrap())?;
 	s.send("\r")?;
 	s.contains("Unsupported ANSI Sequences")?;
 	s.contains("Seq.")?;
-	s.send("s")?;
-	s.contains("Save changes before continuing?")?;
-	s.send("c")?;
+	s.send("a")?;
 	ensure!(s.row(2).contains("Save me"));
 	s.send(&import)?;
 	s.paste(bad.to_str().unwrap())?;
 	s.send("\r")?;
 	s.send("s")?;
-	s.send("d")?;
+	s.excludes("Save changes before continuing?")?;
 	ensure!(s.row(2).contains("Imported"));
 	ensure!(matches!(
 		s.cell(2, 7).fgcolor(),
@@ -70,7 +69,7 @@ fn persistence(binary: &Path) -> Result<()> {
 	s.send("\x13")?;
 	s.contains("Save document as")?;
 	s.send("\x1b")?;
-	s.send("\x11d")?;
+	s.send("\x11dd")?;
 	s.finish(0)?;
 	let mut s = Session::new(binary, &[document.as_os_str()], &[])?;
 	ensure!(s.row(2).contains("Save me"));
@@ -104,7 +103,7 @@ fn explorer(runner: &Runner, binary: &Path) -> Result<()> {
 	s.send("\x06jggMG\r")?;
 	ensure!(s.row(2).contains("Terminal UX Designer"));
 	s.send("Z")?;
-	let save_as = "\x1b[14~".to_owned() + &"\x1b[B".repeat(3) + "\r";
+	let save_as = "\x1b[14~".to_owned() + &"\x1b[B".repeat(4) + "\r";
 	s.send(&save_as)?;
 	s.send("\x01\x16")?;
 	s.send("\r")?;

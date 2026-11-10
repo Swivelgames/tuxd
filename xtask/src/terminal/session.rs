@@ -98,7 +98,7 @@ impl Session {
 		let deadline = Instant::now() + Duration::from_secs(5);
 		while Instant::now() < deadline {
 			session.drain()?;
-			if session.text().contains("F6 focus") || !session.alive()? {
+			if session.row(0).contains("tuxd") || !session.alive()? {
 				break;
 			}
 		}

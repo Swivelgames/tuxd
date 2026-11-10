@@ -105,7 +105,7 @@ fn dropdowns_stage_jump_cancel_and_commit_without_editing_the_document() {
 		CATALOG.groups[app.workspace.panel.characters.group].name,
 		"Braille"
 	);
-	assert!(app.workspace.session.editing.document.is_empty());
+	assert!(app.workspace.active.session.editing.document.is_empty());
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn mouse_dropdown_takes_focus_and_commits_the_clicked_choice() {
 		CATALOG.groups[app.workspace.panel.characters.group].name,
 		"Arrows"
 	);
-	assert!(app.workspace.session.editing.document.is_empty());
+	assert!(app.workspace.active.session.editing.document.is_empty());
 }
 
 #[test]
@@ -337,5 +337,5 @@ fn type_headings_toggle_by_keyboard_and_mouse_without_inserting() {
 	assert!(matches!(panel.mouse(mouse), Some(Effect::Focus)));
 	assert_eq!(panel.characters.grid.len(), count);
 	assert_eq!(panel.items()[panel.selected].control, header);
-	assert!(app.workspace.session.editing.document.is_empty());
+	assert!(app.workspace.active.session.editing.document.is_empty());
 }

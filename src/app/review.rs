@@ -7,7 +7,7 @@ use crate::{
 impl App {
 	pub fn import_document(&mut self, import: Import, source: Source) {
 		if import.issues.is_empty() {
-			self.replace_import(import.document, source.path());
+			self.add_import(import.document, source.path());
 		} else {
 			self.begin_review(import, source, Destination::Document);
 		}
@@ -16,7 +16,7 @@ impl App {
 		self.shortcuts.cancel();
 		self.files.dialog = None;
 		self.workspace.cancel_pointer_interactions();
-		self.workspace.session.editing.break_group();
+		self.workspace.active.session.editing.break_group();
 		self.import_review = Some(PendingReview::new(import, source, destination));
 	}
 	pub fn decide_review(&mut self, decision: Decision) {
@@ -26,7 +26,7 @@ impl App {
 		self.shortcuts.cancel();
 		match review.decide(decision) {
 			Some(crate::workflows::Commit::Document { document, path }) => {
-				self.replace_import(document, path)
+				self.add_import(document, path)
 			}
 			Some(crate::workflows::Commit::Paste { document, target }) => {
 				self.finish_paste_review(target, &document)

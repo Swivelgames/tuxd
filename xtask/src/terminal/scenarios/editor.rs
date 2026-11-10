@@ -117,7 +117,9 @@ fn styles(binary: &Path) -> Result<()> {
 
 fn colors(binary: &Path) -> Result<()> {
 	let mut s = Session::new(binary, &[], &[])?;
-	ensure!(s.row(0).contains("Code: on"));
+	ensure!(s.row(0).contains("tuxd") && s.row(0).contains("untitled"));
+	s.excludes("Code: on")?;
+	s.excludes("F6 focus")?;
 	ensure!(
 		s.rows()
 			.iter()

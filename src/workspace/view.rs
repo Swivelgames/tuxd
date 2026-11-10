@@ -52,6 +52,8 @@ impl super::Workspace {
 		self.panel.hide();
 		self.pane_toggles = [Rect::default(); 2];
 		self.slim_tabs.clear();
+		self.tab_hits.clear();
+		self.tab_close_hits.clear();
 		let slim = area.width <= 64;
 		let layout_changed = self.slim != slim;
 		let focused_tool = self
@@ -82,45 +84,23 @@ impl super::Workspace {
 				.position(|item| item.control == control)
 				.unwrap_or(0);
 		}
-		self.code.surface.hide();
-		self.editor.surface.hide();
-		self.code_toggle = Rect::default();
+		self.active.code.surface.hide();
+		self.active.editor.surface.hide();
 		self.editor_wrap_toggle = Rect::default();
 		self.code_wrap_toggle = Rect::default();
 		if area.width < 20 || area.height < 5 {
-			self.editor.surface.hide();
-			self.editor.resize(&self.session.editing, 0, 0);
+			self.active.editor.surface.hide();
+			self.active
+				.editor
+				.resize(&self.active.session.editing, 0, 0);
 			frame.render_widget(Paragraph::new("Resize · F1 settings"), area);
 			return;
 		}
 		frame.render_widget(
-			Paragraph::new(format!(
-				" tuxd{}{}{}{}",
-				shortcut_hint(&chrome, crate::shortcuts::ActionId::ToggleCode, "code"),
-				shortcut_hint(
-					&chrome,
-					if self.focus == Pane::Code {
-						crate::shortcuts::ActionId::CodeWrap
-					} else {
-						crate::shortcuts::ActionId::EditorWrap
-					},
-					"wrap"
-				),
-				shortcut_hint(&chrome, crate::shortcuts::ActionId::FileMenu, "files"),
-				shortcut_hint(&chrome, crate::shortcuts::ActionId::CyclePanes, "focus")
-			))
-			.style(Style::default().fg(theme::accent_color())),
-			Rect::new(area.x, area.y, area.width, 1),
+			Paragraph::new(" tuxd").style(Style::default().fg(theme::accent_color())),
+			Rect::new(area.x, area.y, 5, 1),
 		);
-		self.code_toggle = Rect::new(area.right() - 11, area.y, 11, 1);
-		frame.render_widget(
-			Paragraph::new(if self.code_open {
-				"[Code: on]"
-			} else {
-				"[Code: off]"
-			}),
-			self.code_toggle,
-		);
+		self.draw_tabs(frame, Rect::new(area.x + 6, area.y, area.width - 6, 1));
 		let tools_width = if area.width >= 65 { 35 } else { 0 };
 		let available = area.height - 2;
 		let code_height = if !self.code_open {
@@ -146,7 +126,7 @@ impl super::Workspace {
 			);
 		}
 		self.draw_editor(frame, body, chrome.focused);
-		let editor = &self.session.editing;
+		let editor = &self.active.session.editing;
 		let status = chrome.status.map(str::to_owned).unwrap_or_else(|| {
 			format!(
 				" Ln {}, Col {} · {} lines{}{} · F1 settings{}",
@@ -171,7 +151,7 @@ impl super::Workspace {
 			self.panel.draw(
 				frame,
 				tool_rect,
-				&self.session.editing,
+				&self.active.session.editing,
 				self.focus == Pane::Tools,
 			);
 		} else if self.code_open && self.slim_tab > 0 {
@@ -185,10 +165,10 @@ impl super::Workspace {
 			self.panel.draw(
 				frame,
 				tool_rect,
-				&self.session.editing,
+				&self.active.session.editing,
 				self.focus == Pane::Tools,
 			);
-			self.code.surface.hide();
+			self.active.code.surface.hide();
 			self.code_wrap_toggle = Rect::default();
 		}
 	}
@@ -273,48 +253,46 @@ impl super::Workspace {
 
 		self.code_wrap_toggle =
 			if self.code_open && (!slim || (self.slim_tab == 0 && code_rect.width >= 53)) {
-				wrap_button(frame, code_rect, self.code.surface.viewport.wrap)
+				wrap_button(frame, code_rect, self.active.code.surface.viewport.wrap)
 			} else {
 				Rect::default()
 			};
-		self.code.draw(
+		self.active.code.draw(
 			frame,
 			code_rect,
 			inner,
-			&self.session.editing.document,
-			self.session.editing.cursor.row,
+			&self.active.session.editing.document,
+			self.active.session.editing.cursor.row,
 		);
 	}
 
 	fn draw_editor(&mut self, frame: &mut Frame, body: Rect, focused: bool) {
-		let name = self
-			.session
-			.path
-			.as_ref()
-			.and_then(|p| p.file_name())
-			.map(|s| crate::libraries::text::display::sanitize(&s.to_string_lossy()))
-			.unwrap_or_else(|| "untitled".into());
+		let name = self.active.name();
 		let border = theme::block()
 			.border_type(ratatui::widgets::BorderType::Rounded)
 			.title(format!(
 				" {} Editor · {name}{} ",
 				if self.editor_open { "▾" } else { "▸" },
-				if self.session.dirty() { " *" } else { "" }
+				if self.active.session.dirty() {
+					" *"
+				} else {
+					""
+				}
 			));
 		let inner = border.inner(body);
 		frame.render_widget(border, body);
 		self.pane_toggles[0] =
 			Rect::new(body.x + 1, body.y, 10.min(body.width.saturating_sub(1)), 1);
 		self.editor_wrap_toggle = if self.editor_open {
-			wrap_button(frame, body, self.editor.surface.viewport.wrap)
+			wrap_button(frame, body, self.active.editor.surface.viewport.wrap)
 		} else {
 			Rect::default()
 		};
-		self.editor.draw(
+		self.active.editor.draw(
 			frame,
 			body,
 			inner,
-			&self.session.editing,
+			&self.active.session.editing,
 			focused && self.focus == Pane::Editor,
 		);
 	}

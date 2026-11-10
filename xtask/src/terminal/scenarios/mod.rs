@@ -1,3 +1,4 @@
+pub mod buffers;
 pub mod characters;
 pub mod clipboard;
 pub mod editor;

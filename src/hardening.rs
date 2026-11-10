@@ -127,30 +127,32 @@ fn fixture() -> crate::libraries::ansi::Document {
 #[test]
 fn representative_document_survives_resize_and_pane_changes() {
 	let mut app = App::default();
-	app.workspace.session.editing.document = fixture();
-	let original = app.workspace.session.editing.document.clone();
+	app.workspace.active.session.editing.document = fixture();
+	let original = app.workspace.active.session.editing.document.clone();
 	for (w, h) in [(120, 40), (64, 24), (40, 12), (1, 1), (80, 24)] {
 		let mut terminal =
 			ratatui::Terminal::new(ratatui::backend::TestBackend::new(w, h)).unwrap();
 		for pane in [TextPane::Code, TextPane::Editor, TextPane::Code] {
 			app.workspace.toggle_pane(pane);
 			terminal.draw(|frame| app.draw(frame)).unwrap();
-			assert_eq!(app.workspace.session.editing.document, original);
+			assert_eq!(app.workspace.active.session.editing.document, original);
 		}
 	}
-	verify(&app.workspace.session.editing);
+	verify(&app.workspace.active.session.editing);
 }
 
 #[test]
 #[ignore = "run in release mode with --nocapture to measure the documented fixture"]
 fn modest_document_performance() {
 	let mut app = App::default();
-	app.workspace.session.editing.document = fixture();
+	app.workspace.active.session.editing.document = fixture();
 	if let Ok(path) = std::env::var("TUXD_PERF_FIXTURE") {
 		std::fs::write(
 			path,
-			crate::adapters::native_document::encode(&app.workspace.session.editing.document)
-				.unwrap(),
+			crate::adapters::native_document::encode(
+				&app.workspace.active.session.editing.document,
+			)
+			.unwrap(),
 		)
 		.unwrap();
 	}
@@ -158,8 +160,8 @@ fn modest_document_performance() {
 	let mut samples = Vec::new();
 	for i in 0..40 {
 		let start = Instant::now();
-		app.workspace.editor.navigate(
-			&mut app.workspace.session.editing,
+		app.workspace.active.editor.navigate(
+			&mut app.workspace.active.session.editing,
 			if i % 2 == 0 {
 				Movement::Finish
 			} else {
@@ -167,22 +169,24 @@ fn modest_document_performance() {
 			},
 			false,
 		);
-		app.workspace.editor.insert(
-			&mut app.workspace.session.editing,
+		app.workspace.active.editor.insert(
+			&mut app.workspace.active.session.editing,
 			"x",
 			EditKind::Atomic,
 			Instant::now(),
 		);
 		terminal.draw(|frame| app.draw(frame)).unwrap();
 		app.workspace
+			.active
 			.editor
-			.undo(&mut app.workspace.session.editing, false);
+			.undo(&mut app.workspace.active.session.editing, false);
 		samples.push(start.elapsed().as_secs_f64() * 1000.0);
 	}
 	samples.sort_by(f64::total_cmp);
 	println!(
 		"1000 lines, {} text bytes, 1000 style runs; edit + frame + undo: median {:.2} ms, p95 {:.2} ms, max {:.2} ms",
 		app.workspace
+			.active
 			.session
 			.editing
 			.document
@@ -194,7 +198,7 @@ fn modest_document_performance() {
 		samples[39]
 	);
 	let start = Instant::now();
-	verify(&app.workspace.session.editing);
+	verify(&app.workspace.active.session.editing);
 	println!(
 		"validate + project roundtrip + ANSI roundtrip: {:.2} ms",
 		start.elapsed().as_secs_f64() * 1000.0
@@ -225,21 +229,23 @@ fn fallback_layout_preserves_grapheme_hits_and_roundtrips() {
 #[test]
 fn composed_emoji_newline_redraw_clears_previous_rows() {
 	let mut app = App::default();
-	app.workspace.editor.insert(
-		&mut app.workspace.session.editing,
+	app.workspace.active.editor.insert(
+		&mut app.workspace.active.session.editing,
 		"café é 界 👩🏽‍💻 🇺🇳",
 		EditKind::Atomic,
 		Instant::now(),
 	);
-	app.workspace
-		.editor
-		.navigate(&mut app.workspace.session.editing, Movement::Home, false);
+	app.workspace.active.editor.navigate(
+		&mut app.workspace.active.session.editing,
+		Movement::Home,
+		false,
+	);
 	let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(110, 36)).unwrap();
 	terminal.draw(|f| app.draw(f)).unwrap();
 	let initial = terminal.backend().buffer().clone();
 	for _ in 0..10 {
-		app.workspace.editor.insert(
-			&mut app.workspace.session.editing,
+		app.workspace.active.editor.insert(
+			&mut app.workspace.active.session.editing,
 			"\n",
 			EditKind::Atomic,
 			Instant::now(),
@@ -247,9 +253,11 @@ fn composed_emoji_newline_redraw_clears_previous_rows() {
 		terminal.draw(|f| app.draw(f)).unwrap();
 	}
 	for _ in 0..10 {
-		app.workspace
-			.editor
-			.delete(&mut app.workspace.session.editing, true, Instant::now());
+		app.workspace.active.editor.delete(
+			&mut app.workspace.active.session.editing,
+			true,
+			Instant::now(),
+		);
 		terminal.draw(|f| app.draw(f)).unwrap();
 	}
 	// A wide glyph's continuation is not independently drawn by the terminal.
@@ -266,5 +274,5 @@ fn composed_emoji_newline_redraw_clears_previous_rows() {
 			x += unicode_width::UnicodeWidthStr::width(expected.symbol()).max(1) as u16;
 		}
 	}
-	verify(&app.workspace.session.editing);
+	verify(&app.workspace.active.session.editing);
 }

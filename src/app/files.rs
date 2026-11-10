@@ -6,13 +6,19 @@ use crate::{
 };
 use std::path::PathBuf;
 
-pub(super) enum Pending {
-	Replace {
-		document: Document,
-		path: Option<PathBuf>,
-		imported: bool,
-	},
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum BatchMode {
+	SaveAll,
 	Quit,
+}
+
+pub(super) enum Pending {
+	Close(crate::session::SessionId),
+	Batch {
+		remaining: std::collections::VecDeque<crate::session::SessionId>,
+		mode: BatchMode,
+		original: crate::session::SessionId,
+	},
 }
 
 impl App {
@@ -23,6 +29,13 @@ impl App {
 			A::Open => Action::Open,
 			A::Save => Action::Save,
 			A::SaveAs => Action::SaveAs,
+			A::SaveAll => Action::SaveAll,
+			A::CloseBuffer => Action::CloseBuffer,
+			A::NextBuffer | A::PreviousBuffer => {
+				self.shortcuts.cancel();
+				self.workspace.cycle_buffer(action == A::NextBuffer);
+				return true;
+			}
 			A::Import => Action::ImportEscaped,
 			A::Export => Action::ExportEscaped,
 			A::Quit => Action::Quit,
@@ -37,11 +50,11 @@ impl App {
 	}
 
 	pub fn dirty(&self) -> bool {
-		self.workspace.session.dirty()
+		self.workspace.active.session.dirty()
 	}
 
 	pub fn load_document(&mut self, document: Document, path: Option<PathBuf>, imported: bool) {
-		self.editor_clipboard.cancel_edits();
+		self.workspace.active.clipboard.cancel_edits();
 		self.import_review = None;
 		self.workspace.replace(document, path, imported);
 		self.notice = Some(
@@ -61,8 +74,9 @@ impl App {
 	pub(crate) fn file_dialog(&mut self, dialog: Dialog) {
 		self.shortcuts.cancel();
 		self.files.open(dialog);
+		self.files.document_name = self.workspace.active.name();
 		self.workspace.cancel_pointer_interactions();
-		self.workspace.session.editing.break_group();
+		self.workspace.active.session.editing.break_group();
 	}
 
 	fn cancel_file(&mut self) {
@@ -74,39 +88,93 @@ impl App {
 
 	fn finish_pending(&mut self) {
 		self.files.dialog = None;
-		if let Some(pending) = self.pending_file.take() {
-			match pending {
-				Pending::Replace {
-					document,
-					path,
-					imported,
-				} => self.load_document(document, path, imported),
-				Pending::Quit => self.exiting = true,
+		match self.pending_file.take() {
+			Some(Pending::Close(id)) if self.workspace.select_session(id) => {
+				self.workspace.close_buffer();
 			}
+			Some(Pending::Batch {
+				mut remaining,
+				mode,
+				original,
+			}) => {
+				while let Some(id) = remaining.pop_front() {
+					if !self.workspace.select_session(id) || !self.dirty() {
+						continue;
+					}
+					if mode == BatchMode::SaveAll
+						&& let Some(path) = self.workspace.active.session.path.clone()
+					{
+						if self.publish_file(Action::Save, path, true) {
+							continue;
+						}
+						self.pending_file = Some(Pending::Batch {
+							remaining,
+							mode,
+							original,
+						});
+						return;
+					}
+					self.pending_file = Some(Pending::Batch {
+						remaining,
+						mode,
+						original,
+					});
+					if mode == BatchMode::Quit {
+						self.file_dialog(Dialog::Dirty);
+					} else {
+						self.path_dialog(Action::SaveAs);
+					}
+					return;
+				}
+				self.workspace.select_session(original);
+				self.exiting = mode == BatchMode::Quit;
+			}
+			Some(Pending::Close(_)) | None => (),
 		}
 	}
 
-	pub(crate) fn replace_import(&mut self, document: Document, path: Option<PathBuf>) {
-		self.replace_or_prompt(Pending::Replace {
-			document,
-			path,
-			imported: true,
+	fn begin_batch(&mut self, mode: BatchMode) {
+		// Cancel delayed edits before deciding which documents need saving.
+		for buffer in self.workspace.buffers_mut() {
+			buffer.clipboard.cancel_edits();
+		}
+		let remaining = self
+			.workspace
+			.buffers()
+			.filter(|buffer| buffer.session.dirty())
+			.map(|buffer| buffer.session.id)
+			.collect();
+		self.pending_file = Some(Pending::Batch {
+			remaining,
+			mode,
+			original: self.workspace.active.session.id,
 		});
+		self.finish_pending();
 	}
 
-	fn replace_or_prompt(&mut self, pending: Pending) {
-		self.pending_file = Some(pending);
-		if self.dirty() {
-			self.file_dialog(Dialog::Dirty);
-		} else {
-			self.finish_pending();
-		}
+	fn open_buffer(&mut self, document: Document, path: Option<PathBuf>, imported: bool) {
+		self.shortcuts.cancel();
+		self.files.cancel();
+		self.workspace.open_document(document, path, imported);
+		self.notice = Some(
+			if imported {
+				"ANSI imported · unsaved document"
+			} else {
+				"Document opened"
+			}
+			.into(),
+		);
+	}
+
+	pub(crate) fn add_import(&mut self, document: Document, path: Option<PathBuf>) {
+		self.open_buffer(document, path, true);
 	}
 
 	fn path_dialog(&mut self, action: Action) {
 		let text = match action {
 			Action::Save | Action::SaveAs => self
 				.workspace
+				.active
 				.session
 				.path
 				.as_ref()
@@ -117,7 +185,7 @@ impl App {
 		let picker = crate::files::picker::Picker::new(
 			action,
 			&text,
-			self.workspace.session.directory_source(),
+			self.workspace.active.session.directory_source(),
 		);
 		self.file_dialog(Dialog::Path {
 			picker: Box::new(picker),
@@ -127,14 +195,25 @@ impl App {
 	pub fn file_action(&mut self, action: Action) {
 		self.files.error = None;
 		match action {
-			Action::New => self.replace_or_prompt(Pending::Replace {
-				document: Document::default(),
-				path: None,
-				imported: false,
-			}),
-			Action::Quit => self.replace_or_prompt(Pending::Quit),
+			Action::New => {
+				self.shortcuts.cancel();
+				self.files.cancel();
+				self.workspace.add_buffer(Document::default(), None, false);
+				self.notice = Some("New document".into());
+			}
+			Action::Quit => self.begin_batch(BatchMode::Quit),
+			Action::SaveAll => self.begin_batch(BatchMode::SaveAll),
+			Action::CloseBuffer => {
+				self.workspace.active.clipboard.cancel_edits();
+				self.pending_file = Some(Pending::Close(self.workspace.active.session.id));
+				if self.dirty() {
+					self.file_dialog(Dialog::Dirty);
+				} else {
+					self.finish_pending();
+				}
+			}
 			Action::Save => {
-				if let Some(path) = self.workspace.session.path.clone() {
+				if let Some(path) = self.workspace.active.session.path.clone() {
 					self.write_file(Action::Save, path, true);
 				} else {
 					self.path_dialog(Action::SaveAs);
@@ -149,7 +228,7 @@ impl App {
 		let picker = crate::files::picker::Picker::new(
 			action,
 			&text,
-			self.workspace.session.directory_source(),
+			self.workspace.active.session.directory_source(),
 		);
 		self.file_dialog(Dialog::Path {
 			picker: Box::new(picker),
@@ -159,25 +238,44 @@ impl App {
 	}
 
 	pub(crate) fn write_file(&mut self, action: Action, path: PathBuf, replace: bool) {
+		if self.publish_file(action, path, replace) {
+			self.finish_pending();
+		}
+	}
+
+	fn publish_file(&mut self, action: Action, path: PathBuf, replace: bool) -> bool {
 		use crate::workflows::publication::{self, Format};
 		let format = match action {
 			Action::ExportRaw => Format::Raw,
 			Action::ExportEscaped => Format::Escaped,
 			_ => Format::Native,
 		};
-		let result =
-			publication::publish(&mut self.workspace.session, path.clone(), format, replace);
+		if self
+			.workspace
+			.native_buffer(&path)
+			.is_some_and(|id| id != self.workspace.active.session.id)
+		{
+			self.file_failure(action, path, "This file is already open in another buffer");
+			return false;
+		}
+		let result = publication::publish(
+			&mut self.workspace.active.session,
+			path.clone(),
+			format,
+			replace,
+		);
 		match result {
 			Ok(()) => {
 				self.files.error = None;
 				self.notice = Some(format.notice().into());
-				self.finish_pending();
+				return true;
 			}
 			Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists && !replace => {
 				self.file_dialog(Dialog::Overwrite { action, path })
 			}
 			Err(error) => self.file_failure(action, path, error),
 		}
+		false
 	}
 
 	pub(crate) fn submit_path(&mut self, action: Action, mut path: PathBuf) {
@@ -189,6 +287,13 @@ impl App {
 			path.set_extension("tuxd.json");
 		}
 		if action == Action::Open
+			&& let Some(id) = self.workspace.native_buffer(&path)
+		{
+			self.files.cancel();
+			self.workspace.select_session(id);
+			return;
+		}
+		if action == Action::Open
 			&& !path
 				.file_name()
 				.is_some_and(|name| name.to_string_lossy().ends_with(".tuxd.json"))
@@ -196,7 +301,7 @@ impl App {
 			let mut picker = crate::files::picker::Picker::new(
 				Action::ImportEscaped,
 				&path.to_string_lossy(),
-				self.workspace.session.path.as_deref(),
+				self.workspace.active.session.path.as_deref(),
 			);
 			picker.offer_import();
 			self.file_dialog(Dialog::Path {
@@ -204,13 +309,10 @@ impl App {
 			});
 			return;
 		}
+
 		match action {
 			Action::Open => match persistence::load(&path) {
-				Ok(document) => self.replace_or_prompt(Pending::Replace {
-					document,
-					path: Some(path),
-					imported: false,
-				}),
+				Ok(document) => self.open_buffer(document, Some(path), false),
 				Err(error) => self.file_failure(action, path, error),
 			},
 			Action::ImportRaw | Action::ImportEscaped => {

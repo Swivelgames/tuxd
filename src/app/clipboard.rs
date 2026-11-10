@@ -11,12 +11,13 @@ impl App {
 
 	fn poll_clipboard_with(&mut self, output: &mut impl Write) -> bool {
 		let path_updated = self.files.poll();
-		let code_copied = if let Some(notice) = self.workspace.code.poll_copy(output) {
-			self.notice = Some(notice);
-			true
-		} else {
-			false
-		};
+		let mut code_copied = false;
+		for buffer in self.workspace.buffers_mut() {
+			if let Some(notice) = buffer.code.poll_copy(output) {
+				self.notice = Some(notice);
+				code_copied = true;
+			}
+		}
 		let editor_copied = self.poll_editor_copy(output);
 		let field_copied = self.poll_field_copy(output);
 		let editor_pasted = self.poll_editor_paste();
@@ -89,21 +90,23 @@ mod tests {
 			"keep",
 			crate::features::editor::clipboard::PasteMode::Styled,
 		);
-		app.workspace
-			.editor
-			.navigate(&mut app.workspace.session.editing, Movement::Start, true);
-		let before = app.workspace.session.editing.document.clone();
+		app.workspace.active.editor.navigate(
+			&mut app.workspace.active.session.editing,
+			Movement::Start,
+			true,
+		);
+		let before = app.workspace.active.session.editing.document.clone();
 		app.workspace.focus = Pane::Code;
 		app.execute_action(crate::shortcuts::ActionId::Copy);
 		app.workspace.focus = Pane::Editor;
 		app.copy_selection(true);
-		assert!(!app.editor_clipboard.copying());
+		assert!(!app.workspace.active.clipboard.copying());
 		control
 			.writes
 			.send(Ok(WriteOutput::Delivered(Receipt::Tmux)))
 			.unwrap();
 		until(|| app.poll_clipboard_with(&mut Vec::new()));
-		assert_eq!(app.workspace.session.editing.document, before);
+		assert_eq!(app.workspace.active.session.editing.document, before);
 		assert_eq!(
 			app.notice.as_deref(),
 			Some("Sent escaped ANSI via tmux; clipboard delivery unconfirmed")
@@ -121,24 +124,28 @@ mod tests {
 			"keep",
 			crate::features::editor::clipboard::PasteMode::Styled,
 		);
-		app.workspace
-			.editor
-			.navigate(&mut app.workspace.session.editing, Movement::Start, true);
+		app.workspace.active.editor.navigate(
+			&mut app.workspace.active.session.editing,
+			Movement::Start,
+			true,
+		);
 		app.copy_selection(true);
 		app.request_editor_paste(crate::features::editor::clipboard::PasteMode::Styled);
-		let document = app.workspace.session.editing.document.clone();
+		let document = app.workspace.active.session.editing.document.clone();
 		app.load_document(document.clone(), None, false);
-		app.workspace
-			.editor
-			.navigate(&mut app.workspace.session.editing, Movement::Finish, true);
+		app.workspace.active.editor.navigate(
+			&mut app.workspace.active.session.editing,
+			Movement::Finish,
+			true,
+		);
 		control
 			.writes
 			.send(Ok(WriteOutput::Delivered(Receipt::Desktop)))
 			.unwrap();
 		control.reads.send(Ok("stale".into())).unwrap();
 		until(|| app.poll_clipboard_with(&mut Vec::new()));
-		assert_eq!(app.workspace.session.editing.document, document);
-		assert!(!app.editor_clipboard.pasting());
+		assert_eq!(app.workspace.active.session.editing.document, document);
+		assert!(!app.workspace.active.clipboard.pasting());
 	}
 
 	#[test]
@@ -153,7 +160,7 @@ mod tests {
 		control.reads.send(Ok("U+2500".into())).unwrap();
 		until(|| app.poll_clipboard_with(&mut Vec::new()));
 		assert_eq!(app.workspace.panel.characters.results, vec!['─']);
-		assert!(app.workspace.session.editing.document.is_empty());
+		assert!(app.workspace.active.session.editing.document.is_empty());
 	}
 
 	#[test]
