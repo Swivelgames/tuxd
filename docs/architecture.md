@@ -20,10 +20,10 @@ not replace document content or reconstruct history.
 `workspace/tabs.rs` paints the tab strip and records hit targets.
 `workspace/layout.rs` defines shared-frame pane, sidebar, status, and scrollbar bounds.
 The editor and tools share outer borders; Code and tool headings are dividers.
-Pane focus,
-collapse state, and tool instances remain workspace-wide. The active buffer is
-stored separately so consumers can borrow its session and views together without
-indexing or duplicating ownership.
+`workspace/panes.rs` preserves focus when switching between sidebar and slim tabs.
+Pane focus, collapse state, and tool instances remain workspace-wide. The active
+buffer is stored separately so consumers can borrow its session and views together
+without indexing or duplicating ownership.
 
 App coordinates Save All and quit with queues of stable session IDs. Close targets
 one ID. Pickers and prompts block buffer navigation; file failures retain the
@@ -169,7 +169,7 @@ records contracts and evidence. Stage 8 completes the App/Workspace composition.
 | `features::editor::clipboard` | Own pending copy/paste, captured targets, paste policy and revalidation; return notices or review requests |
 | `workflows::PendingReview` | Own candidate/source/destination; consume decisions into document or paste commits |
 | `app::view` | Establish scoped appearance, render Workspace and layer modals |
-| `workspace::view` | Render pane composition from shortcut configuration, status text and focus availability |
+| `workspace::view` | Render pane composition from layout, status text and focus availability |
 
 Workspace applies document/focus tool effects locally; only clipboard requests and
 notices escape to App. No feature, component or workflow implements App methods.

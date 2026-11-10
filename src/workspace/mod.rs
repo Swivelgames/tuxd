@@ -51,6 +51,7 @@ pub(crate) enum TextPane {
 
 pub struct Workspace {
 	pub(crate) active: buffers::Buffer,
+	// Inactive buffers retain tab order; active_index is the gap occupied by active.
 	inactive: Vec<buffers::Buffer>,
 	active_index: usize,
 	next_untitled: usize,

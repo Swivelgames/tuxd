@@ -1,10 +1,11 @@
 use super::App;
+use crate::session::SessionId;
 use crate::{
 	files::{Action, Dialog, MENU},
 	libraries::ansi::{Document, Mode},
 	persistence,
 };
-use std::path::PathBuf;
+use std::{collections::VecDeque, path::PathBuf};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum BatchMode {
@@ -13,11 +14,11 @@ pub(super) enum BatchMode {
 }
 
 pub(super) enum Pending {
-	Close(crate::session::SessionId),
+	Close(SessionId),
 	Batch {
-		remaining: std::collections::VecDeque<crate::session::SessionId>,
+		remaining: VecDeque<SessionId>,
 		mode: BatchMode,
-		original: crate::session::SessionId,
+		original: SessionId,
 	},
 }
 
@@ -93,44 +94,55 @@ impl App {
 				self.workspace.close_buffer();
 			}
 			Some(Pending::Batch {
-				mut remaining,
+				remaining,
 				mode,
 				original,
 			}) => {
-				while let Some(id) = remaining.pop_front() {
-					if !self.workspace.select_session(id) || !self.dirty() {
-						continue;
-					}
-					if mode == BatchMode::SaveAll
-						&& let Some(path) = self.workspace.active.session.path.clone()
-					{
-						if self.publish_file(Action::Save, path, true) {
-							continue;
-						}
-						self.pending_file = Some(Pending::Batch {
-							remaining,
-							mode,
-							original,
-						});
-						return;
-					}
-					self.pending_file = Some(Pending::Batch {
-						remaining,
-						mode,
-						original,
-					});
-					if mode == BatchMode::Quit {
-						self.file_dialog(Dialog::Dirty);
-					} else {
-						self.path_dialog(Action::SaveAs);
-					}
-					return;
-				}
-				self.workspace.select_session(original);
-				self.exiting = mode == BatchMode::Quit;
+				self.continue_batch(remaining, mode, original);
 			}
 			Some(Pending::Close(_)) | None => (),
 		}
+	}
+
+	fn continue_batch(
+		&mut self,
+		mut remaining: VecDeque<SessionId>,
+		mode: BatchMode,
+		original: SessionId,
+	) {
+		while let Some(id) = remaining.pop_front() {
+			if !self.workspace.select_session(id) || !self.dirty() {
+				continue;
+			}
+
+			// Associated files can save immediately; failures already open a retry dialog.
+			let saved = if mode == BatchMode::SaveAll
+				&& let Some(path) = self.workspace.active.session.path.clone()
+			{
+				self.publish_file(Action::Save, path, true)
+			} else {
+				if mode == BatchMode::Quit {
+					self.file_dialog(Dialog::Dirty);
+				} else {
+					self.path_dialog(Action::SaveAs);
+				}
+				false
+			};
+			if saved {
+				continue;
+			}
+
+			// The current dialog owns this buffer; resume with the rest only after it succeeds.
+			self.pending_file = Some(Pending::Batch {
+				remaining,
+				mode,
+				original,
+			});
+			return;
+		}
+
+		self.workspace.select_session(original);
+		self.exiting = mode == BatchMode::Quit;
 	}
 
 	fn begin_batch(&mut self, mode: BatchMode) {

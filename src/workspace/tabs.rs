@@ -7,27 +7,36 @@ use ratatui::{
 	widgets::Paragraph,
 };
 
+struct Tab {
+	id: crate::session::SessionId,
+	label: String,
+	width: u16,
+}
+
 impl super::Workspace {
 	pub(super) fn draw_tabs(&mut self, frame: &mut Frame, area: Rect) {
 		self.tab_hits.clear();
 		self.tab_close_hits.clear();
-		let ids: Vec<_> = self.buffers().map(|buffer| buffer.session.id).collect();
 		let max_width = area.width.saturating_sub(4).max(1) as usize;
-		let labels: Vec<_> = self
+		let tabs: Vec<_> = self
 			.buffers()
-			.map(|buffer| tab_label(&buffer.name(), buffer.session.dirty(), max_width))
-			.collect();
-		let widths: Vec<_> = labels
-			.iter()
-			.map(|label| {
-				unicode_width::UnicodeWidthStr::width(label.as_str()).min(max_width) as u16
+			.map(|buffer| {
+				let label = tab_label(&buffer.name(), buffer.session.dirty(), max_width);
+				let width =
+					unicode_width::UnicodeWidthStr::width(label.as_str()).min(max_width) as u16;
+				Tab {
+					id: buffer.session.id,
+					label,
+					width,
+				}
 			})
 			.collect();
+
 		self.tab_start = self.tab_start.min(self.active_index);
 		while self.tab_start < self.active_index
-			&& widths[self.tab_start..=self.active_index]
+			&& tabs[self.tab_start..=self.active_index]
 				.iter()
-				.map(|w| u32::from(*w) + 1)
+				.map(|tab| u32::from(tab.width) + 1)
 				.sum::<u32>()
 				> u32::from(area.width.saturating_sub(4))
 		{
@@ -43,8 +52,8 @@ impl super::Workspace {
 				.push((Rect::new(area.x, area.y, 2, 1), self.tab_start - 1));
 		}
 		let mut x = area.x + 2;
-		for (index, label) in labels.iter().enumerate().skip(self.tab_start) {
-			let width = widths[index];
+		for (index, tab) in tabs.iter().enumerate().skip(self.tab_start) {
+			let width = tab.width;
 			if x + width > area.right().saturating_sub(2) {
 				let rect = Rect::new(area.right().saturating_sub(2), area.y, 2, 1);
 				frame.render_widget(Paragraph::new(" ›"), rect);
@@ -60,10 +69,10 @@ impl super::Workspace {
 			} else {
 				theme::muted()
 			};
-			frame.render_widget(Paragraph::new(label.as_str()).style(style), rect);
+			frame.render_widget(Paragraph::new(tab.label.as_str()).style(style), rect);
 			self.tab_hits.push((rect, index));
 			self.tab_close_hits
-				.push((Rect::new(rect.right() - 2, rect.y, 1, 1), ids[index]));
+				.push((Rect::new(rect.right() - 2, rect.y, 1, 1), tab.id));
 			x += width + 1;
 			if x <= area.right().saturating_sub(2) {
 				frame.render_widget(Paragraph::new(" "), Rect::new(x - 1, area.y, 1, 1));

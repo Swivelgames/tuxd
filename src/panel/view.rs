@@ -29,7 +29,9 @@ impl super::Panel {
 		} else {
 			Rect::new(area.x, area.y, area.width.saturating_sub(1), area.height)
 		};
-		let padding = if shared_frame { 5 } else { 4 };
+		// Content leaves room for the nested track, sidebar track, and shared border.
+		let nested_right_inset = if shared_frame { 3 } else { 2 };
+		let padding = nested_right_inset + 2;
 		self.color.indexed_area = Rect::default();
 		let character_start = self.layout().1[2].0;
 		let focused = self.items().get(self.selected).map(|item| item.control);
@@ -54,36 +56,7 @@ impl super::Panel {
 		let top = self.top;
 		let mut buffer = Buffer::empty(Rect::new(0, 0, area.width, count as u16));
 		if shared_frame {
-			for row in 0..count as u16 {
-				for x in [0, area.width - 1] {
-					buffer[(x, row)].set_symbol("│").set_style(
-						Style::default()
-							.fg(theme::border_color())
-							.bg(theme::surface_color()),
-					);
-				}
-			}
-		}
-		for &(start, height) in &sections {
-			if height == 0 || self.active_section.is_some() {
-				continue;
-			}
-			theme::block()
-				.borders(Borders::TOP)
-				.border_style(Style::default().fg(theme::border_color()))
-				.style(Style::default().bg(theme::surface_color()))
-				.render(
-					Rect::new(0, start as u16, area.width, height as u16),
-					&mut buffer,
-				);
-		}
-		if shared_frame {
-			for &(start, height) in &sections {
-				if height > 0 {
-					buffer[(0, start as u16)].set_symbol("├");
-					buffer[(area.width - 1, start as u16)].set_symbol("┤");
-				}
-			}
+			draw_section_frame(&mut buffer, &sections);
 		}
 		let width = area.width.saturating_sub(padding) as usize;
 		for (index, item) in items.iter().enumerate() {
@@ -327,7 +300,7 @@ impl super::Panel {
 				self.color.indexed_area = Rect::new(
 					area.x + 1,
 					area.y + (first - top) as u16,
-					area.width.saturating_sub(if shared_frame { 3 } else { 2 }),
+					area.width.saturating_sub(nested_right_inset),
 					(end - first) as u16,
 				);
 			}
@@ -373,7 +346,7 @@ impl super::Panel {
 				Rect::new(
 					area.x + 1,
 					area.y + (first - top) as u16,
-					area.width.saturating_sub(if shared_frame { 3 } else { 2 }),
+					area.width.saturating_sub(nested_right_inset),
 					(end - first) as u16,
 				)
 			} else {
@@ -408,8 +381,7 @@ impl super::Panel {
 				Bar {
 					target: Target::Characters,
 					area: Rect::new(
-						area.right()
-							.saturating_sub(if shared_frame { 3 } else { 2 }),
+						area.right().saturating_sub(nested_right_inset),
 						characters.area.y,
 						1,
 						characters.area.height,
@@ -428,8 +400,7 @@ impl super::Panel {
 				Bar {
 					target: Target::Indexed,
 					area: Rect::new(
-						area.right()
-							.saturating_sub(if shared_frame { 3 } else { 2 }),
+						area.right().saturating_sub(nested_right_inset),
 						grid.y,
 						1,
 						grid.height,
@@ -441,6 +412,35 @@ impl super::Panel {
 			);
 		}
 		self.draw_character_dropdown(frame, area);
+	}
+}
+
+/// Paint the sidebar rails and connect each visible section header to them.
+fn draw_section_frame(buffer: &mut Buffer, sections: &[(usize, usize)]) {
+	let area = buffer.area;
+	let style = Style::default()
+		.fg(theme::border_color())
+		.bg(theme::surface_color());
+	for row in 0..area.height {
+		for x in [0, area.width - 1] {
+			buffer[(x, row)].set_symbol("│").set_style(style);
+		}
+	}
+
+	for &(start, height) in sections {
+		if height == 0 {
+			continue;
+		}
+		theme::block()
+			.borders(Borders::TOP)
+			.border_style(Style::default().fg(theme::border_color()))
+			.style(Style::default().bg(theme::surface_color()))
+			.render(
+				Rect::new(0, start as u16, area.width, height as u16),
+				buffer,
+			);
+		buffer[(0, start as u16)].set_symbol("├");
+		buffer[(area.width - 1, start as u16)].set_symbol("┤");
 	}
 }
 

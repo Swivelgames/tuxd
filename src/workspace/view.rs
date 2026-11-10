@@ -27,6 +27,24 @@ fn wrap_button(frame: &mut Frame, body: Rect, enabled: bool) -> Rect {
 	area
 }
 
+fn draw_sidebar_divider(frame: &mut Frame, area: Rect, divider_x: u16) {
+	let style = Style::default().fg(theme::border_color());
+	for y in area.y + 1..area.bottom() - 1 {
+		frame.render_widget(
+			Paragraph::new("│").style(style),
+			Rect::new(divider_x, y, 1, 1),
+		);
+	}
+	frame.render_widget(
+		Paragraph::new("┬").style(style),
+		Rect::new(divider_x, area.y, 1, 1),
+	);
+	frame.render_widget(
+		Paragraph::new("┴").style(style),
+		Rect::new(divider_x, area.bottom() - 1, 1, 1),
+	);
+}
+
 impl super::Workspace {
 	pub fn draw(&mut self, frame: &mut Frame, chrome: Chrome<'_>) {
 		let area = frame.area();
@@ -39,52 +57,26 @@ impl super::Workspace {
 			area,
 		);
 		frame.render_widget(Clear, area);
+
 		self.panel.hide();
 		self.pane_toggles = [Rect::default(); 2];
 		self.slim_tabs.clear();
 		self.tab_hits.clear();
 		self.tab_close_hits.clear();
-		let slim = area.width <= 64;
-		let layout_changed = self.slim != slim;
-		let focused_tool = self
-			.panel
-			.items()
-			.get(self.panel.selected)
-			.map(|item| item.control);
-		if layout_changed {
-			self.slim = slim;
-			self.panel.top = 0;
-			self.panel.selected = 0;
-			if slim && self.focus == Pane::Tools {
-				self.select_slim_tab(focused_tool.map_or(1, |control| control.section() + 1));
-			} else if slim && self.focus == Pane::Code {
-				self.select_slim_tab(0);
-			}
-		}
-		self.panel.active_section = if slim {
-			self.slim_tab.checked_sub(1)
-		} else {
-			None
-		};
-		if layout_changed && let Some(control) = focused_tool {
-			self.panel.selected = self
-				.panel
-				.items()
-				.iter()
-				.position(|item| item.control == control)
-				.unwrap_or(0);
-		}
+		self.update_arrangement(area.width <= 64);
+		let slim = self.slim;
 		self.active.code.surface.hide();
 		self.active.editor.surface.hide();
 		self.code_wrap_toggle = Rect::default();
+
 		if area.width < 20 || area.height < 5 {
-			self.active.editor.surface.hide();
 			self.active
 				.editor
 				.resize(&self.active.session.editing, 0, 0);
 			frame.render_widget(Paragraph::new("Resize · F1 settings"), area);
 			return;
 		}
+
 		let layout = super::layout::Layout::new(
 			area,
 			self.editor_open,
@@ -96,21 +88,7 @@ impl super::Workspace {
 			area,
 		);
 		if let Some(tools) = layout.tools {
-			let style = Style::default().fg(theme::border_color());
-			for y in area.y + 1..area.bottom() - 1 {
-				frame.render_widget(
-					Paragraph::new("│").style(style),
-					Rect::new(tools.x, y, 1, 1),
-				);
-			}
-			frame.render_widget(
-				Paragraph::new("┬").style(style),
-				Rect::new(tools.x, area.y, 1, 1),
-			);
-			frame.render_widget(
-				Paragraph::new("┴").style(style),
-				Rect::new(tools.x, area.bottom() - 1, 1, 1),
-			);
+			draw_sidebar_divider(frame, area, tools.x);
 			self.panel.draw(
 				frame,
 				tools,
@@ -151,8 +129,12 @@ impl super::Workspace {
 				1,
 			),
 		);
+		self.draw_status(frame, layout.status, chrome.status);
+	}
+
+	fn draw_status(&mut self, frame: &mut Frame, area: Rect, notice: Option<&str>) {
 		let editor = &self.active.session.editing;
-		let status = chrome.status.map(str::to_owned).unwrap_or_else(|| {
+		let status = notice.map(str::to_owned).unwrap_or_else(|| {
 			format!(
 				"Ln {}, Col {} · {} lines",
 				editor.cursor.row + 1,
@@ -168,9 +150,9 @@ impl super::Workspace {
 		} else {
 			format!("▸ Editor · {status}")
 		};
-		frame.render_widget(Paragraph::new(status).style(theme::muted()), layout.status);
+		frame.render_widget(Paragraph::new(status).style(theme::muted()), area);
 		if !self.editor_open {
-			self.pane_toggles[0] = layout.status;
+			self.pane_toggles[0] = area;
 		}
 	}
 
@@ -211,57 +193,7 @@ impl super::Workspace {
 			1,
 		);
 		if slim {
-			let labels = if code_rect.width < 40 {
-				["Code", "Style", "Color", "Chars"]
-			} else {
-				["Code", "Style", "Color", "Characters"]
-			};
-			let end = if self.code_open && self.slim_tab == 0 && code_rect.width >= 53 {
-				code_rect.right() - 13
-			} else {
-				code_rect.right().saturating_sub(1)
-			};
-			let start = if code_rect.width < 35 {
-				self.slim_tab.saturating_sub(1)
-			} else {
-				0
-			};
-			let mut x = code_rect.x + 4;
-			for (i, label) in labels.iter().enumerate().skip(start) {
-				let width = label.len() as u16;
-				if x + width > end {
-					break;
-				}
-				let rect = Rect::new(x, code_rect.y, width, 1);
-				frame.render_widget(
-					Paragraph::new(*label).style(
-						Style::default()
-							.fg(theme::accent_color())
-							.bg(if self.slim_tab == i {
-								theme::selected_color()
-							} else {
-								theme::surface_color()
-							})
-							.add_modifier(if self.slim_tab == i {
-								Modifier::BOLD
-							} else {
-								Modifier::empty()
-							}),
-					),
-					rect,
-				);
-				self.slim_tabs.push((rect, i));
-				x += width;
-				if x < end {
-					frame.render_widget(Paragraph::new(" "), Rect::new(x, code_rect.y, 1, 1));
-				}
-				if i < 3 && x + 3 + labels[i + 1].len() as u16 <= end {
-					frame.render_widget(Paragraph::new(" · "), Rect::new(x, code_rect.y, 3, 1));
-					x += 3;
-				} else {
-					break;
-				}
-			}
+			self.draw_slim_tabs(frame, code_rect);
 		}
 
 		if slim && self.slim_tab > 0 {
@@ -281,6 +213,60 @@ impl super::Workspace {
 			&self.active.session.editing.document,
 			self.active.session.editing.cursor.row,
 		);
+	}
+
+	fn draw_slim_tabs(&mut self, frame: &mut Frame, code_rect: Rect) {
+		let labels = if code_rect.width < 40 {
+			["Code", "Style", "Color", "Chars"]
+		} else {
+			["Code", "Style", "Color", "Characters"]
+		};
+		let end = if self.code_open && self.slim_tab == 0 && code_rect.width >= 53 {
+			code_rect.right() - 13
+		} else {
+			code_rect.right().saturating_sub(1)
+		};
+		let start = if code_rect.width < 35 {
+			self.slim_tab.saturating_sub(1)
+		} else {
+			0
+		};
+		let mut x = code_rect.x + 4;
+		for (i, label) in labels.iter().enumerate().skip(start) {
+			let width = label.len() as u16;
+			if x + width > end {
+				break;
+			}
+			let rect = Rect::new(x, code_rect.y, width, 1);
+			frame.render_widget(
+				Paragraph::new(*label).style(
+					Style::default()
+						.fg(theme::accent_color())
+						.bg(if self.slim_tab == i {
+							theme::selected_color()
+						} else {
+							theme::surface_color()
+						})
+						.add_modifier(if self.slim_tab == i {
+							Modifier::BOLD
+						} else {
+							Modifier::empty()
+						}),
+				),
+				rect,
+			);
+			self.slim_tabs.push((rect, i));
+			x += width;
+			if x < end {
+				frame.render_widget(Paragraph::new(" "), Rect::new(x, code_rect.y, 1, 1));
+			}
+			if i < 3 && x + 3 + labels[i + 1].len() as u16 <= end {
+				frame.render_widget(Paragraph::new(" · "), Rect::new(x, code_rect.y, 3, 1));
+				x += 3;
+			} else {
+				break;
+			}
+		}
 	}
 
 	fn draw_editor(&mut self, frame: &mut Frame, body: Rect, focused: bool) {

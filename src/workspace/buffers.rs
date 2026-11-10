@@ -27,6 +27,15 @@ impl Buffer {
 		}
 	}
 
+	fn is_initial_placeholder(&self) -> bool {
+		self.untitled == 1
+			&& self.session.path.is_none()
+			&& self.session.origin.is_none()
+			&& self.session.editing.document.is_empty()
+			&& !self.session.dirty()
+			&& self.session.editing.pending.is_none()
+	}
+
 	pub fn name(&self) -> String {
 		use unicode_segmentation::UnicodeSegmentation;
 		let name = self
@@ -65,6 +74,8 @@ impl super::Workspace {
 		}
 		self.cancel_pointer_interactions();
 		self.active.session.editing.break_group();
+
+		// The active buffer occupies a logical tab position, but is not in inactive.
 		let stored_index = if index > self.active_index {
 			index - 1
 		} else {
@@ -72,6 +83,8 @@ impl super::Workspace {
 		};
 		let next = self.inactive.remove(stored_index);
 		let previous = std::mem::replace(&mut self.active, next);
+
+		// Removing the selected tab shifts the old active insertion point when moving left.
 		let previous_index = if index < self.active_index {
 			self.active_index - 1
 		} else {
@@ -79,6 +92,7 @@ impl super::Workspace {
 		};
 		self.inactive.insert(previous_index, previous);
 		self.active_index = index;
+
 		self.active.editor.surface.hide();
 		self.active.code.surface.hide();
 	}
@@ -115,13 +129,7 @@ impl super::Workspace {
 		path: Option<PathBuf>,
 		imported: bool,
 	) {
-		let initial = self.active.untitled == 1
-			&& self.active.session.path.is_none()
-			&& self.active.session.origin.is_none()
-			&& self.active.session.editing.document.is_empty()
-			&& !self.active.session.dirty()
-			&& self.active.session.editing.pending.is_none();
-		if initial {
+		if self.active.is_initial_placeholder() {
 			self.cancel_pointer_interactions();
 			self.active = Buffer::new(document, path, imported, 1);
 			self.editor_open = true;

@@ -2,6 +2,39 @@ use super::Workspace;
 use crate::workspace::{Pane, TextPane};
 
 impl Workspace {
+	/// Preserve the focused tool when moving between sidebar and lower-pane tabs.
+	pub(super) fn update_arrangement(&mut self, slim: bool) {
+		let layout_changed = self.slim != slim;
+		let focused_tool = self
+			.panel
+			.items()
+			.get(self.panel.selected)
+			.map(|item| item.control);
+		if layout_changed {
+			self.slim = slim;
+			self.panel.top = 0;
+			self.panel.selected = 0;
+			if slim && self.focus == Pane::Tools {
+				self.select_slim_tab(focused_tool.map_or(1, |control| control.section() + 1));
+			} else if slim && self.focus == Pane::Code {
+				self.select_slim_tab(0);
+			}
+		}
+		self.panel.active_section = if slim {
+			self.slim_tab.checked_sub(1)
+		} else {
+			None
+		};
+		if layout_changed && let Some(control) = focused_tool {
+			self.panel.selected = self
+				.panel
+				.items()
+				.iter()
+				.position(|item| item.control == control)
+				.unwrap_or(0);
+		}
+	}
+
 	pub(crate) fn toggle_wrap(&mut self, pane: TextPane) {
 		if pane == TextPane::Code {
 			self.active.code.surface.viewport.toggle_wrap();
