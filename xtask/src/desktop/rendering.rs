@@ -66,6 +66,8 @@ pub fn render(runner: &Runner, mode: Mode, with_tmux: bool) -> Result<()> {
 		tmux.run(&["set-option", "prefix", "C-a"])?;
 		tmux.run(&["set-option", "-s", "escape-time", "10"])?;
 	}
+	// Dismiss the startup notice so restoration compares the same status line.
+	window.keys(&["Home"])?;
 	window.capture(&evidence.join("initial.png"))?;
 	if matches!(mode, Mode::Characters) {
 		characters(&window, &evidence)?;
