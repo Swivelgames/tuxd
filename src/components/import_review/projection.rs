@@ -1,8 +1,10 @@
 use crate::libraries::ansi::Import;
+
 pub struct Projection {
 	pub lines: Vec<String>,
 	pub marks: Vec<Vec<bool>>,
 }
+
 impl Projection {
 	pub fn new(import: &Import) -> Self {
 		let mut lines = vec![String::new()];
@@ -14,13 +16,7 @@ impl Projection {
 				marks.push(Vec::new());
 				continue;
 			}
-			let value = if ch == '\x1b' {
-				"\\x1b".to_owned()
-			} else if ch.is_control() {
-				ch.escape_default().to_string()
-			} else {
-				ch.to_string()
-			};
+			let value = display_character(ch);
 			while issue_index < import.issues.len() && import.issues[issue_index].end <= offset {
 				issue_index += 1;
 			}
@@ -35,5 +31,16 @@ impl Projection {
 				.extend(std::iter::repeat_n(error, value.len()));
 		}
 		Self { lines, marks }
+	}
+}
+
+/// Review notation preserves printable source and exposes controls without executing them.
+pub(super) fn display_character(ch: char) -> String {
+	if ch == '\x1b' {
+		"\\x1b".to_owned()
+	} else if ch.is_control() {
+		ch.escape_default().to_string()
+	} else {
+		ch.to_string()
 	}
 }

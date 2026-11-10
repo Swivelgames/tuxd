@@ -1,4 +1,4 @@
-use super::{BindingKey, Catalog, Configuration, Map, sequence_label};
+use super::{BindingKey, Catalog, Configuration, Descriptor, Map, sequence_label};
 
 impl<
 	A: Copy + Ord + std::fmt::Debug + std::fmt::Display,
@@ -42,48 +42,7 @@ impl<
 				let Some(keys) = keys else {
 					continue;
 				};
-				let symbolic = keys.first().is_some_and(K::is_leader);
-				if keys.iter().skip(1).any(K::is_leader) || (symbolic && keys.len() < 2) {
-					return Err("Leader must prefix at least one key".into());
-				}
-				if keys.is_empty() || keys.len() > 10 {
-					return Err(format!(
-						"{} slot {}: use 1–10 keys or unset",
-						spec.label,
-						slot + 1
-					));
-				}
-				let mut keys = keys.clone();
-				if symbolic {
-					keys[0] = config.leader.clone().ok_or("Leader is unset")?;
-				} else if keys.first() == config.leader.as_ref() && config.leader.is_some() {
-					return Err("Use <leader> as the dedicated prefix".into());
-				}
-				for key in &keys {
-					if *key != key.clone().normalized() {
-						return Err(format!(
-							"{} slot {}: noncanonical key {}",
-							spec.label,
-							slot + 1,
-							key.label()
-						));
-					}
-					if let Some((_, purpose)) =
-						self.reserved.iter().find(|(reserved, _)| reserved == key)
-					{
-						return Err(format!("{} is reserved for {purpose}", key.label()));
-					}
-				}
-				if keys.len() > 1 && keys.iter().any(|k| k.escape()) {
-					return Err("Esc cancels sequences and cannot be part of one".into());
-				}
-				if keys[0].is_printable() && spec.scopes.iter().any(|scope| self.contexts[scope]) {
-					return Err(format!(
-						"{} would consume ordinary text in an editable context ({})",
-						spec.label,
-						keys[0].label()
-					));
-				}
+				let keys = self.resolve_sequence(config, spec, slot, keys)?;
 				entries.push((spec, slot, keys));
 			}
 		}
@@ -134,5 +93,56 @@ impl<
 			}
 		}
 		Ok(map)
+	}
+
+	/// Resolve the leader and validate one slot before conflict checks use its literal keys.
+	fn resolve_sequence(
+		&self,
+		config: &Configuration<A, K>,
+		spec: &Descriptor<A, S, K>,
+		slot: usize,
+		keys: &[K],
+	) -> Result<Vec<K>, String> {
+		let symbolic = keys.first().is_some_and(K::is_leader);
+		if keys.iter().skip(1).any(K::is_leader) || (symbolic && keys.len() < 2) {
+			return Err("Leader must prefix at least one key".into());
+		}
+		if keys.is_empty() || keys.len() > 10 {
+			return Err(format!(
+				"{} slot {}: use 1–10 keys or unset",
+				spec.label,
+				slot + 1
+			));
+		}
+		let mut keys = keys.to_vec();
+		if symbolic {
+			keys[0] = config.leader.clone().ok_or("Leader is unset")?;
+		} else if keys.first() == config.leader.as_ref() && config.leader.is_some() {
+			return Err("Use <leader> as the dedicated prefix".into());
+		}
+		for key in &keys {
+			if *key != key.clone().normalized() {
+				return Err(format!(
+					"{} slot {}: noncanonical key {}",
+					spec.label,
+					slot + 1,
+					key.label()
+				));
+			}
+			if let Some((_, purpose)) = self.reserved.iter().find(|(reserved, _)| reserved == key) {
+				return Err(format!("{} is reserved for {purpose}", key.label()));
+			}
+		}
+		if keys.len() > 1 && keys.iter().any(|k| k.escape()) {
+			return Err("Esc cancels sequences and cannot be part of one".into());
+		}
+		if keys[0].is_printable() && spec.scopes.iter().any(|scope| self.contexts[scope]) {
+			return Err(format!(
+				"{} would consume ordinary text in an editable context ({})",
+				spec.label,
+				keys[0].label()
+			));
+		}
+		Ok(keys)
 	}
 }

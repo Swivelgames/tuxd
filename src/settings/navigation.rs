@@ -6,6 +6,14 @@ use crate::shortcuts::registry::{Subsection, category_actions};
 use crossterm::event::KeyCode;
 
 impl Settings {
+	pub(super) fn focus_category_content(&mut self) {
+		self.focus = match self.category {
+			Section::Appearance => Focus::Preset,
+			Section::Timeout => Focus::Leader,
+			_ => Focus::List,
+		};
+	}
+
 	pub(super) fn categories(&self) -> Vec<Section> {
 		Section::ALL
 			.into_iter()
@@ -205,13 +213,7 @@ impl Settings {
 				}
 				if right {
 					self.mode = Mode::Browse;
-					self.focus = if self.category == Section::Appearance {
-						Focus::Preset
-					} else if self.category == Section::Timeout {
-						Focus::Leader
-					} else {
-						Focus::List
-					};
+					self.focus_category_content();
 				}
 			}
 			Focus::List if self.category == Section::Appearance => {
@@ -373,13 +375,7 @@ impl Settings {
 					self.focus = Focus::Footer((i + 1).min(2));
 				}
 				if up {
-					self.focus = if self.category == Section::Appearance {
-						Focus::Preset
-					} else if self.category == Section::Timeout {
-						Focus::Leader
-					} else {
-						Focus::List
-					};
+					self.focus_category_content();
 				}
 			}
 		}

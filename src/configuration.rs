@@ -1,5 +1,8 @@
 //! Application configuration location; codecs never discover paths.
+pub mod commit;
+
 use std::path::PathBuf;
+
 pub fn directory() -> Result<PathBuf, String> {
 	if let Some(dir) = std::env::var_os("XDG_CONFIG_HOME").filter(|s| !s.is_empty()) {
 		let dir = PathBuf::from(dir);
@@ -13,8 +16,6 @@ pub fn directory() -> Result<PathBuf, String> {
 		.map(|p| PathBuf::from(p).join(".config/tuxd"))
 		.ok_or_else(|| "Cannot locate user config directory (HOME is unset)".into())
 }
-
-pub mod commit;
 
 /// Configuration codecs validate their schema before requesting publication.
 pub fn write_json(path: &std::path::Path, value: &impl serde::Serialize) -> Result<(), String> {

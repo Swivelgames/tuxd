@@ -2,6 +2,7 @@
 mod highlight;
 pub mod projection;
 pub mod shortcuts;
+
 use super::clipboard_notice;
 use crate::libraries::{
 	ansi::Document,
@@ -13,6 +14,7 @@ pub struct Code {
 	pub surface: crate::components::text_surface::Surface,
 	copy: Option<WriteRequest>,
 }
+
 impl Code {
 	pub fn handle_action(
 		&mut self,
@@ -28,40 +30,27 @@ impl Code {
 		}
 		None
 	}
+
 	pub fn navigate(&mut self, action: crate::shortcuts::ActionId) {
 		use crate::shortcuts::ActionId as A;
+		let page = self.surface.text.height as usize;
+		let viewport = &mut self.surface.viewport;
 		match action {
-			A::CodeUp => self.surface.viewport.top = self.surface.viewport.top.saturating_sub(1),
-			A::CodeDown => self.surface.viewport.top = self.surface.viewport.top.saturating_add(1),
-			A::CodeLeft => {
-				self.surface.viewport.left = self.surface.viewport.left.saturating_sub(4)
-			}
-			A::CodeRight => {
-				self.surface.viewport.left = self.surface.viewport.left.saturating_add(4)
-			}
-			A::CodePageUp => {
-				self.surface.viewport.top = self
-					.surface
-					.viewport
-					.top
-					.saturating_sub(self.surface.text.height as usize)
-			}
-			A::CodePageDown => {
-				self.surface.viewport.top = self
-					.surface
-					.viewport
-					.top
-					.saturating_add(self.surface.text.height as usize)
-			}
-			A::CodeHome => self.surface.viewport.left = 0,
-			A::CodeEnd => self.surface.viewport.left = usize::MAX,
+			A::CodeUp => viewport.top = viewport.top.saturating_sub(1),
+			A::CodeDown => viewport.top = viewport.top.saturating_add(1),
+			A::CodeLeft => viewport.left = viewport.left.saturating_sub(4),
+			A::CodeRight => viewport.left = viewport.left.saturating_add(4),
+			A::CodePageUp => viewport.top = viewport.top.saturating_sub(page),
+			A::CodePageDown => viewport.top = viewport.top.saturating_add(page),
+			A::CodeHome => viewport.left = 0,
+			A::CodeEnd => viewport.left = usize::MAX,
 			A::CodeStart => {
-				self.surface.viewport.top = 0;
-				self.surface.viewport.left = 0;
+				viewport.top = 0;
+				viewport.left = 0;
 			}
 			A::CodeFinish => {
-				self.surface.viewport.top = usize::MAX;
-				self.surface.viewport.left = usize::MAX;
+				viewport.top = usize::MAX;
+				viewport.left = usize::MAX;
 			}
 			_ => (),
 		}
@@ -108,6 +97,7 @@ impl Code {
 		self.copy = Some(clipboard.write(document.to_escaped_ansi())?);
 		Some("Copying escaped ANSI…".into())
 	}
+
 	pub fn poll_copy(&mut self, output: &mut impl Write) -> Option<String> {
 		let completion = self.copy.as_mut()?.poll(output)?;
 		self.copy = None;

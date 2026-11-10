@@ -1,7 +1,7 @@
 //! Bounded helper processes; no application or terminal rendering policy.
 use std::{
 	io::Write,
-	process::{Command, Stdio},
+	process::{Child, Command, Stdio},
 	thread,
 	time::{Duration, Instant},
 };
@@ -20,19 +20,8 @@ pub(super) fn copy_with(program: &str, args: &[&str], text: &str) -> Result<(), 
 		let _ = sent.send(stdin.write_all(&bytes));
 	});
 	let deadline = Instant::now() + Duration::from_secs(3);
-	let result = loop {
-		match child.try_wait() {
-			Ok(Some(status)) => break if status.success() { Ok(()) } else { Err(()) },
-			Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
-			_ => {
-				let _ = child.kill();
-				let _ = child.wait();
-				break Err(());
-			}
-		}
-	};
 	// On timeout, do not wait on a pipe that an ill-behaved descendant may still hold.
-	result?;
+	wait_for_success(&mut child, deadline)?;
 	written
 		.recv_timeout(deadline.saturating_duration_since(Instant::now()))
 		.map_err(|_| ())?
@@ -67,14 +56,17 @@ pub(super) fn paste_with(program: &str, args: &[&str]) -> Result<String, ()> {
 		let _ = sender.send(result);
 	});
 	let deadline = Instant::now() + Duration::from_secs(3);
+	wait_for_success(&mut child, deadline)?;
+	receiver
+		.recv_timeout(deadline.saturating_duration_since(Instant::now()))
+		.map_err(|_| ())?
+}
+
+/// Reap failed or timed-out helpers before returning; pipe workers share this deadline.
+fn wait_for_success(child: &mut Child, deadline: Instant) -> Result<(), ()> {
 	loop {
 		match child.try_wait() {
-			Ok(Some(status)) if status.success() => {
-				return receiver
-					.recv_timeout(deadline.saturating_duration_since(Instant::now()))
-					.map_err(|_| ())?;
-			}
-			Ok(Some(_)) => return Err(()),
+			Ok(Some(status)) => return if status.success() { Ok(()) } else { Err(()) },
 			Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
 			_ => {
 				let _ = child.kill();

@@ -1,5 +1,6 @@
+//! Inert source preview and independently scrollable import diagnostics.
 mod projection;
-// Inert source preview and independently scrollable import diagnostics.
+
 use crate::theme;
 use crate::{
 	components::scrollbar::{self, Axis, Bar},
@@ -20,6 +21,7 @@ pub enum Decision {
 	Strip,
 	Abort,
 }
+
 impl Decision {
 	fn from_button(index: usize) -> Self {
 		if index == 0 { Self::Strip } else { Self::Abort }
@@ -41,6 +43,7 @@ pub struct Review {
 	focus: usize,
 	drag: Option<(usize, usize)>,
 }
+
 impl Default for Review {
 	fn default() -> Self {
 		Self {
@@ -54,6 +57,7 @@ impl Default for Review {
 		}
 	}
 }
+
 impl Review {
 	fn bar(&self, index: usize) -> Option<Bar> {
 		if index == 0 {
@@ -75,10 +79,12 @@ impl Review {
 	pub fn has_scrollbar(&self) -> bool {
 		self.error_bar.is_some() || !self.preview.bars.is_empty()
 	}
+
 	#[cfg(test)]
 	pub fn scrolled(&self) -> bool {
 		self.preview.viewport.top > 0 || self.errors_top > 0
 	}
+
 	pub fn input_scope(&self) -> crate::shortcuts::InputScope {
 		if self.focus >= 2 {
 			crate::shortcuts::InputScope::ReviewButtons
@@ -86,6 +92,7 @@ impl Review {
 			crate::shortcuts::InputScope::ReviewContent
 		}
 	}
+
 	pub fn shortcut(&mut self, action: crate::shortcuts::ActionId) -> Option<Decision> {
 		use crate::shortcuts::ActionId as A;
 		let at = self.focus.min(1);
@@ -108,6 +115,7 @@ impl Review {
 		}
 		None
 	}
+
 	pub fn event(&mut self, event: &Event) -> Option<Decision> {
 		if let Event::Mouse(mouse) = event {
 			let point = (mouse.column, mouse.row).into();
@@ -160,6 +168,7 @@ impl Review {
 		}
 		None
 	}
+
 	pub fn draw(&mut self, frame: &mut Frame, import: &Import, presentation: Presentation<'_>) {
 		let screen = frame.area();
 		let width = screen
@@ -284,15 +293,7 @@ impl Review {
 					ratatui::widgets::Cell::from(
 						import.source[issue.start..issue.end]
 							.chars()
-							.map(|ch| {
-								if ch == '\x1b' {
-									"\\x1b".to_owned()
-								} else if ch.is_control() {
-									ch.escape_default().to_string()
-								} else {
-									ch.to_string()
-								}
-							})
+							.map(projection::display_character)
 							.collect::<String>(),
 					)
 					.style(red),

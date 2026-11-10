@@ -54,13 +54,7 @@ impl Settings {
 					self.mode = Mode::Selector;
 				} else {
 					self.mode = Mode::Browse;
-					self.focus = if self.category == Section::Appearance {
-						Focus::Preset
-					} else if self.category == Section::Timeout {
-						Focus::Leader
-					} else {
-						Focus::List
-					};
+					self.focus_category_content();
 				}
 			}
 			Focus::List => match self.shortcuts.rows.get(self.shortcuts.row).copied() {

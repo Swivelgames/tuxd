@@ -312,15 +312,15 @@ impl Editing {
 		let row = self.cursor.row;
 		match movement {
 			Movement::Up | Movement::Down | Movement::PageUp | Movement::PageDown => {
+				let distance = if matches!(movement, Movement::PageUp | Movement::PageDown) {
+					view.height.max(1)
+				} else {
+					1
+				};
 				if view.wrap {
 					let layout = view.layout;
 					let (visual_row, x) = layout.location(self.cursor);
 					let column = *self.preferred_column.get_or_insert(x);
-					let distance = if matches!(movement, Movement::PageUp | Movement::PageDown) {
-						view.height.max(1)
-					} else {
-						1
-					};
 					let target = if matches!(movement, Movement::Up | Movement::PageUp) {
 						visual_row.saturating_sub(distance)
 					} else {
@@ -347,11 +347,6 @@ impl Editing {
 				let column = *self.preferred_column.get_or_insert_with(|| {
 					column_at(&self.document.lines()[row], self.cursor.byte)
 				});
-				let distance = if matches!(movement, Movement::PageUp | Movement::PageDown) {
-					view.height.max(1)
-				} else {
-					1
-				};
 				let row = if matches!(movement, Movement::Up | Movement::PageUp) {
 					row.saturating_sub(distance)
 				} else {

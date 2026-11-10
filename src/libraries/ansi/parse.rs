@@ -137,24 +137,7 @@ fn sgr(parameters: &str, original: TextStyle) -> Result<TextStyle, String> {
 			39 => style.foreground = Ink::Default,
 			49 => style.background = Ink::Default,
 			38 | 48 => {
-				let count = match values.get(i) {
-					Some(5) => 1,
-					Some(2) => 3,
-					_ => return Err("Unsupported or incomplete extended color".into()),
-				};
-				i += 1;
-				let channels = values
-					.get(i..i + count)
-					.ok_or("Incomplete extended color")?;
-				if channels.iter().any(|n| *n > 255) {
-					return Err("Color components must be 0–255".into());
-				}
-				let ink = if count == 1 {
-					Ink::Indexed(channels[0] as u8)
-				} else {
-					Ink::Rgb(channels[0] as u8, channels[1] as u8, channels[2] as u8)
-				};
-				i += count;
+				let ink = consume_extended_color(&values, &mut i)?;
 				if value == 38 {
 					style.foreground = ink;
 				} else {
@@ -169,6 +152,30 @@ fn sgr(parameters: &str, original: TextStyle) -> Result<TextStyle, String> {
 		}
 	}
 	Ok(style)
+}
+
+/// Consume an extended-color mode and its channels before returning a validated ink.
+fn consume_extended_color(values: &[u16], at: &mut usize) -> Result<Ink, String> {
+	let count = match values.get(*at) {
+		Some(5) => 1,
+		Some(2) => 3,
+		_ => return Err("Unsupported or incomplete extended color".into()),
+	};
+	*at += 1;
+	let channels = values
+		.get(*at..*at + count)
+		.ok_or("Incomplete extended color")?;
+	if channels.iter().any(|channel| *channel > 255) {
+		return Err("Color components must be 0–255".into());
+	}
+
+	let ink = if count == 1 {
+		Ink::Indexed(channels[0] as u8)
+	} else {
+		Ink::Rgb(channels[0] as u8, channels[1] as u8, channels[2] as u8)
+	};
+	*at += count;
+	Ok(ink)
 }
 
 /// Consume one CSI sequence, committing styling only when the entire SGR is valid.
