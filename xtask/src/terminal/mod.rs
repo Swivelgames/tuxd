@@ -58,7 +58,7 @@ pub fn packaged(runner: &Runner, binary: &Path, version: &str) -> Result<()> {
 	std::fs::copy(runner.root.join("examples/welcome.tuxd.json"), &path)?;
 	let original = fixtures::read(&path)?["text"].as_str().unwrap().to_owned();
 	let mut s = session::Session::new(binary, &[path.as_os_str()], &[])?;
-	s.contains("Editor")?;
+	s.contains("tuxd")?;
 	s.send("\x1b[1;5F")?;
 	s.paste(" release café 界")?;
 	s.send("\x13")?;

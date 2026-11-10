@@ -2,7 +2,7 @@ use super::{Chrome, Workspace};
 use crate::workspace::{Pane, TextPane};
 use crate::{
 	libraries::ansi::{Document, Position},
-	shortcuts::{ActionId, Config, InputScope},
+	shortcuts::{ActionId, InputScope},
 };
 use ratatui::{Terminal, backend::TestBackend};
 
@@ -42,7 +42,6 @@ fn replacement_installs_a_new_session_and_resets_views_without_resetting_prefere
 #[test]
 fn workspace_composes_slim_tools_and_collapsed_panes_without_application_services() {
 	let mut workspace = Workspace::default();
-	let config = Config::default();
 	let mut terminal = Terminal::new(TestBackend::new(64, 24)).unwrap();
 	let draw = |workspace: &mut Workspace, terminal: &mut Terminal<TestBackend>| {
 		terminal
@@ -50,7 +49,6 @@ fn workspace_composes_slim_tools_and_collapsed_panes_without_application_service
 				workspace.draw(
 					frame,
 					Chrome {
-						config: &config,
 						status: None,
 						focused: true,
 					},
@@ -77,4 +75,56 @@ fn workspace_composes_slim_tools_and_collapsed_panes_without_application_service
 	draw(&mut workspace, &mut terminal);
 	assert!(workspace.active.code.surface.inner.height > 15);
 	assert!(!workspace.editor_open);
+}
+
+#[test]
+fn shared_frame_keeps_status_and_scrollbars_inside_pane_boundaries() {
+	for width in [40, 64, 65, 100] {
+		let mut workspace = Workspace::default();
+		let mut document = Document::default();
+		document
+			.insert(
+				Position::default(),
+				&vec!["long line ".repeat(30); 50].join("\n"),
+			)
+			.unwrap();
+		workspace.replace(document, None, false);
+		workspace.active.editor.surface.viewport.wrap = false;
+		workspace.active.code.surface.viewport.wrap = false;
+		let mut terminal = Terminal::new(TestBackend::new(width, 30)).unwrap();
+		terminal
+			.draw(|frame| {
+				workspace.draw(
+					frame,
+					Chrome {
+						status: None,
+						focused: true,
+					},
+				)
+			})
+			.unwrap();
+		let buffer = terminal.backend().buffer();
+		assert_eq!(buffer[(0, 0)].symbol(), "╭");
+		assert_eq!(buffer[(width - 1, 0)].symbol(), "╮");
+		assert_eq!(buffer[(0, 29)].symbol(), "╰");
+		assert_eq!(buffer[(width - 1, 29)].symbol(), "╯");
+		let divider_y = workspace.pane_toggles[1].y;
+		let status: String = (1..width.min(30))
+			.map(|x| buffer[(x, divider_y - 1)].symbol())
+			.collect();
+		assert!(status.starts_with("Ln 1, Col 1"), "{status}");
+		assert_eq!(buffer[(0, divider_y)].symbol(), "├");
+		for bar in workspace
+			.active
+			.editor
+			.surface
+			.bars
+			.iter()
+			.chain(&workspace.active.code.surface.bars)
+		{
+			assert!(bar.area.right() < width);
+			assert!(bar.area.bottom() < 30);
+			assert!(!(bar.area.y..bar.area.bottom()).contains(&(divider_y - 1)));
+		}
+	}
 }

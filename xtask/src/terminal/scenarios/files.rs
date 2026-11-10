@@ -46,7 +46,7 @@ fn persistence(binary: &Path) -> Result<()> {
 	s.send("\r")?;
 	s.contains("Error:")?;
 	s.send("\x1b")?;
-	ensure!(s.row(2).contains("Save me"));
+	ensure!(s.row(1).contains("Save me"));
 	s.send("X")?;
 	let import = "\x1b[14~".to_owned() + &"\x1b[B".repeat(6) + "\r";
 	s.send(&import)?;
@@ -55,15 +55,15 @@ fn persistence(binary: &Path) -> Result<()> {
 	s.contains("Unsupported ANSI Sequences")?;
 	s.contains("Seq.")?;
 	s.send("a")?;
-	ensure!(s.row(2).contains("Save me"));
+	ensure!(s.row(1).contains("Save me"));
 	s.send(&import)?;
 	s.paste(bad.to_str().unwrap())?;
 	s.send("\r")?;
 	s.send("s")?;
 	s.excludes("Save changes before continuing?")?;
-	ensure!(s.row(2).contains("Imported"));
+	ensure!(s.row(1).contains("Imported"));
 	ensure!(matches!(
-		s.cell(2, 7).fgcolor(),
+		s.cell(1, 7).fgcolor(),
 		Color::Idx(1) | Color::Rgb(205, 0, 0)
 	));
 	s.send("\x13")?;
@@ -72,7 +72,7 @@ fn persistence(binary: &Path) -> Result<()> {
 	s.send("\x11dd")?;
 	s.finish(0)?;
 	let mut s = Session::new(binary, &[document.as_os_str()], &[])?;
-	ensure!(s.row(2).contains("Save me"));
+	ensure!(s.row(1).contains("Save me"));
 	s.send("\x11")?;
 	s.finish(0)
 }
@@ -101,7 +101,7 @@ fn explorer(runner: &Runner, binary: &Path) -> Result<()> {
 	s.send("\x06")?;
 	s.contains("other.txt")?;
 	s.send("\x06jggMG\r")?;
-	ensure!(s.row(2).contains("Terminal UX Designer"));
+	ensure!(s.row(1).contains("Terminal UX Designer"));
 	s.send("Z")?;
 	let save_as = "\x1b[14~".to_owned() + &"\x1b[B".repeat(4) + "\r";
 	s.send(&save_as)?;
@@ -125,10 +125,10 @@ fn explorer(runner: &Runner, binary: &Path) -> Result<()> {
 		s.contains("Escaped ANSI")?;
 		if cancel {
 			s.send("\x1b")?;
-			ensure!(s.row(2).contains("ZTerminal UX Designer"));
+			ensure!(s.row(1).contains("ZTerminal UX Designer"));
 		} else {
 			s.send("\x1b[C\r")?;
-			ensure!(s.row(2).contains("not a document"));
+			ensure!(s.row(1).contains("not a document"));
 		}
 	}
 	s.send("\x11d")?;

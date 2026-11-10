@@ -17,7 +17,10 @@ transactions. Switching changes which buffer is composed into the panes; it does
 not replace document content or reconstruct history.
 
 `workspace/buffers.rs` owns insertion, switching, removal, and native-path identity.
-`workspace/tabs.rs` paints the tab strip and records hit targets. Layout, pane focus,
+`workspace/tabs.rs` paints the tab strip and records hit targets.
+`workspace/layout.rs` defines shared-frame pane, sidebar, status, and scrollbar bounds.
+The editor and tools share outer borders; Code and tool headings are dividers.
+Pane focus,
 collapse state, and tool instances remain workspace-wide. The active buffer is
 stored separately so consumers can borrow its session and views together without
 indexing or duplicating ownership.

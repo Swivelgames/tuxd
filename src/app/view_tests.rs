@@ -603,16 +603,16 @@ fn gutters_number_logical_lines_and_stay_blank_on_continuations() {
 	app.workspace.active.code.surface.viewport.wrap = true;
 	terminal.draw(|frame| app.draw(frame)).unwrap();
 	let buffer = terminal.backend().buffer();
-	assert_eq!(buffer[(4, 2)].symbol(), "1");
-	assert_eq!(buffer[(4, 3)].symbol(), " ");
-	assert_eq!(buffer[(4, 4)].symbol(), "2");
+	assert_eq!(buffer[(4, 1)].symbol(), "1");
+	assert_eq!(buffer[(4, 2)].symbol(), " ");
+	assert_eq!(buffer[(4, 3)].symbol(), "2");
 	let code_y = app.workspace.active.code.surface.text.y;
 	assert_eq!(buffer[(4, code_y)].symbol(), "1");
 	assert_eq!(buffer[(4, code_y + 1)].symbol(), " ");
 	assert_eq!(buffer[(4, code_y + 2)].symbol(), "2");
-	assert_eq!(buffer[(7, 3)].symbol(), "a");
+	assert_eq!(buffer[(7, 2)].symbol(), "a");
 	assert_eq!(
-		(1..7).map(|x| buffer[(x, 2)].symbol()).collect::<String>(),
+		(1..7).map(|x| buffer[(x, 1)].symbol()).collect::<String>(),
 		"   1  "
 	);
 	assert_eq!(
@@ -669,12 +669,12 @@ fn selected_text_renders_document_attributes_and_selection_overlay() {
 		.apply_tool(Action::Bold);
 	terminal.draw(|frame| app.draw(frame)).unwrap();
 	assert!(
-		terminal.backend().buffer()[(7, 2)]
+		terminal.backend().buffer()[(7, 1)]
 			.modifier
 			.contains(ratatui::style::Modifier::BOLD)
 	);
 	assert_eq!(
-		terminal.backend().buffer()[(7, 2)].bg,
+		terminal.backend().buffer()[(7, 1)].bg,
 		ratatui::style::Color::DarkGray
 	);
 }
@@ -691,12 +691,12 @@ fn renders_unicode_and_tabs_at_shared_display_coordinates() {
 	);
 	terminal.draw(|frame| app.draw(frame)).unwrap();
 	let buffer = terminal.backend().buffer();
-	assert_eq!(buffer[(7, 2)].symbol(), "a");
-	assert_eq!(buffer[(11, 2)].symbol(), "界");
-	assert_eq!(buffer[(13, 2)].symbol(), "e\u{301}");
+	assert_eq!(buffer[(7, 1)].symbol(), "a");
+	assert_eq!(buffer[(11, 1)].symbol(), "界");
+	assert_eq!(buffer[(13, 1)].symbol(), "e\u{301}");
 	assert_eq!(
 		app.workspace.active.editor.surface.text,
-		Rect::new(7, 2, 32, 2)
+		Rect::new(7, 1, 31, 4)
 	);
 }
 

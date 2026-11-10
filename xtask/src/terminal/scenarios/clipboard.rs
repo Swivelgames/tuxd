@@ -80,6 +80,7 @@ fn exercise(s: &mut Session, expected: &str) -> Result<()> {
 		.last()
 		.context("No OSC52 forwarding")?;
 	ensure!(STANDARD.decode(&payload[1])? == expected.as_bytes());
+	s.resize(120, 24)?;
 	s.contains("delivery unconfirmed")
 }
 

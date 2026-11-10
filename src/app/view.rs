@@ -15,7 +15,6 @@ impl App {
 			self.workspace.draw(
 				frame,
 				crate::workspace::Chrome {
-					config: &self.shortcuts.config,
 					status: status.as_deref(),
 					focused,
 				},

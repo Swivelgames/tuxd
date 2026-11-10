@@ -10,20 +10,32 @@ use ratatui::{
 	layout::Rect,
 	style::{Modifier, Style},
 	text::{Line, Span},
-	widgets::{BorderType, Paragraph, Tabs, Widget},
+	widgets::{Borders, Paragraph, Tabs, Widget},
 };
 
 impl super::Panel {
 	pub fn draw(&mut self, frame: &mut Frame, area: Rect, editing: &Editing, has_focus: bool) {
 		self.area = area;
-		let sidebar_track = Rect::new(area.right().saturating_sub(1), area.y, 1, area.height);
-		let area = Rect::new(area.x, area.y, area.width.saturating_sub(1), area.height);
+		let shared_frame = self.active_section.is_none();
+		let sidebar_track = Rect::new(
+			area.right()
+				.saturating_sub(if shared_frame { 2 } else { 1 }),
+			area.y,
+			1,
+			area.height,
+		);
+		let area = if shared_frame {
+			area
+		} else {
+			Rect::new(area.x, area.y, area.width.saturating_sub(1), area.height)
+		};
+		let padding = if shared_frame { 5 } else { 4 };
 		self.color.indexed_area = Rect::default();
 		let character_start = self.layout().1[2].0;
 		let focused = self.items().get(self.selected).map(|item| item.control);
 		let character_resized = self.characters.resize(
 			(area.height as usize).saturating_sub(character_start),
-			area.width.saturating_sub(4) as usize,
+			area.width.saturating_sub(padding) as usize,
 		);
 		if character_resized
 			&& let Some(control @ (Control::Glyph(_) | Control::CharacterType(_, _))) = focused
@@ -41,12 +53,23 @@ impl super::Panel {
 		self.top = self.top.min(count.saturating_sub(self.height));
 		let top = self.top;
 		let mut buffer = Buffer::empty(Rect::new(0, 0, area.width, count as u16));
+		if shared_frame {
+			for row in 0..count as u16 {
+				for x in [0, area.width - 1] {
+					buffer[(x, row)].set_symbol("│").set_style(
+						Style::default()
+							.fg(theme::border_color())
+							.bg(theme::surface_color()),
+					);
+				}
+			}
+		}
 		for &(start, height) in &sections {
 			if height == 0 || self.active_section.is_some() {
 				continue;
 			}
 			theme::block()
-				.border_type(BorderType::Rounded)
+				.borders(Borders::TOP)
 				.border_style(Style::default().fg(theme::border_color()))
 				.style(Style::default().bg(theme::surface_color()))
 				.render(
@@ -54,7 +77,15 @@ impl super::Panel {
 					&mut buffer,
 				);
 		}
-		let width = area.width.saturating_sub(4) as usize;
+		if shared_frame {
+			for &(start, height) in &sections {
+				if height > 0 {
+					buffer[(0, start as u16)].set_symbol("├");
+					buffer[(area.width - 1, start as u16)].set_symbol("┤");
+				}
+			}
+		}
+		let width = area.width.saturating_sub(padding) as usize;
 		for (index, item) in items.iter().enumerate() {
 			let Some(display_row) = self.display_row(item) else {
 				continue;
@@ -296,7 +327,7 @@ impl super::Panel {
 				self.color.indexed_area = Rect::new(
 					area.x + 1,
 					area.y + (first - top) as u16,
-					area.width.saturating_sub(2),
+					area.width.saturating_sub(if shared_frame { 3 } else { 2 }),
 					(end - first) as u16,
 				);
 			}
@@ -342,7 +373,7 @@ impl super::Panel {
 				Rect::new(
 					area.x + 1,
 					area.y + (first - top) as u16,
-					area.width.saturating_sub(2),
+					area.width.saturating_sub(if shared_frame { 3 } else { 2 }),
 					(end - first) as u16,
 				)
 			} else {
@@ -357,7 +388,7 @@ impl super::Panel {
 		}
 		use super::scroll::Target;
 		use crate::components::scrollbar::{self, Bar};
-		// Keep the sidebar track outside the cards; the indexed viewport has its own inset track.
+		// Reserve separate tracks for the sidebar and its nested scrolling controls.
 		scrollbar::draw(
 			frame,
 			&mut self.scrollbars,
@@ -377,7 +408,8 @@ impl super::Panel {
 				Bar {
 					target: Target::Characters,
 					area: Rect::new(
-						area.right().saturating_sub(2),
+						area.right()
+							.saturating_sub(if shared_frame { 3 } else { 2 }),
 						characters.area.y,
 						1,
 						characters.area.height,
@@ -395,7 +427,13 @@ impl super::Panel {
 				&mut self.scrollbars,
 				Bar {
 					target: Target::Indexed,
-					area: Rect::new(area.right().saturating_sub(2), grid.y, 1, grid.height),
+					area: Rect::new(
+						area.right()
+							.saturating_sub(if shared_frame { 3 } else { 2 }),
+						grid.y,
+						1,
+						grid.height,
+					),
 					content: 37,
 					viewport: 5,
 					offset: self.color.indexed_top,

@@ -168,7 +168,7 @@ fn theme_loading(binary: &Path) -> Result<()> {
 			&[("XDG_CONFIG_HOME", Some(temp.path().as_os_str()))],
 		)?;
 		if valid {
-			ensure!(s.cell(0, 1).fgcolor() == Color::Rgb(18, 52, 86));
+			ensure!(s.cell(0, 3).fgcolor() == Color::Rgb(18, 52, 86));
 			let (y, row) = s
 				.rows()
 				.into_iter()
@@ -201,7 +201,7 @@ fn theme_settings(binary: &Path) -> Result<()> {
 	let path = temp.path().join("tuxd/theme.json");
 	let env = [("XDG_CONFIG_HOME", Some(temp.path().as_os_str()))];
 	let mut s = Session::new(binary, &[], &env)?;
-	let baseline = s.cell(0, 1).fgcolor();
+	let baseline = s.cell(0, 3).fgcolor();
 	appearance(&mut s)?;
 	s.send("\r")?;
 	s.paste("#123456")?;
@@ -209,14 +209,14 @@ fn theme_settings(binary: &Path) -> Result<()> {
 	s.send("\r\x1b")?;
 	s.contains("Discard unsaved settings")?;
 	s.send("\x1b[D\r")?;
-	ensure!(!path.exists() && s.cell(0, 1).fgcolor() == baseline);
+	ensure!(!path.exists() && s.cell(0, 3).fgcolor() == baseline);
 	appearance(&mut s)?;
 	s.send("\r")?;
 	s.paste("#123456")?;
 	s.send("\r\x13")?;
 	ensure!(
 		fixtures::read(&path)?["colors"]["accent"] == "#123456"
-			&& s.cell(0, 1).fgcolor() == Color::Rgb(18, 52, 86)
+			&& s.cell(0, 3).fgcolor() == Color::Rgb(18, 52, 86)
 	);
 	let shortcuts_path = path.with_file_name("shortcuts.json");
 	let shortcuts = fs::read(&shortcuts_path)?;
@@ -230,23 +230,23 @@ fn theme_settings(binary: &Path) -> Result<()> {
 		fixtures::read(&path)?["preset"] == "light"
 			&& fixtures::read(&path)?["colors"] == json!({})
 			&& fs::read(&shortcuts_path)? == shortcuts
-			&& s.cell(0, 1).fgcolor() == Color::Rgb(0, 90, 128)
+			&& s.cell(0, 3).fgcolor() == Color::Rgb(0, 90, 128)
 	);
 	s.send("\x1bOP\x0cggj\r\x1b[C")?;
 	s.send("\x1b")?;
 	s.send("\x1b[D\r")?;
-	ensure!(s.cell(0, 1).fgcolor() == Color::Rgb(0, 90, 128));
+	ensure!(s.cell(0, 3).fgcolor() == Color::Rgb(0, 90, 128));
 	s.send("\x1bOP\x0cggj\r\rG")?;
 	s.contains("Catppuccin Mocha")?;
 	s.send("\r\x13")?;
 	ensure!(
 		fixtures::read(&path)?["preset"] == "catppuccin-mocha"
-			&& s.cell(0, 1).fgcolor() == Color::Rgb(137, 180, 250)
+			&& s.cell(0, 3).fgcolor() == Color::Rgb(137, 180, 250)
 	);
 	s.send("\x11")?;
 	s.finish(0)?;
 	let mut s = Session::new(binary, &[], &env)?;
-	ensure!(s.cell(0, 1).fgcolor() == Color::Rgb(137, 180, 250));
+	ensure!(s.cell(0, 3).fgcolor() == Color::Rgb(137, 180, 250));
 	s.send("\x11")?;
 	s.finish(0)
 }

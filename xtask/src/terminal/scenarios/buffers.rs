@@ -13,11 +13,11 @@ pub fn run(binary: &Path) -> Result<()> {
 	s.paste("second buffer")?;
 	s.excludes("Save changes before continuing?")?;
 	s.send("\x1b[5;5~")?;
-	ensure!(s.row(2).contains("first buffer"));
+	ensure!(s.row(1).contains("first buffer"));
 	s.send("\x1a")?;
-	ensure!(!s.row(2).contains("first buffer"));
+	ensure!(!s.row(1).contains("first buffer"));
 	s.send("\x19\x1b[6;5~")?;
-	ensure!(s.row(2).contains("second buffer"));
+	ensure!(s.row(1).contains("second buffer"));
 	s.send("\x1b[115;7u")?;
 	for path in [&first, &second] {
 		s.contains("Save document as")?;
@@ -26,15 +26,15 @@ pub fn run(binary: &Path) -> Result<()> {
 	}
 	fixtures::text(&first, "first buffer")?;
 	fixtures::text(&second, "second buffer")?;
-	ensure!(s.row(2).contains("second buffer"));
+	ensure!(s.row(1).contains("second buffer"));
 	s.send("\x0f")?;
 	s.paste(first.to_str().unwrap())?;
 	s.send("\r")?;
-	ensure!(s.row(2).contains("first buffer"));
+	ensure!(s.row(1).contains("first buffer"));
 	s.send("\x1b[6;5~")?;
-	ensure!(s.row(2).contains("second buffer"));
+	ensure!(s.row(1).contains("second buffer"));
 	s.send("\x1b[14;5~")?;
-	ensure!(s.row(2).contains("first buffer"));
+	ensure!(s.row(1).contains("first buffer"));
 	s.send("\x1b[14;5~")?;
 	ensure!(s.row(0).contains("untitled"));
 	s.send("\x11")?;

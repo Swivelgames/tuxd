@@ -221,7 +221,7 @@ impl Panel {
 				None,
 			);
 			let height = if self.active_section.is_none() && self.collapsed(section) {
-				2
+				1
 			} else {
 				let (mut content, height) = match section {
 					0 => self.style.layout(),
@@ -235,7 +235,7 @@ impl Panel {
 				height
 			};
 			sections.push((start, height));
-			start += height + 1;
+			start += height;
 		}
 		if self.active_section.is_some() {
 			items.retain(|item| !matches!(item.control, Control::Section(_)));

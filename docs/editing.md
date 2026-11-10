@@ -90,11 +90,13 @@ Over SSH, use your terminal’s paste command. For clipboard setup and forwardin
 | --- | --- |
 | Focus another pane | F6 or click it |
 | Collapse / expand Code | F2 or its title indicator |
-| Collapse / expand Editor | F5 or its title indicator |
-| Toggle wrapping in the focused text pane | F3 or its Wrap button |
+| Collapse / expand Editor | F5; click the collapsed Editor label to expand |
+| Toggle wrapping in the focused text pane | F3; Code also has a Wrap button |
 | Scroll | Wheel, scrollbar track, or draggable thumb |
 | Change lower tabs on a narrow terminal | Alt+Left / Alt+Right, or click a tab |
 
+- The editor, Code, and tools share one outer frame. Document tabs sit in its top border.
+- Cursor position and notices appear below the editor, directly above the Code divider.
 - Collapsing a pane gives its space to the other; at least one stays expanded.
 - At **64 columns or fewer**, Code and the tools share tabs in the lower pane.
 - Wrapping and scrolling affect presentation only. Copied ANSI has no gutters or display wrap breaks.

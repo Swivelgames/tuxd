@@ -10,7 +10,6 @@ use ratatui::{
 use crate::libraries::text::display::column_at;
 
 pub struct Chrome<'a> {
-	pub config: &'a crate::shortcuts::Config,
 	pub status: Option<&'a str>,
 	pub focused: bool,
 }
@@ -26,15 +25,6 @@ fn wrap_button(frame: &mut Frame, body: Rect, enabled: bool) -> Rect {
 		area,
 	);
 	area
-}
-
-fn shortcut_hint(chrome: &Chrome<'_>, action: crate::shortcuts::ActionId, label: &str) -> String {
-	let key = chrome.config.hint(action);
-	if key.is_empty() {
-		String::new()
-	} else {
-		format!(" · {key} {label}")
-	}
 }
 
 impl super::Workspace {
@@ -86,7 +76,6 @@ impl super::Workspace {
 		}
 		self.active.code.surface.hide();
 		self.active.editor.surface.hide();
-		self.editor_wrap_toggle = Rect::default();
 		self.code_wrap_toggle = Rect::default();
 		if area.width < 20 || area.height < 5 {
 			self.active.editor.surface.hide();
@@ -96,72 +85,49 @@ impl super::Workspace {
 			frame.render_widget(Paragraph::new("Resize · F1 settings"), area);
 			return;
 		}
+		let layout = super::layout::Layout::new(
+			area,
+			self.editor_open,
+			self.code_open,
+			slim && self.slim_tab > 0,
+		);
 		frame.render_widget(
-			Paragraph::new(" tuxd").style(Style::default().fg(theme::accent_color())),
-			Rect::new(area.x, area.y, 5, 1),
+			theme::block().border_type(ratatui::widgets::BorderType::Rounded),
+			area,
 		);
-		self.draw_tabs(frame, Rect::new(area.x + 6, area.y, area.width - 6, 1));
-		let tools_width = if area.width >= 65 { 35 } else { 0 };
-		let available = area.height - 2;
-		let code_height = if !self.code_open {
-			2.min(available)
-		} else if !self.editor_open {
-			available.saturating_sub(2)
-		} else if slim && self.slim_tab > 0 {
-			(area.height / 2).max(8).min(available.saturating_sub(3))
-		} else {
-			(area.height / 3).max(4).min(available.saturating_sub(2))
-		};
-		let body = Rect::new(
-			area.x,
-			area.y + 1,
-			area.width - tools_width,
-			area.height - 2 - code_height,
-		);
-		if code_height > 0 {
-			self.draw_code(
-				frame,
-				Rect::new(body.x, body.bottom(), body.width, code_height),
-				slim,
+		if let Some(tools) = layout.tools {
+			let style = Style::default().fg(theme::border_color());
+			for y in area.y + 1..area.bottom() - 1 {
+				frame.render_widget(
+					Paragraph::new("│").style(style),
+					Rect::new(tools.x, y, 1, 1),
+				);
+			}
+			frame.render_widget(
+				Paragraph::new("┬").style(style),
+				Rect::new(tools.x, area.y, 1, 1),
 			);
-		}
-		self.draw_editor(frame, body, chrome.focused);
-		let editor = &self.active.session.editing;
-		let status = chrome.status.map(str::to_owned).unwrap_or_else(|| {
-			format!(
-				" Ln {}, Col {} · {} lines{}{} · F1 settings{}",
-				editor.cursor.row + 1,
-				column_at(
-					&editor.document.lines()[editor.cursor.row],
-					editor.cursor.byte
-				) + 1,
-				editor.document.lines().len(),
-				shortcut_hint(&chrome, crate::shortcuts::ActionId::Undo, "undo"),
-				shortcut_hint(&chrome, crate::shortcuts::ActionId::Redo, "redo"),
-				shortcut_hint(&chrome, crate::shortcuts::ActionId::Quit, "quit"),
-			)
-		});
-		frame.render_widget(
-			Paragraph::new(status).style(theme::muted()),
-			Rect::new(area.x, area.bottom() - 1, area.width, 1),
-		);
-		if tools_width > 0 {
-			let tool_rect = Rect::new(body.right(), body.y, tools_width, area.height - 2);
-			frame.render_widget(Clear, tool_rect);
+			frame.render_widget(
+				Paragraph::new("┴").style(style),
+				Rect::new(tools.x, area.bottom() - 1, 1, 1),
+			);
 			self.panel.draw(
 				frame,
-				tool_rect,
+				tools,
 				&self.active.session.editing,
 				self.focus == Pane::Tools,
 			);
-		} else if self.code_open && self.slim_tab > 0 {
+		}
+		self.draw_editor(frame, layout.editor, chrome.focused);
+		self.draw_code(frame, layout.code, slim);
+
+		if slim && self.code_open && self.slim_tab > 0 {
 			let tool_rect = Rect::new(
-				body.x + 1,
-				body.bottom() + 1,
-				body.width.saturating_sub(2),
-				code_height.saturating_sub(2),
+				layout.code.x + 1,
+				layout.code.y + 1,
+				layout.code.width - 2,
+				layout.code.height.saturating_sub(2),
 			);
-			frame.render_widget(Clear, tool_rect);
 			self.panel.draw(
 				frame,
 				tool_rect,
@@ -171,22 +137,73 @@ impl super::Workspace {
 			self.active.code.surface.hide();
 			self.code_wrap_toggle = Rect::default();
 		}
+
+		frame.render_widget(
+			Paragraph::new(" tuxd ·").style(Style::default().fg(theme::accent_color())),
+			Rect::new(area.x + 2, area.y, 7, 1),
+		);
+		self.draw_tabs(
+			frame,
+			Rect::new(
+				area.x + 9,
+				area.y,
+				layout.editor.width.saturating_sub(10),
+				1,
+			),
+		);
+		let editor = &self.active.session.editing;
+		let status = chrome.status.map(str::to_owned).unwrap_or_else(|| {
+			format!(
+				"Ln {}, Col {} · {} lines",
+				editor.cursor.row + 1,
+				column_at(
+					&editor.document.lines()[editor.cursor.row],
+					editor.cursor.byte
+				) + 1,
+				editor.document.lines().len(),
+			)
+		});
+		let status = if self.editor_open {
+			status
+		} else {
+			format!("▸ Editor · {status}")
+		};
+		frame.render_widget(Paragraph::new(status).style(theme::muted()), layout.status);
+		if !self.editor_open {
+			self.pane_toggles[0] = layout.status;
+		}
 	}
 
 	fn draw_code(&mut self, frame: &mut Frame, code_rect: Rect, slim: bool) {
 		let block = theme::block()
-			.border_type(ratatui::widgets::BorderType::Rounded)
+			.borders(ratatui::widgets::Borders::TOP)
 			.title(if slim && self.code_open {
-				" ▾ "
+				"  ▾ "
 			} else if slim {
-				" ▸ "
+				"  ▸ "
 			} else if self.code_open {
-				" ▾ Code "
+				"  ▾ Code "
 			} else {
-				" ▸ Code "
+				"  ▸ Code "
 			});
-		let mut inner = block.inner(code_rect);
+		let (surface, mut inner) =
+			super::layout::surface_rects(code_rect, self.active.code.surface.viewport.wrap);
+		let junction = if frame.buffer_mut()[(code_rect.right() - 1, code_rect.y)].symbol() == "├"
+		{
+			"┼"
+		} else {
+			"┤"
+		};
 		frame.render_widget(block, code_rect);
+		let style = Style::default().fg(theme::border_color());
+		frame.render_widget(
+			Paragraph::new("├").style(style),
+			Rect::new(code_rect.x, code_rect.y, 1, 1),
+		);
+		frame.render_widget(
+			Paragraph::new(junction).style(style),
+			Rect::new(code_rect.right() - 1, code_rect.y, 1, 1),
+		);
 		self.pane_toggles[1] = Rect::new(
 			code_rect.x + 1,
 			code_rect.y,
@@ -259,7 +276,7 @@ impl super::Workspace {
 			};
 		self.active.code.draw(
 			frame,
-			code_rect,
+			surface,
 			inner,
 			&self.active.session.editing.document,
 			self.active.session.editing.cursor.row,
@@ -267,30 +284,11 @@ impl super::Workspace {
 	}
 
 	fn draw_editor(&mut self, frame: &mut Frame, body: Rect, focused: bool) {
-		let name = self.active.name();
-		let border = theme::block()
-			.border_type(ratatui::widgets::BorderType::Rounded)
-			.title(format!(
-				" {} Editor · {name}{} ",
-				if self.editor_open { "▾" } else { "▸" },
-				if self.active.session.dirty() {
-					" *"
-				} else {
-					""
-				}
-			));
-		let inner = border.inner(body);
-		frame.render_widget(border, body);
-		self.pane_toggles[0] =
-			Rect::new(body.x + 1, body.y, 10.min(body.width.saturating_sub(1)), 1);
-		self.editor_wrap_toggle = if self.editor_open {
-			wrap_button(frame, body, self.active.editor.surface.viewport.wrap)
-		} else {
-			Rect::default()
-		};
+		let (surface, inner) =
+			super::layout::surface_rects(body, self.active.editor.surface.viewport.wrap);
 		self.active.editor.draw(
 			frame,
-			body,
+			surface,
 			inner,
 			&self.active.session.editing,
 			focused && self.focus == Pane::Editor,

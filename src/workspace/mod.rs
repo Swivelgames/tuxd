@@ -1,5 +1,6 @@
 //! Session, pane composition, geometry and focus. Modal and runtime policy belongs to App.
 mod buffers;
+mod layout;
 mod mouse;
 mod panes;
 pub mod shortcuts;
@@ -63,7 +64,6 @@ pub struct Workspace {
 	pub(crate) slim_tab: usize,
 	pane_toggles: [Rect; 2],
 	pub(crate) slim_tabs: Vec<(Rect, usize)>,
-	editor_wrap_toggle: Rect,
 	code_wrap_toggle: Rect,
 	pub(crate) focus: Pane,
 	dragging: bool,
@@ -86,7 +86,6 @@ impl Default for Workspace {
 			slim_tab: 0,
 			pane_toggles: [Rect::default(); 2],
 			slim_tabs: Vec::new(),
-			editor_wrap_toggle: Default::default(),
 			code_wrap_toggle: Default::default(),
 			focus: Default::default(),
 			dragging: Default::default(),

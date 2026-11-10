@@ -63,7 +63,7 @@ pub fn paths(runner: &Runner, binary: &Path) -> Result<()> {
 		.join(OsString::from_vec(b"document-\xff.tuxd.json".to_vec()));
 	fs::copy(runner.root.join("examples/welcome.tuxd.json"), &path)?;
 	let mut s = Session::new(binary, &[path.as_os_str()], &[])?;
-	ensure!(s.row(2).contains("Terminal UX Designer"));
+	ensure!(s.row(1).contains("Terminal UX Designer"));
 	s.send("\x11")?;
 	s.finish(0)?;
 	let fifo = temp.path().join("input.fifo");

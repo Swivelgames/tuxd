@@ -33,6 +33,10 @@ impl super::Workspace {
 		{
 			self.tab_start += 1;
 		}
+		frame.render_widget(
+			Paragraph::new("  "),
+			Rect::new(area.x, area.y, 2.min(area.width), 1),
+		);
 		if self.tab_start > 0 {
 			frame.render_widget(Paragraph::new("‹"), Rect::new(area.x, area.y, 1, 1));
 			self.tab_hits
@@ -61,6 +65,9 @@ impl super::Workspace {
 			self.tab_close_hits
 				.push((Rect::new(rect.right() - 2, rect.y, 1, 1), ids[index]));
 			x += width + 1;
+			if x <= area.right().saturating_sub(2) {
+				frame.render_widget(Paragraph::new(" "), Rect::new(x - 1, area.y, 1, 1));
+			}
 		}
 	}
 }
